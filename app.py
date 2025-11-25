@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import base64
 import os
-import requests # 新增 requests 用於爬取 Yahoo
+import requests
 
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide")
@@ -22,7 +22,7 @@ def get_base64_of_bin_file(bin_file):
 def set_png_as_page_bg(png_file):
     """設定背景圖片"""
     if not os.path.exists(png_file):
-        return # 檔案不存在就不設定
+        return
         
     bin_str = get_base64_of_bin_file(png_file)
     page_bg_img = '''
@@ -38,22 +38,16 @@ def set_png_as_page_bg(png_file):
     ''' % bin_str
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 嘗試載入背景 (請確認 GitHub 上有上傳名為 bg.png 的檔案)
+# 嘗試載入背景
 set_png_as_page_bg('bg.png')
 
 # 其餘 CSS 樣式
 st.markdown("""
     <style>
-    /* 若無背景圖，預設為深色 */
-    .stApp {
-        color: #ffffff;
-    }
-    
-    /* 隱藏選單 */
+    .stApp { color: #ffffff; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 霧面玻璃卡片效果 (通用) */
     .recommendation-box, .analysis-text {
         background-color: rgba(20, 20, 20, 0.85) !important;
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -64,13 +58,10 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    .recommendation-box {
-        border-left: 6px solid #ff4b4b;
-    }
+    .recommendation-box { border-left: 6px solid #ff4b4b; }
 
-    /* --- 關鍵修復：強制底部數據指標 (Metric) 樣式 --- */
     [data-testid="stMetric"] {
-        background-color: rgba(30, 30, 30, 0.9) !important; /* 深黑底板 */
+        background-color: rgba(30, 30, 30, 0.9) !important;
         padding: 15px !important;
         border-radius: 10px !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
@@ -78,64 +69,48 @@ st.markdown("""
         text-align: center;
     }
     
-    /* 標籤文字 (RSI, K, D) */
     [data-testid="stMetricLabel"] {
         color: #aaaaaa !important;
         font-size: 1rem !important;
         font-weight: bold !important;
     }
     
-    /* 數值文字 (47.9, 21.7...) */
     [data-testid="stMetricValue"] {
         color: #ffffff !important;
         font-size: 1.8rem !important;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); /* 發光效果 */
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
     }
 
-    /* 強制 Tab 與文字顏色 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
         font-weight: 900;
         font-size: 1.1rem;
     }
-    .stMarkdown p, .stCaption {
-        color: #f0f0f0 !important;
-    }
-    
-    /* 標題陰影 */
-    h1, h2, h3 {
-        text-shadow: 2px 2px 4px #000000;
-    }
+    .stMarkdown p, .stCaption { color: #f0f0f0 !important; }
+    h1, h2, h3 { text-shadow: 2px 2px 4px #000000; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. 資料串接邏輯 ---
 
-# FinMind 用於熱門股排行 (因為 Yahoo 沒開放熱門股 API)
 try:
     from FinMind.data import DataLoader
     FINMIND_AVAILABLE = True
 except ImportError:
     FINMIND_AVAILABLE = False
 
-# 股票代號與中文名稱對照表
 STOCK_NAMES = {
-    # 台股熱門
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海",
     "3231.TW": "緯創", "2382.TW": "廣達", "2303.TW": "聯電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金",
     "2618.TW": "長榮航", "2610.TW": "華航", "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息",
     "2354.TW": "鴻準", "3481.TW": "群創", "2409.TW": "友達", "2888.TW": "新光金",
-    # 美股熱門
     "NVDA": "輝達 (NVIDIA)", "TSLA": "特斯拉 (Tesla)", "AAPL": "蘋果 (Apple)", "AMD": "超微 (AMD)", "PLTR": "Palantir",
     "MSFT": "微軟 (Microsoft)", "GOOGL": "谷歌 (Alphabet)", "AMZN": "亞馬遜 (Amazon)", "META": "Meta", "NFLX": "網飛 (Netflix)",
     "INTC": "英特爾 (Intel)", "TSM": "台積電 ADR", "QCOM": "高通 (Qualcomm)", "AVGO": "博通 (Broadcom)"
 }
 
-@st.cache_data(ttl=3600) # 快取 1 小時
+@st.cache_data(ttl=3600)
 def get_top_volume_stocks():
-    """
-    抓取台股「真實」當日熱門成交量排行 Top 15 (來源: FinMind)
-    """
     if not FINMIND_AVAILABLE:
         return ["2330", "2317", "2603", "2609", "3231", "2618", "00940", "00919", "2454", "2303"]
     
@@ -154,67 +129,53 @@ def get_top_volume_stocks():
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
     """
-    從 Yahoo 股市網頁直接爬取法人買賣超 (單位: 張)
+    從 Yahoo 股市網頁爬取「歷史」法人買賣超數據
+    回傳 DataFrame
     """
     if ".TW" not in ticker: return None
     
     try:
-        # Yahoo 頁面 URL
         url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         
-        # 發送請求
         r = requests.get(url, headers=headers)
-        
-        # 使用 pandas 解析 HTML 表格
         dfs = pd.read_html(r.text)
         
         if not dfs: return None
         
-        # 尋找含有 "外資" 欄位的表格
         target_df = None
         for df in dfs:
-            # Yahoo 表格欄位通常包含 '日期', '外資買賣超', ...
             if any('外資' in str(col) for col in df.columns):
                 target_df = df
                 break
         
         if target_df is None or target_df.empty: return None
         
-        # 取得最新一筆資料 (通常是第一列)
-        latest = target_df.iloc[0]
+        # 欄位識別
+        date_col = next((c for c in target_df.columns if '日期' in str(c)), None)
+        f_col = next((c for c in target_df.columns if '外資' in str(c) and '持股' not in str(c)), None)
+        t_col = next((c for c in target_df.columns if '投信' in str(c)), None)
+        d_col = next((c for c in target_df.columns if '自營' in str(c)), None)
+
+        if not date_col or not f_col: return None
+
+        # 清理數據
+        df_clean = target_df[[date_col, f_col, t_col, d_col]].copy()
+        df_clean.columns = ['Date', 'Foreign', 'Trust', 'Dealer']
         
-        # 輔助函式：處理數值 (移除逗號，轉整數)
-        def parse_val(val):
-            try:
-                if isinstance(val, (int, float)): return int(val)
-                if isinstance(val, str):
-                    return int(val.replace(',', '').replace('+', ''))
-            except:
-                return 0
-            return 0
-
-        # 找出對應的欄位名稱 (Yahoo 欄位有時候會變，模糊比對)
-        cols = target_df.columns
-        f_col = next((c for c in cols if '外資' in str(c) and '持股' not in str(c)), None)
-        t_col = next((c for c in cols if '投信' in str(c)), None)
-        d_col = next((c for c in cols if '自營' in str(c)), None)
-        date_col = next((c for c in cols if '日期' in str(c)), None)
-
-        if not f_col: return None
-
-        data = {
-            'date': str(latest[date_col]) if date_col else datetime.now().strftime('%Y/%m/%d'),
-            'foreign': parse_val(latest[f_col]),
-            'trust': parse_val(latest[t_col]) if t_col else 0,
-            'dealer': parse_val(latest[d_col]) if d_col else 0
-        }
-        
-        # Yahoo 網頁上的單位通常直接是「張」，不需除以 1000
-        return data
+        def clean_num(x):
+            if isinstance(x, str):
+                x = x.replace(',', '').replace('+', '')
+                try: return int(x)
+                except: return 0
+            return x
+            
+        for col in ['Foreign', 'Trust', 'Dealer']:
+            df_clean[col] = df_clean[col].apply(clean_num)
+            
+        return df_clean
 
     except Exception as e:
-        # print(f"Yahoo scraping error: {e}") # 除錯用
         return None
 
 # --- 4. 技術指標運算 ---
@@ -245,7 +206,7 @@ def calculate_indicators(df):
     return df
 
 # --- 5. 分析報告生成 ---
-def generate_report(name, ticker, latest, inst_data, df):
+def generate_report(name, ticker, latest, inst_data_dict, df):
     price = latest['Close']
     ma20 = latest['MA20']
     k, d = latest['K'], latest['D']
@@ -254,12 +215,15 @@ def generate_report(name, ticker, latest, inst_data, df):
     if price > latest['MA5'] and price > ma20 and price > latest['MA60']: trend = "全面噴發 🚀"
     
     inst_text = "資料更新中..."
-    if inst_data:
-        total = inst_data['foreign'] + inst_data['trust'] + inst_data['dealer']
+    if inst_data_dict:
+        f_val = inst_data_dict['Foreign']
+        t_val = inst_data_dict['Trust']
+        d_val = inst_data_dict['Dealer']
+        total = f_val + t_val + d_val
         inst_text = f"""
-        外資: <span style='color:{'#ff4b4b' if inst_data['foreign']>0 else '#00c853'}'>{inst_data['foreign']:,}</span> 張 | 
-        投信: <span style='color:{'#ff4b4b' if inst_data['trust']>0 else '#00c853'}'>{inst_data['trust']:,}</span> 張 | 
-        自營: <span style='color:{'#ff4b4b' if inst_data['dealer']>0 else '#00c853'}'>{inst_data['dealer']:,}</span> 張 
+        外資: <span style='color:{'#ff4b4b' if f_val>0 else '#00c853'}'>{f_val:,}</span> 張 | 
+        投信: <span style='color:{'#ff4b4b' if t_val>0 else '#00c853'}'>{t_val:,}</span> 張 | 
+        自營: <span style='color:{'#ff4b4b' if d_val>0 else '#00c853'}'>{d_val:,}</span> 張 
         (合計: {total:,} 張)
         """
     else:
@@ -324,8 +288,14 @@ try:
         
         display_name = STOCK_NAMES.get(target, stock.info.get('longName', target))
         
-        # 改用 Yahoo 爬蟲抓取法人資料
-        inst_data = get_institutional_data_yahoo(target)
+        # 抓取法人 DataFrame
+        inst_df = get_institutional_data_yahoo(target)
+        
+        # 準備最新一筆法人資料給報告使用
+        latest_inst_dict = None
+        if inst_df is not None and not inst_df.empty:
+            # Yahoo 表格通常最新在最上，直接取 iloc[0]
+            latest_inst_dict = inst_df.iloc[0].to_dict()
         
         change = latest['Close'] - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
@@ -336,8 +306,9 @@ try:
             st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
             st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        st.markdown(generate_report(display_name, target, latest, inst_data, df), unsafe_allow_html=True)
+        st.markdown(generate_report(display_name, target, latest, latest_inst_dict, df), unsafe_allow_html=True)
         
+        # 技術面 K 線圖
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
         fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='orange', width=1), name='MA5'), row=1, col=1)
@@ -355,10 +326,47 @@ try:
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        t1, t2, t3 = st.columns(3)
-        t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
-        t2.metric("K (9)", f"{latest['K']:.1f}")
-        t3.metric("D (9)", f"{latest['D']:.1f}")
+        # 底部 Tab 區塊
+        tab1, tab2 = st.tabs(["📉 詳細指標", "🏛️ 法人籌碼"])
+        
+        with tab1:
+            t1, t2, t3 = st.columns(3)
+            t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
+            t2.metric("K (9)", f"{latest['K']:.1f}")
+            t3.metric("D (9)", f"{latest['D']:.1f}")
+            
+        with tab2:
+            if inst_df is not None and not inst_df.empty:
+                # 顯示法人買賣變化圖表 (Bar Chart)
+                st.subheader("法人買賣變化 (近30日)")
+                fig_inst = go.Figure()
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4')) # 藍
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4')) # 紫
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#FBBC05')) # 黃/橘
+                
+                fig_inst.update_layout(
+                    barmode='group',
+                    template="plotly_white",
+                    height=400,
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    paper_bgcolor='rgba(255, 255, 255, 1)',
+                    plot_bgcolor='rgba(255, 255, 255, 1)',
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                # 反轉 X 軸，因為 Yahoo 表格最新在上面，畫圖要從舊到新
+                fig_inst.update_xaxes(autorange="reversed")
+                st.plotly_chart(fig_inst, use_container_width=True)
+                
+                # 顯示最新數據 Metrics
+                m1, m2, m3 = st.columns(3)
+                last = inst_df.iloc[0]
+                def c_val(v): return "normal" if v > 0 else "inverse"
+                m1.metric("外資", f"{last['Foreign']:,}", delta=f"{last['Foreign']:,}", delta_color=c_val(last['Foreign']))
+                m2.metric("投信", f"{last['Trust']:,}", delta=f"{last['Trust']:,}", delta_color=c_val(last['Trust']))
+                m3.metric("自營商", f"{last['Dealer']:,}", delta=f"{last['Dealer']:,}", delta_color=c_val(last['Dealer']))
+                st.caption(f"資料來源: Yahoo 股市 | 日期: {last['Date']}")
+            else:
+                st.info("目前無法人資料或非台股標的。")
 
 except Exception as e:
     st.error(f"發生錯誤: {e}")

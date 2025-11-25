@@ -25,7 +25,10 @@ st.markdown("""
     <style>
     /* 全局背景與字體 */
     .stApp {
-        background-color: #000000;
+        background-image: url('uploaded:image_d78e10.png-c6800a35-e7d2-451a-a124-fd5f3dd563fc');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
         color: #ffffff;
     }
     
@@ -33,33 +36,33 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 卡片樣式 */
+    /* 卡片樣式 - 使用半透明背景 */
     .metric-card {
-        background-color: #1e1e1e;
-        border: 1px solid #333;
+        background-color: rgba(30, 30, 30, 0.8);
+        border: 1px solid rgba(51, 51, 51, 0.8);
         border-radius: 10px;
         padding: 15px;
         margin-bottom: 10px;
     }
     
-    /* 建議卡片 */
+    /* 建議卡片 - 使用半透明背景 */
     .recommendation-box {
         padding: 20px;
         border-radius: 12px;
         margin: 20px 0;
         border-left: 6px solid;
-        background-color: #1c1c1c;
+        background-color: rgba(28, 28, 28, 0.8);
     }
     
-    /* 分析報告文字區域 */
+    /* 分析報告文字區域 - 使用半透明背景 */
     .analysis-text {
         font-size: 1.1rem;
         line-height: 1.8;
         color: #ffffff !important; /* 強制白色 */
-        background-color: #262730;
+        background-color: rgba(38, 39, 48, 0.8);
         padding: 20px;
         border-radius: 10px;
-        border: 1px solid #444;
+        border: 1px solid rgba(68, 68, 68, 0.8);
     }
 
     /* 強制 Tab 標籤與說明文字為白色 */
@@ -72,7 +75,7 @@ st.markdown("""
     }
 
     /* 分隔線 */
-    hr { margin: 20px 0; border-color: #333; }
+    hr { margin: 20px 0; border-color: rgba(51, 51, 51, 0.8); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -94,33 +97,51 @@ TOP_STOCKS = {
 
 @st.cache_data(ttl=300)
 def get_institutional_data(ticker):
-    """抓取台灣三大法人買賣超"""
+    """抓取台灣三大法人買賣超 (修正 0 資料問題)"""
     if not FINMIND_AVAILABLE: return None
     if ".TW" not in ticker: return None 
     
     try:
         stock_id = ticker.replace(".TW", "")
         dl = DataLoader()
+        # 抓取最近 30 天數據，確保能回溯
         df = dl.taiwan_stock_institutional_investors(
             stock_id=stock_id, 
-            start_date=(datetime.now() - timedelta(days=20)).strftime('%Y-%m-%d')
+            start_date=(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         )
-        if not df.empty:
-            latest_date = df['date'].max()
-            today_df = df[df['date'] == latest_date]
+        
+        if df.empty: return None
+
+        # 將日期排序，從最新開始找
+        dates = df['date'].unique()
+        dates.sort()
+        dates = dates[::-1] # 反轉，最新在最前
+
+        # 迴圈尋找有數據的最近一天
+        for target_date in dates:
+            today_df = df[df['date'] == target_date]
+            
+            # 計算買賣超
+            f_buy = today_df[today_df['name'].str.contains('外資')]['buy'].sum() - today_df[today_df['name'].str.contains('外資')]['sell'].sum()
+            t_buy = today_df[today_df['name'].str.contains('投信')]['buy'].sum() - today_df[today_df['name'].str.contains('投信')]['sell'].sum()
+            d_buy = today_df[today_df['name'].str.contains('自營')]['buy'].sum() - today_df[today_df['name'].str.contains('自營')]['sell'].sum()
+            
+            # 如果這一天所有法人數據都是 0，可能是有問題或休市，繼續找前一天
+            if f_buy == 0 and t_buy == 0 and d_buy == 0:
+                continue
+            
+            # 找到有意義的數據了
             data = {
-                'date': latest_date,
-                'foreign': today_df[today_df['name'].str.contains('外資')]['buy'].sum() - today_df[today_df['name'].str.contains('外資')]['sell'].sum(),
-                'trust': today_df[today_df['name'].str.contains('投信')]['buy'].sum() - today_df[today_df['name'].str.contains('投信')]['sell'].sum(),
-                'dealer': today_df[today_df['name'].str.contains('自營')]['buy'].sum() - today_df[today_df['name'].str.contains('自營')]['sell'].sum(),
+                'date': target_date,
+                'foreign': int(f_buy / 1000),
+                'trust': int(t_buy / 1000),
+                'dealer': int(d_buy / 1000),
             }
-            # 換算成張
-            for k in ['foreign', 'trust', 'dealer']:
-                data[k] = int(data[k] / 1000)
             return data
+            
+        return None # 真的都沒資料
     except:
         return None
-    return None
 
 def calculate_technical_indicators(df):
     """計算技術指標"""
@@ -174,9 +195,9 @@ def generate_analysis_report(ticker, latest, inst_data, history_df):
         inst_text = f"外資 {'買超' if f_buy>0 else '賣超'} {abs(f_buy):,} 張，" \
                     f"投信 {'買超' if t_buy>0 else '賣超'} {abs(t_buy):,} 張，" \
                     f"自營 {'買超' if d_buy>0 else '賣超'} {abs(d_buy):,} 張。"
-        report.append(f"【法人動向】：{inst_text} (合計 {total:,} 張)")
+        report.append(f"【法人動向】：{inst_text} (合計 {total:,} 張 / 資料日期: {inst_data['date']})")
     else:
-        report.append("【法人動向】：暫無即時資料 (僅台股盤後提供)。")
+        report.append("【法人動向】：暫無資料 (僅台股提供，或資料源連線中)。")
 
     # 3. 技術指標 (KD/均線)
     ma_trend = "多頭排列 (站上月線)" if price > latest['MA20'] else "空頭修正 (跌破月線)"
@@ -236,13 +257,24 @@ with st.sidebar:
         target_ticker += ".TW"
         
     st.caption("資料來源: Yahoo Finance, FinMind")
+    
+    # Yahoo 連結按鈕 (側邊欄)
+    yahoo_url = f"https://tw.stock.yahoo.com/quote/{target_ticker}"
+    st.link_button(f"🔗 前往 Yahoo 股市 ({target_ticker})", yahoo_url, use_container_width=True)
 
 # 執行分析
 latest, stock_name, history_df, inst_data, report_text = analyze_stock(target_ticker)
 
 if latest is not None:
     # --- 標題區 ---
-    st.title(f"{stock_name} ({target_ticker})")
+    col_title, col_link = st.columns([3, 1])
+    with col_title:
+        st.title(f"{stock_name} ({target_ticker})")
+    with col_link:
+        # Yahoo 連結按鈕 (標題旁)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.link_button("前往 Yahoo 詳細資料 ↗", f"https://tw.stock.yahoo.com/quote/{target_ticker}")
+
     current_price = latest['Close']
     change = current_price - history_df['Close'].iloc[-2]
     pct_change = (change / history_df['Close'].iloc[-2]) * 100

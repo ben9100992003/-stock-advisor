@@ -91,6 +91,18 @@ try:
 except ImportError:
     FINMIND_AVAILABLE = False
 
+# 股票代號與中文名稱對照表
+STOCK_NAMES = {
+    # 台股熱門
+    "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海",
+    "3231.TW": "緯創", "2382.TW": "廣達", "2303.TW": "聯電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金",
+    "2618.TW": "長榮航", "2610.TW": "華航", "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息",
+    # 美股熱門
+    "NVDA": "輝達 (NVIDIA)", "TSLA": "特斯拉 (Tesla)", "AAPL": "蘋果 (Apple)", "AMD": "超微 (AMD)", "PLTR": "Palantir",
+    "MSFT": "微軟 (Microsoft)", "GOOGL": "谷歌 (Alphabet)", "AMZN": "亞馬遜 (Amazon)", "META": "Meta", "NFLX": "網飛 (Netflix)",
+    "INTC": "英特爾 (Intel)", "TSM": "台積電 ADR", "QCOM": "高通 (Qualcomm)", "AVGO": "博通 (Broadcom)"
+}
+
 @st.cache_data(ttl=3600) # 快取 1 小時
 def get_top_volume_stocks():
     """
@@ -248,10 +260,20 @@ with st.sidebar:
     # 加上美股熱門
     all_hot_stocks = hot_stocks_list + ["NVDA", "TSLA", "AAPL", "AMD", "PLTR"]
     
-    selected_ticker = st.selectbox("🔥 本日熱門成交 Top 15", options=all_hot_stocks)
+    # 製作選單選項 (顯示中文名稱)
+    options_with_names = []
+    for ticker in all_hot_stocks:
+        ticker_key = f"{ticker}.TW" if ticker.isdigit() else ticker
+        name = STOCK_NAMES.get(ticker_key, ticker) # 找不到就顯示代號
+        options_with_names.append(f"{name} ({ticker})")
+
+    selected_option = st.selectbox("🔥 本日熱門成交 Top 15", options=options_with_names)
     
+    # 從選項中提取代號
+    selected_ticker = selected_option.split("(")[-1].replace(")", "")
+
     st.markdown("---")
-    user_input = st.text_input("或輸入代號 (如 2330)", value="")
+    user_input = st.text_input("或輸入代號 (如 2330, NVDA)", value="")
     
     # 決定最終代號
     target = user_input.upper() if user_input else selected_ticker
@@ -270,8 +292,9 @@ try:
     else:
         df = calculate_indicators(df)
         latest = df.iloc[-1]
-        info = stock.info
-        name = info.get('longName', target)
+        
+        # 嘗試獲取中文名稱
+        display_name = STOCK_NAMES.get(target, stock.info.get('longName', target))
         
         # 抓取法人 (防呆版)
         inst_data = get_institutional_data_robust(target)
@@ -283,11 +306,11 @@ try:
         
         c1, c2 = st.columns([3, 1])
         with c1:
-            st.markdown(f"<h1 style='margin-bottom:0;'>{name}</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
             st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
         # 生成報告
-        st.markdown(generate_report(name, target, latest, inst_data, df), unsafe_allow_html=True)
+        st.markdown(generate_report(display_name, target, latest, inst_data, df), unsafe_allow_html=True)
         
         # K線圖
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
@@ -300,7 +323,15 @@ try:
         colors = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
         fig.add_trace(go.Bar(x=df.index.strftime('%Y-%m-%d'), y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
         
-        fig.update_layout(template="plotly_dark", height=500, xaxis_rangeslider_visible=False, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        # 設定圖表樣式 (白色背景)
+        fig.update_layout(
+            template="plotly_white", # 使用白色模板
+            height=500, 
+            xaxis_rangeslider_visible=False, 
+            margin=dict(l=0, r=0, t=0, b=0), 
+            paper_bgcolor='rgba(255, 255, 255, 1)', # 強制背景為純白
+            plot_bgcolor='rgba(255, 255, 255, 1)'  # 強制繪圖區為純白
+        )
         st.plotly_chart(fig, use_container_width=True)
         
         # 底部數據表

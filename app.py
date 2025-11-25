@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 
 # --- 加入防呆機制：嘗試匯入 FinMind ---
@@ -24,8 +25,8 @@ st.markdown("""
     <style>
     /* 全局背景與字體 */
     .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
+        background-color: #000000;
+        color: #ffffff;
     }
     
     /* 隱藏預設選單 */
@@ -47,17 +48,27 @@ st.markdown("""
         border-radius: 12px;
         margin: 20px 0;
         border-left: 6px solid;
+        background-color: #1c1c1c;
     }
     
-    /* 分析報告文字 */
+    /* 分析報告文字區域 */
     .analysis-text {
         font-size: 1.1rem;
         line-height: 1.8;
-        color: #e0e0e0;
+        color: #ffffff !important; /* 強制白色 */
         background-color: #262730;
         padding: 20px;
         border-radius: 10px;
         border: 1px solid #444;
+    }
+
+    /* 強制 Tab 標籤與說明文字為白色 */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
+        font-weight: bold;
+    }
+    .stMarkdown p, .stCaption {
+        color: #e0e0e0 !important;
     }
 
     /* 分隔線 */
@@ -67,18 +78,18 @@ st.markdown("""
 
 # --- 3. 輔助資料與函式 ---
 
-# 熱門交易股清單 (模擬 Top 10)
+# 熱門交易股清單
 TOP_STOCKS = {
     "2330.TW": "台積電",
     "2317.TW": "鴻海",
     "2603.TW": "長榮",
     "2609.TW": "陽明",
     "3231.TW": "緯創",
+    "2454.TW": "聯發科",
     "NVDA": "NVIDIA (輝達)",
     "TSLA": "Tesla (特斯拉)",
     "AAPL": "Apple (蘋果)",
-    "AMD": "AMD (超微)",
-    "PLTR": "Palantir"
+    "AMD": "AMD (超微)"
 }
 
 @st.cache_data(ttl=300)
@@ -141,49 +152,50 @@ def calculate_technical_indicators(df):
     
     return df
 
-def generate_analysis_report(ticker, latest, inst_data):
+def generate_analysis_report(ticker, latest, inst_data, history_df):
     """生成詳細的文字分析報告"""
     price = latest['Close']
+    vol = latest['Volume']
     report = []
     
-    # 1. 均線形態分析
-    ma_trend = ""
-    if price > latest['MA5'] and price > latest['MA20'] and price > latest['MA60']:
-        ma_trend = "呈現多頭排列，股價站穩所有均線之上，短中長期趨勢皆強勢。"
-    elif price < latest['MA5'] and price < latest['MA20']:
-        ma_trend = "呈現空頭排列，股價受制於短中期均線反壓，趨勢偏弱。"
-    elif price > latest['MA20']:
-        ma_trend = "站穩月線之上，中期趨勢有支撐，但需留意短線波動。"
-    else:
-        ma_trend = "跌破月線，中期趨勢轉弱，需觀察季線支撐。"
-    report.append(f"【趨勢分析】：目前股價 {price:.2f}，{ma_trend}")
+    # 1. 價量分析
+    report.append(f"【價量概況】：收盤價 {price:.2f}，成交量 {int(vol/1000):,} 張。")
+    recent_high = history_df['High'].tail(20).max()
+    recent_low = history_df['Low'].tail(20).min()
+    report.append(f"近20日區間：高點 {recent_high:.2f} / 低點 {recent_low:.2f}。")
 
-    # 2. KD 與 RSI 分析
-    kd_status = "黃金交叉向上" if latest['K'] > latest['D'] else "死亡交叉向下"
-    rsi_status = ""
-    if latest['RSI'] > 70: rsi_status = "RSI 進入過熱區(>70)，留意追高風險。"
-    elif latest['RSI'] < 30: rsi_status = "RSI 進入超賣區(<30)，醞釀反彈機會。"
-    else: rsi_status = f"RSI 指標為 {latest['RSI']:.1f}，處於中性區間。"
-    
-    report.append(f"【動能指標】：KD 指標呈現{kd_status}，{rsi_status}")
-
-    # 3. 籌碼分析 (僅台股)
+    # 2. 籌碼分析 (詳細列出)
     if inst_data:
-        total = inst_data['foreign'] + inst_data['trust'] + inst_data['dealer']
-        if total > 0:
-            report.append(f"【籌碼動向】：三大法人今日合計買超 {total:,} 張，資金動能偏多。")
-        else:
-            report.append(f"【籌碼動向】：三大法人今日合計賣超 {abs(total):,} 張，籌碼面有調節壓力。")
-    
-    # 4. 總結
-    if price > latest['MA20'] and latest['K'] > latest['D']:
-        advice = "建議偏多操作，設好停損順勢而為。"
-    elif price < latest['MA20'] and latest['K'] < latest['D']:
-        advice = "建議保守觀望，等待止跌訊號。"
-    else:
-        advice = "建議區間操作，觀察均線支撐與壓力。"
+        f_buy = inst_data['foreign']
+        t_buy = inst_data['trust']
+        d_buy = inst_data['dealer']
+        total = f_buy + t_buy + d_buy
         
-    report.append(f"【武吉拉觀點】：{advice}")
+        inst_text = f"外資 {'買超' if f_buy>0 else '賣超'} {abs(f_buy):,} 張，" \
+                    f"投信 {'買超' if t_buy>0 else '賣超'} {abs(t_buy):,} 張，" \
+                    f"自營 {'買超' if d_buy>0 else '賣超'} {abs(d_buy):,} 張。"
+        report.append(f"【法人動向】：{inst_text} (合計 {total:,} 張)")
+    else:
+        report.append("【法人動向】：暫無即時資料 (僅台股盤後提供)。")
+
+    # 3. 技術指標 (KD/均線)
+    ma_trend = "多頭排列 (站上月線)" if price > latest['MA20'] else "空頭修正 (跌破月線)"
+    kd_val = f"K({latest['K']:.1f}) / D({latest['D']:.1f})"
+    kd_sig = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
+    report.append(f"【技術指標】：均線呈{ma_trend}。KD指標為 {kd_val}，呈現{kd_sig}。")
+
+    # 4. 進出場建議 (簡單邏輯)
+    support = latest['MA20'] if price > latest['MA20'] else recent_low
+    resistance = recent_high if price > latest['MA20'] else latest['MA20']
+    
+    if price > latest['MA20'] and latest['K'] > latest['D']:
+        strategy = f"偏多操作。建議防守支撐 {support:.2f}，目標前高 {recent_high:.2f}。"
+    elif price < latest['MA20'] and latest['K'] < latest['D']:
+        strategy = f"偏空觀望。上方壓力 {resistance:.2f}，需等待止跌訊號。"
+    else:
+        strategy = f"區間震盪。建議在 {support:.2f} ~ {resistance:.2f} 區間來回操作。"
+        
+    report.append(f"【操作建議】：{strategy}")
     
     return "\n\n".join(report)
 
@@ -197,11 +209,9 @@ def analyze_stock(ticker):
         latest = df.iloc[-1]
         inst_data = get_institutional_data(ticker)
         
-        # 嘗試獲取中文名稱
         name = TOP_STOCKS.get(ticker, stock.info.get('longName', ticker))
         
-        # 生成報告
-        report_text = generate_analysis_report(ticker, latest, inst_data)
+        report_text = generate_analysis_report(ticker, latest, inst_data, df)
         
         return latest, name, df, inst_data, report_text
     except Exception as e:
@@ -213,22 +223,15 @@ def analyze_stock(ticker):
 # 側邊欄
 with st.sidebar:
     st.header("🦖 武吉拉選股")
-    
-    # 熱門股選單
     selected_hot_stock = st.selectbox(
         "🔥 市場熱門交易 Top 10",
         options=list(TOP_STOCKS.keys()),
         format_func=lambda x: f"{x} - {TOP_STOCKS[x]}"
     )
-    
-    # 手動輸入框 (優先權高於選單)
     st.markdown("---")
     ticker_input = st.text_input("或輸入代號查詢", value="")
     
-    # 邏輯：如果有輸入代號就用輸入的，否則用選單的
     target_ticker = ticker_input.upper() if ticker_input else selected_hot_stock
-    
-    # 智慧代號處理：如果是 4 位數字，自動加 .TW
     if target_ticker.isdigit() and len(target_ticker) == 4:
         target_ticker += ".TW"
         
@@ -262,19 +265,48 @@ if latest is not None:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- 互動式 K 線圖 ---
+    # --- 互動式 K 線圖 (含成交量) ---
     st.subheader("📊 技術分析圖表")
-    fig = go.Figure()
+    
+    # 建立子圖 (上: K線, 下: 成交量)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                        vertical_spacing=0.03, row_heights=[0.7, 0.3])
+
+    # K線圖
     fig.add_trace(go.Candlestick(
-        x=history_df.index,
+        x=history_df.index.strftime('%Y-%m-%d'), # 轉字串以移除休市日空隙
         open=history_df['Open'], high=history_df['High'],
         low=history_df['Low'], close=history_df['Close'],
         name='K線'
-    ))
-    fig.add_trace(go.Scatter(x=history_df.index, y=history_df['MA5'], line=dict(color='orange', width=1), name='MA5'))
-    fig.add_trace(go.Scatter(x=history_df.index, y=history_df['MA20'], line=dict(color='cyan', width=1), name='MA20'))
-    fig.add_trace(go.Scatter(x=history_df.index, y=history_df['MA60'], line=dict(color='purple', width=1), name='MA60'))
-    fig.update_layout(template="plotly_dark", height=450, margin=dict(l=0, r=0, t=0, b=0), xaxis_rangeslider_visible=False)
+    ), row=1, col=1)
+    
+    # 均線
+    fig.add_trace(go.Scatter(x=history_df.index.strftime('%Y-%m-%d'), y=history_df['MA5'], line=dict(color='orange', width=1), name='MA5'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=history_df.index.strftime('%Y-%m-%d'), y=history_df['MA20'], line=dict(color='cyan', width=1), name='MA20'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=history_df.index.strftime('%Y-%m-%d'), y=history_df['MA60'], line=dict(color='purple', width=1), name='MA60'), row=1, col=1)
+
+    # 成交量圖
+    colors = ['red' if row['Open'] - row['Close'] >= 0 else 'green' for index, row in history_df.iterrows()]
+    fig.add_trace(go.Bar(
+        x=history_df.index.strftime('%Y-%m-%d'), 
+        y=history_df['Volume'],
+        marker_color=colors,
+        name='成交量'
+    ), row=2, col=1)
+
+    # 設定圖表樣式
+    fig.update_layout(
+        template="plotly_dark",
+        height=500,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis_rangeslider_visible=False, # 隱藏下方滑桿，改用滑鼠拖曳
+        dragmode='pan', # 預設為拖曳模式
+        hovermode='x unified' # 統一顯示資訊
+    )
+    
+    # 修復 X 軸顯示
+    fig.update_xaxes(type='category', tickangle=-45, nticks=20) # 使用類別軸避免日期空隙
+
     st.plotly_chart(fig, use_container_width=True)
 
     # --- 數據儀表板 ---

@@ -52,9 +52,9 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 霧面玻璃卡片效果 */
-    .metric-card, .recommendation-box, .analysis-text {
-        background-color: rgba(20, 20, 20, 0.85) !important; /* 加深背景色以凸顯文字 */
+    /* 霧面玻璃卡片效果 (通用) */
+    .recommendation-box, .analysis-text {
+        background-color: rgba(20, 20, 20, 0.85) !important;
         border: 1px solid rgba(255, 255, 255, 0.2);
         backdrop-filter: blur(10px);
         border-radius: 12px;
@@ -65,6 +65,30 @@ st.markdown("""
     
     .recommendation-box {
         border-left: 6px solid #ff4b4b;
+    }
+
+    /* --- 關鍵修復：強制底部數據指標 (Metric) 樣式 --- */
+    [data-testid="stMetric"] {
+        background-color: rgba(30, 30, 30, 0.9) !important; /* 深黑底板 */
+        padding: 15px !important;
+        border-radius: 10px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5) !important;
+        text-align: center;
+    }
+    
+    /* 標籤文字 (RSI, K, D) */
+    [data-testid="stMetricLabel"] {
+        color: #aaaaaa !important;
+        font-size: 1rem !important;
+        font-weight: bold !important;
+    }
+    
+    /* 數值文字 (47.9, 21.7...) */
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-size: 1.8rem !important;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); /* 發光效果 */
     }
 
     /* 強制 Tab 與文字顏色 */
@@ -109,30 +133,24 @@ def get_top_volume_stocks():
     抓取台股「真實」當日熱門成交量排行 Top 15
     """
     if not FINMIND_AVAILABLE:
-        # 備案：如果抓不到，回傳固定清單
         return ["2330", "2317", "2603", "2609", "3231", "2618", "00940", "00919", "2454", "2303"]
     
     try:
         dl = DataLoader()
-        # 抓取最近交易日 (往回找 7 天內一定有開市的一天)
         latest_trade_date = dl.taiwan_stock_daily_adj(
             stock_id="2330", 
             start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         ).iloc[-1]['date']
-        
-        # 抓取該日所有股票成交資訊
         df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
-        
-        # 排序成交量 (Trading_Volume) 並取前 15 名
         top_df = df.sort_values(by='Trading_Volume', ascending=False).head(15)
         return top_df['stock_id'].tolist()
     except:
-        return ["2330", "2317", "2603", "2609", "3231", "2454"] # 連線失敗時的備案
+        return ["2330", "2317", "2603", "2609", "3231", "2454"] 
 
 @st.cache_data(ttl=300)
 def get_institutional_data_robust(ticker):
     """
-    強效版法人資料抓取：死命必達，直到找到資料為止
+    強效版法人資料抓取
     """
     if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
     
@@ -140,19 +158,16 @@ def get_institutional_data_robust(ticker):
     dl = DataLoader()
     
     try:
-        # 一次抓過去 14 天，確保能跨過連假
         start_date = (datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         
         if df.empty: return None
 
-        # 從最新的一天開始往回找，直到找到「非零」的數據
         dates = sorted(df['date'].unique(), reverse=True)
         
         for d in dates:
             day_df = df[df['date'] == d]
             
-            # 計算買賣超 (buy - sell)
             def get_net(name_keyword):
                 rows = day_df[day_df['name'].str.contains(name_keyword)]
                 if rows.empty: return 0
@@ -162,11 +177,10 @@ def get_institutional_data_robust(ticker):
             t_net = get_net('投信')
             d_net = get_net('自營')
             
-            # 只要有一天資料不是全 0，就當作是這天的資料
             if f_net != 0 or t_net != 0 or d_net != 0:
                 return {
                     'date': d,
-                    'foreign': int(f_net / 1000), # 換算張
+                    'foreign': int(f_net / 1000), 
                     'trust': int(t_net / 1000),
                     'dealer': int(d_net / 1000)
                 }
@@ -176,19 +190,16 @@ def get_institutional_data_robust(ticker):
 
 # --- 4. 技術指標運算 ---
 def calculate_indicators(df):
-    # MA
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
     df['MA60'] = df['Close'].rolling(60).mean()
     
-    # KD (9,3,3)
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
     
-    # RSI (14)
     delta = df['Close'].diff()
     u = delta.clip(lower=0)
     d = -1 * delta.clip(upper=0)
@@ -197,7 +208,6 @@ def calculate_indicators(df):
     rs = ema_u / ema_d
     df['RSI'] = 100 - (100 / (1 + rs))
     
-    # MACD
     exp12 = df['Close'].ewm(span=12, adjust=False).mean()
     exp26 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp12 - exp26
@@ -211,11 +221,9 @@ def generate_report(name, ticker, latest, inst_data, df):
     ma20 = latest['MA20']
     k, d = latest['K'], latest['D']
     
-    # 趨勢判斷
     trend = "多頭強勢 🔥" if price > ma20 else "空方修正 🧊"
     if price > latest['MA5'] and price > ma20 and price > latest['MA60']: trend = "全面噴發 🚀"
     
-    # 法人文字
     inst_text = "資料更新中..."
     if inst_data:
         total = inst_data['foreign'] + inst_data['trust'] + inst_data['dealer']
@@ -226,7 +234,6 @@ def generate_report(name, ticker, latest, inst_data, df):
         (合計: {total:,} 張)
         """
     
-    # 操作建議
     action = "觀望"
     if price > ma20 and k > d: action = "偏多操作 (拉回找買點)"
     elif price < ma20 and k < d: action = "偏空操作 (反彈找賣點)"
@@ -249,40 +256,31 @@ def generate_report(name, ticker, latest, inst_data, df):
 
 # --- 6. 主程式邏輯 ---
 
-# 側邊欄
 with st.sidebar:
     st.header("🦖 武吉拉選股")
     
-    # 自動抓取熱門股
     with st.spinner("正在掃描市場熱門股..."):
         hot_stocks_list = get_top_volume_stocks()
         
-    # 加上美股熱門
     all_hot_stocks = hot_stocks_list + ["NVDA", "TSLA", "AAPL", "AMD", "PLTR"]
     
-    # 製作選單選項 (顯示中文名稱)
     options_with_names = []
     for ticker in all_hot_stocks:
         ticker_key = f"{ticker}.TW" if ticker.isdigit() else ticker
-        name = STOCK_NAMES.get(ticker_key, ticker) # 找不到就顯示代號
+        name = STOCK_NAMES.get(ticker_key, ticker) 
         options_with_names.append(f"{name} ({ticker})")
 
     selected_option = st.selectbox("🔥 本日熱門成交 Top 15", options=options_with_names)
-    
-    # 從選項中提取代號
     selected_ticker = selected_option.split("(")[-1].replace(")", "")
 
     st.markdown("---")
     user_input = st.text_input("或輸入代號 (如 2330, NVDA)", value="")
     
-    # 決定最終代號
     target = user_input.upper() if user_input else selected_ticker
-    if target.isdigit(): target += ".TW" # 自動補 .TW
+    if target.isdigit(): target += ".TW" 
 
-    # Yahoo 按鈕
     st.link_button(f"前往 Yahoo 股市 ({target})", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
 
-# 執行數據抓取
 try:
     stock = yf.Ticker(target)
     df = stock.history(period="6mo")
@@ -293,13 +291,9 @@ try:
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
-        # 嘗試獲取中文名稱
         display_name = STOCK_NAMES.get(target, stock.info.get('longName', target))
-        
-        # 抓取法人 (防呆版)
         inst_data = get_institutional_data_robust(target)
         
-        # 標題區 (帶顏色)
         change = latest['Close'] - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
         color = "#ff4b4b" if change >= 0 else "#00c853"
@@ -309,32 +303,25 @@ try:
             st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
             st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        # 生成報告
         st.markdown(generate_report(display_name, target, latest, inst_data, df), unsafe_allow_html=True)
         
-        # K線圖
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
-        # K線
         fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線'), row=1, col=1)
-        # 均線
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='orange', width=1), name='MA5'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA20'], line=dict(color='cyan', width=1), name='MA20'), row=1, col=1)
-        # 成交量
         colors = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
         fig.add_trace(go.Bar(x=df.index.strftime('%Y-%m-%d'), y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
         
-        # 設定圖表樣式 (白色背景)
         fig.update_layout(
-            template="plotly_white", # 使用白色模板
+            template="plotly_white",
             height=500, 
             xaxis_rangeslider_visible=False, 
             margin=dict(l=0, r=0, t=0, b=0), 
-            paper_bgcolor='rgba(255, 255, 255, 1)', # 強制背景為純白
-            plot_bgcolor='rgba(255, 255, 255, 1)'  # 強制繪圖區為純白
+            paper_bgcolor='rgba(255, 255, 255, 1)', 
+            plot_bgcolor='rgba(255, 255, 255, 1)' 
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # 底部數據表
         t1, t2, t3 = st.columns(3)
         t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
         t2.metric("K (9)", f"{latest['K']:.1f}")

@@ -7,6 +7,7 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import base64
 import os
+import requests # 新增 requests 用於爬取 Yahoo
 
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide")
@@ -108,7 +109,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FinMind 資料串接 (防呆與邏輯優化) ---
+# --- 3. 資料串接邏輯 ---
+
+# FinMind 用於熱門股排行 (因為 Yahoo 沒開放熱門股 API)
 try:
     from FinMind.data import DataLoader
     FINMIND_AVAILABLE = True
@@ -121,6 +124,7 @@ STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海",
     "3231.TW": "緯創", "2382.TW": "廣達", "2303.TW": "聯電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金",
     "2618.TW": "長榮航", "2610.TW": "華航", "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息",
+    "2354.TW": "鴻準", "3481.TW": "群創", "2409.TW": "友達", "2888.TW": "新光金",
     # 美股熱門
     "NVDA": "輝達 (NVIDIA)", "TSLA": "特斯拉 (Tesla)", "AAPL": "蘋果 (Apple)", "AMD": "超微 (AMD)", "PLTR": "Palantir",
     "MSFT": "微軟 (Microsoft)", "GOOGL": "谷歌 (Alphabet)", "AMZN": "亞馬遜 (Amazon)", "META": "Meta", "NFLX": "網飛 (Netflix)",
@@ -130,7 +134,7 @@ STOCK_NAMES = {
 @st.cache_data(ttl=3600) # 快取 1 小時
 def get_top_volume_stocks():
     """
-    抓取台股「真實」當日熱門成交量排行 Top 15
+    抓取台股「真實」當日熱門成交量排行 Top 15 (來源: FinMind)
     """
     if not FINMIND_AVAILABLE:
         return ["2330", "2317", "2603", "2609", "3231", "2618", "00940", "00919", "2454", "2303"]
@@ -148,44 +152,69 @@ def get_top_volume_stocks():
         return ["2330", "2317", "2603", "2609", "3231", "2454"] 
 
 @st.cache_data(ttl=300)
-def get_institutional_data_robust(ticker):
+def get_institutional_data_yahoo(ticker):
     """
-    強效版法人資料抓取
+    從 Yahoo 股市網頁直接爬取法人買賣超 (單位: 張)
     """
-    if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
-    
-    stock_id = ticker.replace(".TW", "")
-    dl = DataLoader()
+    if ".TW" not in ticker: return None
     
     try:
-        start_date = (datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')
-        df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
+        # Yahoo 頁面 URL
+        url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         
-        if df.empty: return None
-
-        dates = sorted(df['date'].unique(), reverse=True)
+        # 發送請求
+        r = requests.get(url, headers=headers)
         
-        for d in dates:
-            day_df = df[df['date'] == d]
-            
-            def get_net(name_keyword):
-                rows = day_df[day_df['name'].str.contains(name_keyword)]
-                if rows.empty: return 0
-                return rows['buy'].sum() - rows['sell'].sum()
+        # 使用 pandas 解析 HTML 表格
+        dfs = pd.read_html(r.text)
+        
+        if not dfs: return None
+        
+        # 尋找含有 "外資" 欄位的表格
+        target_df = None
+        for df in dfs:
+            # Yahoo 表格欄位通常包含 '日期', '外資買賣超', ...
+            if any('外資' in str(col) for col in df.columns):
+                target_df = df
+                break
+        
+        if target_df is None or target_df.empty: return None
+        
+        # 取得最新一筆資料 (通常是第一列)
+        latest = target_df.iloc[0]
+        
+        # 輔助函式：處理數值 (移除逗號，轉整數)
+        def parse_val(val):
+            try:
+                if isinstance(val, (int, float)): return int(val)
+                if isinstance(val, str):
+                    return int(val.replace(',', '').replace('+', ''))
+            except:
+                return 0
+            return 0
 
-            f_net = get_net('外資')
-            t_net = get_net('投信')
-            d_net = get_net('自營')
-            
-            if f_net != 0 or t_net != 0 or d_net != 0:
-                return {
-                    'date': d,
-                    'foreign': int(f_net / 1000), 
-                    'trust': int(t_net / 1000),
-                    'dealer': int(d_net / 1000)
-                }
-        return None
-    except:
+        # 找出對應的欄位名稱 (Yahoo 欄位有時候會變，模糊比對)
+        cols = target_df.columns
+        f_col = next((c for c in cols if '外資' in str(c) and '持股' not in str(c)), None)
+        t_col = next((c for c in cols if '投信' in str(c)), None)
+        d_col = next((c for c in cols if '自營' in str(c)), None)
+        date_col = next((c for c in cols if '日期' in str(c)), None)
+
+        if not f_col: return None
+
+        data = {
+            'date': str(latest[date_col]) if date_col else datetime.now().strftime('%Y/%m/%d'),
+            'foreign': parse_val(latest[f_col]),
+            'trust': parse_val(latest[t_col]) if t_col else 0,
+            'dealer': parse_val(latest[d_col]) if d_col else 0
+        }
+        
+        # Yahoo 網頁上的單位通常直接是「張」，不需除以 1000
+        return data
+
+    except Exception as e:
+        # print(f"Yahoo scraping error: {e}") # 除錯用
         return None
 
 # --- 4. 技術指標運算 ---
@@ -233,6 +262,8 @@ def generate_report(name, ticker, latest, inst_data, df):
         自營: <span style='color:{'#ff4b4b' if inst_data['dealer']>0 else '#00c853'}'>{inst_data['dealer']:,}</span> 張 
         (合計: {total:,} 張)
         """
+    else:
+        inst_text = "無法取得今日法人資料 (Yahoo 來源連線中...)"
     
     action = "觀望"
     if price > ma20 and k > d: action = "偏多操作 (拉回找買點)"
@@ -292,7 +323,9 @@ try:
         latest = df.iloc[-1]
         
         display_name = STOCK_NAMES.get(target, stock.info.get('longName', target))
-        inst_data = get_institutional_data_robust(target)
+        
+        # 改用 Yahoo 爬蟲抓取法人資料
+        inst_data = get_institutional_data_yahoo(target)
         
         change = latest['Close'] - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100

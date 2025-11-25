@@ -113,7 +113,6 @@ STOCK_NAMES = {
 def get_top_volume_stocks():
     if not FINMIND_AVAILABLE:
         return ["2330", "2317", "2603", "2609", "3231", "2618", "00940", "00919", "2454", "2303"]
-    
     try:
         dl = DataLoader()
         latest_trade_date = dl.taiwan_stock_daily_adj(
@@ -128,54 +127,105 @@ def get_top_volume_stocks():
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
-    """
-    從 Yahoo 股市網頁爬取「歷史」法人買賣超數據
-    回傳 DataFrame
-    """
+    """第一層：Yahoo 爬蟲"""
     if ".TW" not in ticker: return None
-    
     try:
         url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7'
+        }
         r = requests.get(url, headers=headers)
-        dfs = pd.read_html(r.text)
+        r.encoding = 'utf-8'
         
+        # 強制解析表格
+        dfs = pd.read_html(r.text)
         if not dfs: return None
         
         target_df = None
         for df in dfs:
-            if any('外資' in str(col) for col in df.columns):
+            # 尋找關鍵字
+            if any('外資' in str(col) for col in df.columns) and any('日期' in str(col) for col in df.columns):
                 target_df = df
                 break
         
         if target_df is None or target_df.empty: return None
         
-        # 欄位識別
-        date_col = next((c for c in target_df.columns if '日期' in str(c)), None)
-        f_col = next((c for c in target_df.columns if '外資' in str(c) and '持股' not in str(c)), None)
-        t_col = next((c for c in target_df.columns if '投信' in str(c)), None)
-        d_col = next((c for c in target_df.columns if '自營' in str(c)), None)
+        # 欄位標準化
+        target_df.columns = [str(c).replace(' ', '') for c in target_df.columns]
+        date_col = next((c for c in target_df.columns if '日期' in c), None)
+        f_col = next((c for c in target_df.columns if '外資' in c and '持股' not in c), None)
+        t_col = next((c for c in target_df.columns if '投信' in c), None)
+        d_col = next((c for c in target_df.columns if '自營' in c), None)
 
         if not date_col or not f_col: return None
 
-        # 清理數據
         df_clean = target_df[[date_col, f_col, t_col, d_col]].copy()
         df_clean.columns = ['Date', 'Foreign', 'Trust', 'Dealer']
         
+        # 數據清洗
         def clean_num(x):
+            if isinstance(x, (int, float)): return int(x)
             if isinstance(x, str):
-                x = x.replace(',', '').replace('+', '')
+                x = x.replace(',', '').replace('+', '').replace('nan', '0')
                 try: return int(x)
                 except: return 0
-            return x
+            return 0
             
         for col in ['Foreign', 'Trust', 'Dealer']:
             df_clean[col] = df_clean[col].apply(clean_num)
             
-        return df_clean
+        # 確保日期格式 (Yahoo 可能是 11/25，需加上年份)
+        def clean_date(d):
+            if isinstance(d, str) and '/' in d and len(d) <= 5:
+                return f"{datetime.now().year}/{d}"
+            return d
+        
+        df_clean['Date'] = df_clean['Date'].apply(clean_date)
+        
+        # 回傳前 30 筆
+        return df_clean.head(30)
 
     except Exception as e:
+        # print(f"Yahoo Error: {e}") 
+        return None
+
+@st.cache_data(ttl=300)
+def get_institutional_data_finmind(ticker):
+    """第二層：FinMind 備援 (如果 Yahoo 失敗)"""
+    if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
+    
+    stock_id = ticker.replace(".TW", "")
+    dl = DataLoader()
+    try:
+        start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
+        df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
+        if df.empty: return None
+
+        # 轉成寬表格格式 (Pivot) 模擬 Yahoo 格式
+        # FinMind: date, name(外資/投信..), buy, sell
+        df['net'] = df['buy'] - df['sell']
+        
+        # 建立日期清單
+        dates = sorted(df['date'].unique(), reverse=True)
+        result_data = []
+        
+        for d in dates:
+            day_df = df[df['date'] == d]
+            
+            def get_net(key):
+                v = day_df[day_df['name'].str.contains(key)]['net'].sum()
+                return int(v / 1000) # FinMind 單位是股，轉張
+            
+            result_data.append({
+                'Date': d,
+                'Foreign': get_net('外資'),
+                'Trust': get_net('投信'),
+                'Dealer': get_net('自營')
+            })
+            
+        return pd.DataFrame(result_data).head(30)
+    except:
         return None
 
 # --- 4. 技術指標運算 ---
@@ -206,7 +256,7 @@ def calculate_indicators(df):
     return df
 
 # --- 5. 分析報告生成 ---
-def generate_report(name, ticker, latest, inst_data_dict, df):
+def generate_report(name, ticker, latest, inst_df, df):
     price = latest['Close']
     ma20 = latest['MA20']
     k, d = latest['K'], latest['D']
@@ -214,20 +264,24 @@ def generate_report(name, ticker, latest, inst_data_dict, df):
     trend = "多頭強勢 🔥" if price > ma20 else "空方修正 🧊"
     if price > latest['MA5'] and price > ma20 and price > latest['MA60']: trend = "全面噴發 🚀"
     
-    inst_text = "資料更新中..."
-    if inst_data_dict:
-        f_val = inst_data_dict['Foreign']
-        t_val = inst_data_dict['Trust']
-        d_val = inst_data_dict['Dealer']
+    # 法人數據處理
+    inst_text = "資料讀取中..."
+    source_text = ""
+    
+    if inst_df is not None and not inst_df.empty:
+        last = inst_df.iloc[0]
+        f_val, t_val, d_val = last['Foreign'], last['Trust'], last['Dealer']
         total = f_val + t_val + d_val
+        
         inst_text = f"""
         外資: <span style='color:{'#ff4b4b' if f_val>0 else '#00c853'}'>{f_val:,}</span> 張 | 
         投信: <span style='color:{'#ff4b4b' if t_val>0 else '#00c853'}'>{t_val:,}</span> 張 | 
         自營: <span style='color:{'#ff4b4b' if d_val>0 else '#00c853'}'>{d_val:,}</span> 張 
         (合計: {total:,} 張)
         """
+        source_text = f"(資料來源: Yahoo/FinMind | 日期: {last['Date']})"
     else:
-        inst_text = "無法取得今日法人資料 (Yahoo 來源連線中...)"
+        inst_text = "無法取得法人資料 (系統連線異常)"
     
     action = "觀望"
     if price > ma20 and k > d: action = "偏多操作 (拉回找買點)"
@@ -241,6 +295,7 @@ def generate_report(name, ticker, latest, inst_data_dict, df):
         <p><b>【趨勢燈號】</b>：{trend}</p>
         <p><b>【價量結構】</b>：收盤 {price:.2f}，成交量 {int(latest['Volume']/1000):,} 張。</p>
         <p><b>【法人籌碼】</b>：{inst_text}</p>
+        <p style="font-size:0.8em; color:#aaa;">{source_text}</p>
         <p><b>【關鍵指標】</b>：KD({k:.1f}/{d:.1f}) {'黃金交叉' if k>d else '死亡交叉'} | RSI: {latest['RSI']:.1f}</p>
         <p><b>【支撐壓力】</b>：月線 {ma20:.2f} 為重要多空分水嶺。</p>
         <hr>
@@ -288,14 +343,10 @@ try:
         
         display_name = STOCK_NAMES.get(target, stock.info.get('longName', target))
         
-        # 抓取法人 DataFrame
+        # 雙重保險抓取法人資料
         inst_df = get_institutional_data_yahoo(target)
-        
-        # 準備最新一筆法人資料給報告使用
-        latest_inst_dict = None
-        if inst_df is not None and not inst_df.empty:
-            # Yahoo 表格通常最新在最上，直接取 iloc[0]
-            latest_inst_dict = inst_df.iloc[0].to_dict()
+        if inst_df is None:
+            inst_df = get_institutional_data_finmind(target)
         
         change = latest['Close'] - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
@@ -306,7 +357,7 @@ try:
             st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
             st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        st.markdown(generate_report(display_name, target, latest, latest_inst_dict, df), unsafe_allow_html=True)
+        st.markdown(generate_report(display_name, target, latest, inst_df, df), unsafe_allow_html=True)
         
         # 技術面 K 線圖
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
@@ -353,7 +404,7 @@ try:
                     plot_bgcolor='rgba(255, 255, 255, 1)',
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
-                # 反轉 X 軸，因為 Yahoo 表格最新在上面，畫圖要從舊到新
+                # 如果是 Yahoo 來源，最新的在上面，需要反轉畫圖順序
                 fig_inst.update_xaxes(autorange="reversed")
                 st.plotly_chart(fig_inst, use_container_width=True)
                 
@@ -364,9 +415,11 @@ try:
                 m1.metric("外資", f"{last['Foreign']:,}", delta=f"{last['Foreign']:,}", delta_color=c_val(last['Foreign']))
                 m2.metric("投信", f"{last['Trust']:,}", delta=f"{last['Trust']:,}", delta_color=c_val(last['Trust']))
                 m3.metric("自營商", f"{last['Dealer']:,}", delta=f"{last['Dealer']:,}", delta_color=c_val(last['Dealer']))
-                st.caption(f"資料來源: Yahoo 股市 | 日期: {last['Date']}")
+                st.caption(f"資料來源: Yahoo/FinMind | 日期: {last['Date']}")
             else:
                 st.info("目前無法人資料或非台股標的。")
 
 except Exception as e:
     st.error(f"發生錯誤: {e}")
+
+

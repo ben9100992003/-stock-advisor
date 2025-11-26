@@ -210,9 +210,6 @@ def get_institutional_data_finmind(ticker):
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
         
-        # 關鍵修正：處理欄位名稱中文化與合併
-        # FinMind 可能回傳 'Foreign_Investor', 'Investment_Trust' 或 '外資', '投信'
-        # 我們先定義一個正規化函式
         def normalize_name(n):
             if '外資' in n or 'Foreign' in n: return 'Foreign'
             if '投信' in n or 'Trust' in n: return 'Trust'
@@ -222,23 +219,20 @@ def get_institutional_data_finmind(ticker):
         df['norm_name'] = df['name'].apply(normalize_name)
         df['net'] = df['buy'] - df['sell']
         
-        # 進行 Pivot，將同一天的同一類別（如自營商避險+自營商自行買賣）加總
         pivot_df = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
         
-        # 確保只有需要的欄位
         for col in ['Foreign', 'Trust', 'Dealer']:
             if col not in pivot_df.columns: pivot_df[col] = 0
             
-        # 單位換算 (股 -> 張)
         pivot_df = (pivot_df / 1000).astype(int)
-        
-        # 整理 Index 與 Columns
         pivot_df = pivot_df.reset_index()
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
         
+        # 強制日期格式為 YYYY/MM/DD
+        pivot_df['Date'] = pd.to_datetime(pivot_df['Date']).dt.strftime('%Y/%m/%d')
+        
         return pivot_df
     except Exception as e:
-        # print(f"FinMind Error: {e}") # Debug 用
         return None
 
 @st.cache_data(ttl=300)
@@ -269,10 +263,15 @@ def get_institutional_data_yahoo(ticker):
         for c in ['Foreign', 'Trust', 'Dealer']:
             if c in df_clean.columns: df_clean[c] = df_clean[c].apply(clean)
             else: df_clean[c] = 0
+            
+        # 處理日期格式並轉換為 YYYY/MM/DD 字串
         df_clean['Date'] = df_clean['Date'].apply(lambda x: f"{datetime.now().year}/{x}" if len(x)<=5 else x)
         df_clean['Date'] = pd.to_datetime(df_clean['Date'])
         df_clean.set_index('Date', inplace=True)
-        return df_clean.sort_index().reset_index()[['Date', 'Foreign', 'Trust', 'Dealer']].head(30)
+        
+        res = df_clean.sort_index().reset_index()[['Date', 'Foreign', 'Trust', 'Dealer']].head(30)
+        res['Date'] = res['Date'].dt.strftime('%Y/%m/%d')
+        return res
     except: return None
 
 @st.cache_data(ttl=300)
@@ -466,14 +465,23 @@ try:
             legend=dict(orientation="h", y=1.01, x=0),
             dragmode='pan', 
             hovermode='x unified',
-            xaxis=dict(rangeslider_visible=False), 
+            xaxis=dict(rangeslider_visible=False, tickformat="%Y/%m/%d"),
             yaxis=dict(fixedrange=False) 
         )
         
         # 設定十字線
         for row in [1, 2, 3]:
-            fig.update_xaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="grey", spikethickness=1, rangeslider_visible=False, row=row, col=1)
-            fig.update_yaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="grey", spikethickness=1, row=row, col=1)
+            fig.update_xaxes(
+                showspikes=True, spikemode='across', spikesnap='cursor', 
+                showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
+                rangeslider_visible=False, 
+                row=row, col=1
+            )
+            fig.update_yaxes(
+                showspikes=True, spikemode='across', spikesnap='cursor', 
+                showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
+                row=row, col=1
+            )
             
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False, 'doubleClick': 'reset+autosize'})
         
@@ -491,15 +499,11 @@ try:
         """, unsafe_allow_html=True)
 
     with tab2:
-        # 法人資料備援邏輯：FinMind -> Yahoo
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
         st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
 
     with tab3:
-        inst_df = get_institutional_data_finmind(target)
-        if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
-        
         if inst_df is not None and not inst_df.empty:
             st.markdown(f"<div class='content-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
             fig_inst = go.Figure()
@@ -510,7 +514,7 @@ try:
             st.plotly_chart(fig_inst, use_container_width=True)
             st.dataframe(inst_df.sort_values('Date', ascending=False).head(10), use_container_width=True)
         else:
-            st.info("無法人籌碼資料 (資料源連線失敗或該股無資料)")
+            st.info("無法人籌碼資料")
             
     with tab4:
         st.markdown("<div class='content-card'><h3>📰 個股相關新聞</h3></div>", unsafe_allow_html=True)

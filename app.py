@@ -41,46 +41,28 @@ def set_png_as_page_bg(png_file):
 # 嘗試載入背景
 set_png_as_page_bg('bg.png')
 
-# 其餘 CSS 樣式
+# 其餘 CSS 樣式 (終極顯影版)
 st.markdown("""
     <style>
     .stApp { color: #ffffff; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 半透明容器樣式 (核心修復) */
+    /* --- 1. 分析報告容器 (上方) --- */
     .glass-container {
-        background-color: rgba(0, 0, 0, 0.75); /* 加深背景透明度 */
+        background-color: rgba(0, 0, 0, 0.8);
         border: 1px solid rgba(255, 255, 255, 0.3);
         border-radius: 16px;
         padding: 30px;
         margin-bottom: 25px;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        color: #ffffff !important; /* 強制文字白色 */
     }
-    
-    /* 報告中的標題與文字 */
-    .glass-container h3 {
-        color: #ffcc00 !important;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-        text-shadow: 1px 1px 2px black;
-    }
-    .glass-container p {
-        font-size: 1.1rem;
-        line-height: 1.8;
-        margin-bottom: 15px;
-        color: #f0f0f0 !important;
-    }
-    .glass-container b {
-        color: #ffffff;
-        font-weight: 700;
-    }
+    .glass-container h3 { color: #ffcc00 !important; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 10px; text-shadow: 2px 2px 4px black; }
+    .glass-container p { color: #f0f0f0 !important; font-size: 1.1rem; line-height: 1.6; }
+    .glass-container b { color: #fff; }
 
-    /* 側邊欄卡片 */
+    /* --- 2. 側邊欄卡片 --- */
     .market-summary-box {
         padding: 15px;
         font-size: 0.9rem;
@@ -90,24 +72,50 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* Metric 指標樣式 */
-    [data-testid="stMetric"] {
-        background-color: rgba(40, 40, 40, 0.85) !important;
+    /* --- 3. 數據指標卡片 (下方 Metric) - 關鍵修復 --- */
+    div[data-testid="stMetric"] {
+        background-color: rgba(20, 20, 20, 0.85) !important; /* 半透明黑底 */
         padding: 15px !important;
-        border-radius: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        text-align: center;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+        backdrop-filter: blur(5px);
     }
-    [data-testid="stMetricLabel"] { color: #cccccc !important; }
-    [data-testid="stMetricValue"] { color: #ffffff !important; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+    
+    /* 標籤文字 (如 RSI, K, D) */
+    div[data-testid="stMetricLabel"] p {
+        color: #bbbbbb !important; /* 亮灰色 */
+        font-size: 1rem !important;
+        font-weight: bold !important;
+    }
+    
+    /* 數值文字 (如 47.9) */
+    div[data-testid="stMetricValue"] div {
+        color: #ffffff !important; /* 純白 */
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.6); /* 發光特效 */
+    }
 
-    /* Tab 樣式 */
+    /* --- 4. Tab 分頁標籤 --- */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
+        font-size: 1.1rem;
         font-weight: bold;
+        text-shadow: 1px 1px 2px black;
     }
-    .stMarkdown p, .stCaption { color: #e0e0e0 !important; }
-    h1, h2 { text-shadow: 2px 2px 4px #000000; color: #fff !important; }
+    
+    /* 一般文字與標題 */
+    .stMarkdown p, .stCaption { color: #e0e0e0 !important; text-shadow: 1px 1px 2px black; }
+    h1, h2, h3 { text-shadow: 2px 2px 8px #000000; color: #fff !important; }
+    
+    /* Yahoo 按鈕優化 */
+    .stLinkButton a {
+        background-color: #420066 !important;
+        color: white !important;
+        border: 1px solid #888 !important;
+        font-weight: bold !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -444,7 +452,7 @@ try:
         report_html = generate_narrative_report(name, target, latest, latest_inst_dict, df)
         st.markdown(report_html, unsafe_allow_html=True)
         
-        # K 線圖
+        # K 線圖 (文字強制白色)
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.2, 0.3], vertical_spacing=0.03)
         
         # K線
@@ -461,17 +469,45 @@ try:
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['K'], line=dict(color='#2962ff', width=1), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['D'], line=dict(color='#ff6d00', width=1), name='D9'), row=3, col=1)
         
-        fig.update_layout(template="plotly_dark", height=800, xaxis_rangeslider_visible=False, xaxis3_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False)
+        # 圖表版面設定 (強制字體白色)
+        fig.update_layout(
+            template="plotly_dark",
+            height=800,
+            xaxis_rangeslider_visible=False,
+            xaxis3_rangeslider_visible=False,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False,
+            font=dict(color='white') # 全域字體白色
+        )
         st.plotly_chart(fig, use_container_width=True)
         
-        # 法人圖表
-        if inst_df is not None and not inst_df.empty:
-            st.subheader("🏛️ 法人買賣變化")
-            fig_inst = go.Figure()
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
-            fig_inst.update_layout(barmode='group', template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(autorange="reversed"))
-            st.plotly_chart(fig_inst, use_container_width=True)
+        # 底部 Tab 區塊
+        tab1, tab2 = st.tabs(["📉 詳細指標", "🏛️ 法人籌碼"])
+        
+        with tab1:
+            t1, t2, t3, t4 = st.columns(4)
+            t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
+            t2.metric("K (9)", f"{latest['K']:.1f}")
+            t3.metric("D (9)", f"{latest['D']:.1f}")
+            t4.metric("MACD", f"{latest['MACD']:.2f}")
+            
+        with tab2:
+            if inst_df is not None and not inst_df.empty:
+                st.subheader("🏛️ 法人買賣變化")
+                fig_inst = go.Figure()
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
+                fig_inst.update_layout(
+                    barmode='group', 
+                    template="plotly_dark", 
+                    height=300, 
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)', 
+                    xaxis=dict(autorange="reversed"),
+                    font=dict(color='white')
+                )
+                st.plotly_chart(fig_inst, use_container_width=True)
 
 except Exception as e:
     st.error(f"系統忙碌中，請稍後再試: {e}")

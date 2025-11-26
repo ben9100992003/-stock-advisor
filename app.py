@@ -101,33 +101,28 @@ st.markdown("""
         margin-top: 10px;
         margin-bottom: 20px;
     }
-    .kd-title { font-size: 1.1rem; font-weight: bold; color: #555; }
-    .kd-val { font-size: 1.5rem; font-weight: 800; color: #000; }
-    .kd-tag { padding: 4px 12px; border-radius: 20px; color: white; font-weight: bold; font-size: 0.9rem; }
+    .kd-title { font-size: 1.3rem; font-weight: bold; color: #444; }
+    .kd-val { font-size: 2rem; font-weight: 900; color: #000; }
+    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white; font-weight: bold; font-size: 1rem; }
 
-    /* 5. Tab 與週期按鈕 (優化間距) */
+    /* 5. Tab 與週期按鈕 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important; font-size: 1.1rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
-    /* 週期按鈕樣式 (膠囊樣式，增加間距) */
     .stRadio > div {
-        display: flex; 
-        flex-direction: row; 
-        gap: 8px; /* 增加按鈕間距 */
+        display: flex; flex-direction: row; gap: 0px;
         background-color: #f0f0f0;
-        padding: 6px 8px; /* 增加內距 */
-        border-radius: 25px;
+        padding: 4px; border-radius: 8px;
         width: 100%;
-        justify-content: space-between; /* 平均分配空間 */
-        flex-wrap: wrap; /* 允許換行，避免手機螢幕過窄時擠在一起 */
+        justify-content: space-between;
     }
     .stRadio div[role="radiogroup"] > label {
         flex: 1;
         text-align: center;
         background-color: transparent;
-        padding: 8px 4px;
+        padding: 8px 0;
         border-radius: 20px;
         margin: 0;
         color: #666 !important;
@@ -135,8 +130,6 @@ st.markdown("""
         border: none;
         display: flex; justify-content: center;
         cursor: pointer;
-        white-space: nowrap; /* 防止文字換行 */
-        min-width: 45px; /* 設定最小寬度 */
     }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #26a69a !important;
@@ -336,56 +329,85 @@ try:
     with tab1:
         # 週期按鈕
         interval_map = {
-            "1分": "1m", "5分": "5m", "10分": "5m", # Yahoo API 不支援10分，改抓5分
+            "1分": "1m", "5分": "5m", "10分": "5m", 
             "30分": "30m", "60分": "60m", 
             "日": "1d", "週": "1wk", "月": "1mo"
         }
         period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
         
         interval = interval_map[period_label]
-        
-        # 根據週期決定抓取資料區間
-        # Yahoo 分時資料限制: 1m(7d), 5m(60d), 60m(730d)
+        data_period = "2y" if interval in ["1d", "1wk", "1mo"] else "5d"
         if interval == "1m": data_period = "7d"
-        elif interval in ["5m", "15m", "30m"]: data_period = "60d"
-        elif interval == "60m": data_period = "1y" 
-        else: data_period = "2y"
         
         df = stock.history(period=data_period, interval=interval)
         
-        # 10分線特殊處理：重新取樣
         if period_label == "10分":
-             agg_dict = {'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}
-             df = df.resample('10min').agg(agg_dict).dropna()
+             agg = {'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}
+             df = df.resample('10min').agg(agg).dropna()
 
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
         # K 線圖
-        fig = make_subplots(rows=1, cols=1)
-        
-        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ef5350', decreasing_line_color='#26a69a'))
-        for ma, c in [('MA5','#1f77b4'), ('MA10','#9467bd'), ('MA20','#ff7f0e'), ('MA60','#bcbd22'), ('MA120','#8c564b')]:
-            if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma))
-
-        # 設定預設範圍：最近 45 根
-        if len(df) > 45:
-            fig.update_xaxes(range=[df.index[-45], df.index[-1]])
-
-        # Layout
-        fig.update_layout(
-            template="plotly_white", height=450,
-            margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", y=1.02, x=0),
-            dragmode='pan',
-            hovermode='x unified',
-            xaxis=dict(rangeslider_visible=False, fixedrange=False), # 允許 X 軸移動
-            yaxis=dict(fixedrange=True) # 鎖定 Y 軸
+        fig = make_subplots(
+            rows=3, cols=1, 
+            shared_xaxes=True, 
+            row_heights=[0.6, 0.2, 0.2], 
+            vertical_spacing=0.01
         )
         
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False, 'doubleClick': 'reset+autosize'})
+        # 1. 主圖
+        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ef5350', decreasing_line_color='#26a69a'), row=1, col=1)
+        for ma, c in [('MA5','#1f77b4'), ('MA10','#9467bd'), ('MA20','#ff7f0e'), ('MA60','#bcbd22'), ('MA120','#8c564b')]:
+            if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
+
+        # 2. 成交量
+        colors_vol = ['#ef5350' if r['Open'] < r['Close'] else '#26a69a' for i, r in df.iterrows()]
+        fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=colors_vol, name='成交量'), row=2, col=1)
+        if 'VOL_MA5' in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df['VOL_MA5'], line=dict(color='#1f77b4', width=1), name='MV5'), row=2, col=1)
+
+        # 3. KD (只保留 KD，移除 RSI, MACD)
+        fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#1f77b4', width=1.2), name='K9'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#ff7f0e', width=1.2), name='D9'), row=3, col=1)
+
+        # 設定預設顯示範圍 (最近 45 根)
+        if len(df) > 45:
+            fig.update_xaxes(range=[df.index[-45], df.index[-1]], row=1, col=1)
+
+        # Layout 配置 (加上十字線與拖曳)
+        fig.update_layout(
+            template="plotly_white", height=700,
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(orientation="h", y=1.01, x=0),
+            dragmode='pan', # 啟用平移拖曳
+            hovermode='x unified', # 啟用統一十字線
+            xaxis=dict(rangeslider_visible=False), # 移除下方滑桿
+            yaxis=dict(fixedrange=False) # 允許 Y 軸縮放
+        )
         
-        # 只顯示 KD 卡片
+        # 設定十字線樣式 (Spikes)
+        for row in [1, 2, 3]:
+            fig.update_xaxes(
+                showspikes=True, spikemode='across', spikesnap='cursor', 
+                showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
+                rangeslider_visible=False, # 確保子圖也沒滑桿
+                row=row, col=1
+            )
+            fig.update_yaxes(
+                showspikes=True, spikemode='across', spikesnap='cursor', 
+                showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
+                row=row, col=1
+            )
+            
+        # 手機雙擊放大
+        config = {
+            'scrollZoom': True, 
+            'displayModeBar': False,
+            'doubleClick': 'reset+autosize'
+        }
+        st.plotly_chart(fig, use_container_width=True, config=config)
+        
+        # 只顯示 KD 指標卡片
         kd_color = "#ef5350" if latest['K'] > latest['D'] else "#26a69a"
         kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
         st.markdown(f"""

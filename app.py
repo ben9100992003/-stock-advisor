@@ -490,7 +490,7 @@ try:
         report_html = generate_narrative_report(name, target, latest, latest_inst_dict, df)
         st.markdown(report_html, unsafe_allow_html=True)
         
-        # K 線圖 (文字強制白色)
+        # K 線圖 (改為白色背景，黑色文字)
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.2, 0.3], vertical_spacing=0.03)
         
         # K線
@@ -507,16 +507,17 @@ try:
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['K'], line=dict(color='#2962ff', width=1), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['D'], line=dict(color='#ff6d00', width=1), name='D9'), row=3, col=1)
         
-        # 圖表版面設定 (強制字體白色)
+        # 設定圖表樣式 (白色背景 + 黑色文字)
         fig.update_layout(
-            template="plotly_dark",
+            template="plotly_white",
             height=800,
             xaxis_rangeslider_visible=False,
             xaxis3_rangeslider_visible=False,
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            font=dict(color='white') # 全域字體白色
+            paper_bgcolor='rgba(255, 255, 255, 0.95)',
+            plot_bgcolor='rgba(255, 255, 255, 0.95)',
+            showlegend=True,
+            font=dict(color='black'), # 圖表內文字設為黑色
+            margin=dict(l=50, r=20, t=30, b=50) # 調整邊距
         )
         st.plotly_chart(fig, use_container_width=True)
         
@@ -538,12 +539,12 @@ try:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
                 fig_inst.update_layout(
                     barmode='group', 
-                    template="plotly_dark", 
+                    template="plotly_white", 
                     height=300, 
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
+                    paper_bgcolor='rgba(255, 255, 255, 0.95)', 
+                    plot_bgcolor='rgba(255, 255, 255, 0.95)', 
                     xaxis=dict(autorange="reversed"),
-                    font=dict(color='white')
+                    font=dict(color='black')
                 )
                 st.plotly_chart(fig_inst, use_container_width=True)
 

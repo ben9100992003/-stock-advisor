@@ -30,21 +30,19 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
-    # 使用 format 避免 f-string 與 CSS 大括號衝突
-    page_bg_img = """
+    page_bg_img = f'''
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{0}");
+        background-image: url("data:image/png;base64,{bin_str}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
     </style>
-    """.format(bin_str)
+    '''
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 設定背景
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
@@ -79,10 +77,28 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         color: #000 !important;
     }
-    .content-card h3 { color: #000 !important; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-    .content-card p, .content-card li { color: #333 !important; font-size: 1rem; line-height: 1.6; }
-    .content-card b { color: #000; }
-
+    .content-card h3 { 
+        color: #000 !important; 
+        border-bottom: 3px solid #FFD700; 
+        padding-bottom: 10px; 
+        margin-bottom: 15px;
+        font-weight: 800 !important;
+    }
+    .content-card h4 {
+        color: #2962ff !important;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+    }
+    .content-card p, .content-card li { 
+        color: #333 !important; 
+        font-size: 1.05rem; 
+        line-height: 1.6; 
+        margin-bottom: 8px;
+    }
+    .content-card b { color: #000 !important; font-weight: 900; }
+    
     /* 3. 搜尋框 */
     .stTextInput > div > div > input {
         background-color: #ffffff;
@@ -90,11 +106,6 @@ st.markdown("""
         border: 2px solid #eee;
         border-radius: 10px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #ffffff;
-        color: #000;
-        border-radius: 10px;
     }
 
     /* 4. KD 指標卡片 */
@@ -180,61 +191,40 @@ st.markdown("""
     
     /* Plotly Tooltip */
     .plotly-notifier { visibility: hidden; }
-
-    /* 側邊欄大盤 */
-    .market-summary-box {
-        padding: 15px;
-        font-size: 0.9rem;
-        border-left: 4px solid #FFD700;
-        margin-bottom: 10px;
-        background-color: rgba(30, 30, 30, 0.95);
-        border-radius: 8px;
-        color: white;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. 資料串接邏輯 ---
 
-# 股票代號對照表
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電",
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
-    "4903.TWO": "聯光通",
+    "4903.TWO": "聯光通", "8110.TW": "華東",
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
     "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR"
 }
 
 @st.cache_data(ttl=3600)
 def resolve_ticker(user_input):
-    """智慧解析代號"""
     user_input = user_input.strip().upper()
-    
     if user_input.isdigit():
-        # 嘗試上市 (.TW)
         ticker_tw = f"{user_input}.TW"
         try:
             s = yf.Ticker(ticker_tw)
             if not s.history(period="1d").empty: return ticker_tw, s.info.get('longName', ticker_tw)
         except: pass
-        
-        # 嘗試上櫃 (.TWO)
         ticker_two = f"{user_input}.TWO"
         try:
             s = yf.Ticker(ticker_two)
             if not s.history(period="1d").empty: return ticker_two, s.info.get('longName', ticker_two)
         except: pass
-        
         return None, None
-
     else:
-        # 美股
         try:
             s = yf.Ticker(user_input)
             if not s.history(period="1d").empty: return user_input, s.info.get('longName', user_input)
         except: pass
-        
         return None, None
 
 @st.cache_data(ttl=3600)
@@ -270,16 +260,15 @@ def get_institutional_data_finmind(ticker):
         df['net'] = df['buy'] - df['sell']
         
         pivot_df = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
-        
         for col in ['Foreign', 'Trust', 'Dealer']:
             if col not in pivot_df.columns: pivot_df[col] = 0
-            
         pivot_df = (pivot_df / 1000).astype(int)
         pivot_df = pivot_df.reset_index()
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
         pivot_df['Date'] = pd.to_datetime(pivot_df['Date']).dt.strftime('%Y/%m/%d')
         return pivot_df
-    except: return None
+    except Exception as e:
+        return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
@@ -351,6 +340,7 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
+    df['J'] = 3 * df['K'] - 2 * df['D']
     
     delta = df['Close'].diff()
     u = delta.clip(lower=0)
@@ -360,35 +350,93 @@ def calculate_indicators(df):
     
     return df
 
-def generate_narrative_report(name, ticker, latest, inst_df, df):
+def generate_narrative_report(name, ticker, latest, inst_df, df, info):
+    # 1. 基本面 (題材與展望)
+    sector = info.get('sector', '科技')
+    summary = info.get('longBusinessSummary', '')
+    
+    theme_text = f"<b>{name} ({ticker})</b> 屬於 {sector} 產業。"
+    if "Semiconductor" in summary or "晶圓" in summary:
+        theme_text += " 受惠於 AI 伺服器需求爆發，先進製程產能滿載，營運展望樂觀。"
+    elif "Shipping" in summary or "海運" in summary:
+        theme_text += " 運價指數波動與全球地緣政治風險為主要觀察重點。"
+    else:
+        theme_text += " 公司基本面穩健，需留意產業景氣循環變化。"
+
+    # 2. 技術面 (趨勢與技術判讀)
     price = latest['Close']
-    ma20 = latest['MA20']
+    ma5, ma10, ma20 = latest['MA5'], latest['MA10'], latest['MA20']
     k, d = latest['K'], latest['D']
     
-    trend = "多頭" if price > ma20 else "空頭"
+    tech_trend = ""
+    if price > ma5 and ma5 > ma10 and ma10 > ma20:
+        tech_trend = "均線呈現<b>多頭排列</b> (MA5>MA10>MA20)，股價沿 5 日線強勢上攻，短線動能強勁。"
+    elif price < ma5 and ma5 < ma10 and ma10 < ma20:
+        tech_trend = "均線呈現<b>空頭排列</b>，上方層層反壓，反彈宜減碼。"
+    elif price > ma20:
+        tech_trend = "股價站穩<b>月線</b>之上，中期趨勢偏多。"
+        if price < ma5: tech_trend += " 唯短線跌破 5 日線，進入漲多回檔整理，測試 10 日線支撐。"
+    else:
+        tech_trend = "股價跌破<b>月線</b>，短線轉弱。"
+        
+    kd_status = "黃金交叉" if k > d else "死亡交叉"
+    kd_desc = f"日 KD 指標 ({k:.1f}/{d:.1f}) 呈現<b>{kd_status}</b>。"
+    if k > 80: kd_desc += " 位於高檔鈍化區，留意隨時可能回檔。"
+    elif k < 20: kd_desc += " 位於低檔超賣區，隨時醞釀反彈。"
+
+    # 3. 籌碼面 (三大法人)
     inst_text = "籌碼中性"
-    inst_detail = ""
-    
     if inst_df is not None and not inst_df.empty:
-        last_row = inst_df.iloc[-1]
-        f_val, t_val, d_val = last_row['Foreign'], last_row['Trust'], last_row['Dealer']
+        last = inst_df.iloc[-1]
+        f_val, t_val, d_val = last['Foreign'], last['Trust'], last['Dealer']
         total = f_val + t_val + d_val
         
-        inst_detail = f"外資: {f_val:,} / 投信: {t_val:,} / 自營: {d_val:,}"
-        if total > 1000: inst_text = "法人買超"
-        elif total < -1000: inst_text = "法人賣超"
+        recent_5 = inst_df.tail(5)['Foreign'].sum()
+        f_trend = "外資近期偏多操作" if recent_5 > 0 else "外資近期偏空調節"
         
-    kd_sig = "黃金交叉" if k > d else "死亡交叉"
-    advice = "偏多操作" if price > ma20 and k > d else "保守觀望"
+        inst_text = f"三大法人合計 {'買超' if total>0 else '賣超'} {abs(total):,} 張。{f_trend}。"
+    else:
+        inst_text = "暫無最新法人數據。"
+
+    # 4. 進出場建議 (核心邏輯)
+    # 支撐：MA10 或 MA20
+    support = ma10 if price > ma10 else ma20
+    # 壓力：MA5 (若在之下) 或 前波高點
+    resistance = ma5 if price < ma5 else (price * 1.05)
     
+    entry_signal = ""
+    exit_signal = ""
+    
+    if price > ma20 and k > d:
+        action = "偏多操作"
+        entry_signal = f"拉回至 5 日線 {ma5:.2f} 附近不破可分批佈局。"
+        exit_signal = f"跌破月線 {ma20:.2f} 則建議停利或停損。"
+    elif price < ma20 and k < d:
+        action = "保守觀望"
+        entry_signal = f"需等待股價重新站回月線 {ma20:.2f} 再行佈局。"
+        exit_signal = f"反彈至月線 {ma20:.2f} 附近遇壓可考慮減碼。"
+    else:
+        action = "區間震盪"
+        entry_signal = f"箱型區間下緣 {support:.2f} 附近嘗試低接。"
+        exit_signal = f"箱型區間上緣 {resistance:.2f} 附近獲利了結。"
+
     return f"""
     <div class="content-card">
-        <h3>📊 武吉拉深度分析</h3>
-        <p><b>1. 趨勢：</b>{trend}格局。收盤 {price:.2f}，月線 {ma20:.2f}。</p>
-        <p><b>2. 籌碼：</b>{inst_text}。<br><span style='font-size:0.9rem;color:#666;'>({inst_detail})</span></p>
-        <p><b>3. 指標：</b>KD {kd_sig} (K:{k:.1f})。</p>
-        <hr style="border-top: 1px dashed #aaa;">
-        <p style="font-size: 1.2rem; font-weight: bold; color: #2962ff;">💡 建議：{advice}</p>
+        <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
+        
+        <h4>1. 技術指標分析</h4>
+        <p><b>趨勢與技術判讀：</b>{tech_trend}</p>
+        <p><b>指標數據：</b>{kd_desc}</p>
+        
+        <h4>2. 主要機構投資人分析</h4>
+        <p><b>最新籌碼分析：</b>{inst_text}</p>
+        
+        <h4>3. 公司題材與願景</h4>
+        <p><b>核心題材：</b>{theme_text}</p>
+        
+        <h4>4. 💡 進出場價格建議 ({action})</h4>
+        <p><b>🟢 進場數據點 (買入訊號)：</b>{entry_signal}</p>
+        <p><b>🔴 出場數據點 (賣出訊號)：</b>{exit_signal}</p>
     </div>
     """
 
@@ -590,7 +638,7 @@ if target:
         with tab2:
             inst_df = get_institutional_data_finmind(target)
             if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
-            st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
+            st.markdown(generate_narrative_report(name, target, latest, inst_df, df, info), unsafe_allow_html=True)
 
         with tab3:
             inst_df = get_institutional_data_finmind(target)

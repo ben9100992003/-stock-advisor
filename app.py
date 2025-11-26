@@ -50,7 +50,7 @@ st.markdown("""
     
     /* 卡片通用樣式 */
     .recommendation-box, .analysis-text, .market-summary-box {
-        background-color: rgba(20, 20, 20, 0.85) !important;
+        background-color: rgba(20, 20, 20, 0.9) !important;
         border: 1px solid rgba(255, 255, 255, 0.2);
         backdrop-filter: blur(10px);
         border-radius: 12px;
@@ -67,6 +67,7 @@ st.markdown("""
         font-size: 0.9rem;
         border-left: 4px solid #FFD700;
         margin-bottom: 10px;
+        background-color: rgba(30, 30, 30, 0.95) !important;
     }
 
     /* 強制 Metric 樣式 */
@@ -218,6 +219,7 @@ def get_institutional_data_finmind(ticker):
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
+    df['MA10'] = df['Close'].rolling(10).mean() # 新增 MA10
     df['MA20'] = df['Close'].rolling(20).mean()
     df['MA60'] = df['Close'].rolling(60).mean()
     
@@ -252,10 +254,10 @@ def calculate_indicators(df):
     return df
 
 def analyze_market_index(ticker_symbol):
-    """大盤指數自動分析"""
+    """大盤指數深度自動分析"""
     try:
         stock = yf.Ticker(ticker_symbol)
-        df = stock.history(period="3mo")
+        df = stock.history(period="6mo")
         if df.empty: return None
         
         df = calculate_indicators(df)
@@ -263,32 +265,36 @@ def analyze_market_index(ticker_symbol):
         price = latest['Close']
         change = price - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
+        
+        ma5 = latest['MA5']
         ma20 = latest['MA20']
+        ma60 = latest['MA60']
         k, d = latest['K'], latest['D']
         
-        # 趨勢判斷文字生成
-        status = "盤整"
+        # 趨勢判斷
+        status = "震盪"
         color = "#ffffff"
-        comment = ""
         
-        if price > ma20:
-            if k > d:
-                status = "多頭強勢"
-                color = "#ff4b4b"
-                comment = "指數站上月線且 KD 黃金交叉，短線動能強勁，偏多操作。"
-            else:
-                status = "多頭回檔"
-                color = "#ff9100"
-                comment = "雖在月線之上但 KD 修正中，留意支撐是否有守。"
+        trend_desc = ""
+        if price > ma20 and ma20 > ma60:
+            trend_desc = "多頭排列，趨勢強勁。"
+            status = "多頭強勢"
+            color = "#ff4b4b"
+        elif price < ma20 and ma20 < ma60:
+            trend_desc = "空頭排列，壓力沉重。"
+            status = "空頭修正"
+            color = "#00c853"
+        elif price > ma20:
+            trend_desc = "站上月線，嘗試轉強。"
+            status = "多方反攻"
+            color = "#ff9100"
         else:
-            if k < d:
-                status = "空方修正"
-                color = "#00c853"
-                comment = "指數跌破月線且 KD 死亡交叉，趨勢偏弱，建議保守觀望。"
-            else:
-                status = "跌深反彈"
-                color = "#ffff00"
-                comment = "KD 低檔交叉向上，醞釀反彈，但上方月線仍有壓。"
+            trend_desc = "跌破月線，弱勢整理。"
+            status = "弱勢整理"
+            color = "#00e676"
+
+        kd_desc = "黃金交叉" if k > d else "死亡交叉"
+        comment = f"{trend_desc} KD{kd_desc} (K:{k:.1f})。支撐看季線 {ma60:.0f}，壓力看月線 {ma20:.0f}。"
                 
         return {
             "price": price,
@@ -309,6 +315,7 @@ def generate_report(name, ticker, latest, inst_data_dict, df):
     vol_ma5 = latest['VOL_MA5']
     
     ma5 = latest['MA5']
+    ma10 = latest['MA10']
     ma20 = latest['MA20']
     ma60 = latest['MA60']
     
@@ -319,29 +326,31 @@ def generate_report(name, ticker, latest, inst_data_dict, df):
     bb_up = latest['BB_UP']
     bb_lo = latest['BB_LO']
     
-    # 1. 結構判斷
+    # 1. 趨勢結構
     trend_str = ""
-    if price > ma20 and ma20 > ma60:
-        trend_str = "多頭排列格局，中長線趨勢向上。"
+    if price > ma5 and ma5 > ma10 and ma10 > ma20:
+        trend_str = "極短線強勢多頭排列，五日線不破續攻。"
+    elif price > ma20 and ma20 > ma60:
+        trend_str = "中長線多頭排列格局，趨勢穩健向上。"
     elif price < ma20 and ma20 < ma60:
-        trend_str = "空頭排列格局，上方層層賣壓。"
+        trend_str = "均線呈現空頭排列，上方層層反壓，不宜躁進。"
     elif price > ma20:
-        trend_str = "站上月線，短線嘗試轉強。"
+        trend_str = "股價站穩月線之上，中期趨勢具支撐，短線震盪。"
     else:
-        trend_str = "跌破月線，短線整理修正。"
+        trend_str = "股價跌破月線，中期趨勢轉弱，需觀察季線防守力道。"
         
-    # 2. 動能分析
+    # 2. 資金動能
     momentum_str = ""
     if macd_hist > 0 and k > d:
-        momentum_str = "MACD 紅柱與 KD 金叉共振，上漲動能強勁。"
+        momentum_str = "MACD 紅柱與 KD 金叉雙重確認，上漲動能充沛。"
     elif macd_hist < 0 and k < d:
-        momentum_str = "MACD 綠柱與 KD 死叉共振，下跌動能增強。"
+        momentum_str = "MACD 綠柱與 KD 死叉同步，下跌壓力增強，小心修正。"
     elif k > 80:
-        momentum_str = "KD 指標進入高檔鈍化區，需留意短線過熱回檔。"
+        momentum_str = "KD 指標進入高檔鈍化區 (>80)，強者恆強，但需留意乖離過大。"
     elif k < 20:
-        momentum_str = "KD 指標進入低檔超賣區，隨時有反彈機會。"
+        momentum_str = "KD 指標進入低檔超賣區 (<20)，隨時醞釀技術性反彈。"
     else:
-        momentum_str = "技術指標呈現中性震盪。"
+        momentum_str = f"KD 指標 ({k:.1f}/{d:.1f}) 位於中性區間，等待方向確認。"
 
     # 3. 籌碼分析
     inst_text = "資料更新中..."
@@ -359,31 +368,32 @@ def generate_report(name, ticker, latest, inst_data_dict, df):
         (合計: {total:,} 張)
         """
         
-        if total > 2000: inst_conclusion = "法人大舉買進，籌碼面偏多。"
-        elif total < -2000: inst_conclusion = "法人調節賣出，籌碼面偏空。"
-        elif t_val > 500: inst_conclusion = "投信積極佈局，關注作帳行情。"
-        else: inst_conclusion = "法人買賣超幅度不大，觀望氣氛濃。"
+        if total > 5000: inst_conclusion = "法人大舉買進，籌碼面強勢偏多。"
+        elif total < -5000: inst_conclusion = "法人大幅調節賣出，籌碼面偏空，需避開鋒頭。"
+        elif t_val > 1000: inst_conclusion = "投信積極佈局認養，關注作帳行情。"
+        elif f_val < -2000 and price > ma20: inst_conclusion = "外資逆勢調節，需留意高檔出貨風險。"
+        else: inst_conclusion = "法人買賣超幅度不大，市場觀望氣氛濃。"
     else:
         inst_text = "無法取得今日法人資料 (Yahoo 來源連線中...)"
 
     # 4. 價量分析
     vol_str = ""
     if vol > 1.5 * vol_ma5:
-        vol_str = "今日出量攻擊，顯示買盤積極。" if price > df['Open'].iloc[-1] else "今日爆量下殺，恐有主力出貨嫌疑。"
+        vol_str = "今日爆量" + ("長紅，買盤積極進駐。" if price > df['Open'].iloc[-1] else "長黑，恐有主力出貨嫌疑。")
     elif vol < 0.6 * vol_ma5:
-        vol_str = "今日量縮整理，市場觀望氣氛濃厚。"
+        vol_str = "今日量縮整理，市場觀望，等待變盤。"
     else:
-        vol_str = "成交量維持常態水平。"
+        vol_str = "成交量維持常態水平，量價結構平穩。"
 
     # 5. 綜合建議
     strategy = ""
     action_color = "#ffffff"
     
     if price > ma20 and k > d:
-        strategy = f"多頭強勢。建議沿 5 日線 ({ma5:.1f}) 操作，跌破月線 ({ma20:.1f}) 停利。"
+        strategy = f"偏多操作。建議沿 5 日線 ({ma5:.1f}) 操作，跌破 10 日線 ({ma10:.1f}) 減碼。"
         action_color = "#ff4b4b" # 紅
     elif price < ma20 and k < d:
-        strategy = f"空方走勢。壓力看月線 ({ma20:.1f})，支撐看布林下軌 ({bb_lo:.1f})，勿輕易摸底。"
+        strategy = f"偏空觀望。上方月線 ({ma20:.1f}) 壓力重，支撐看布林下軌 ({bb_lo:.1f})。"
         action_color = "#00c853" # 綠
     elif price > bb_up:
         strategy = "股價觸及布林上軌，短線乖離過大，不宜追高，可分批獲利。"
@@ -410,7 +420,7 @@ def generate_report(name, ticker, latest, inst_data_dict, df):
         <span style="font-size:0.9em; color:#ccc;">{inst_text}</span></p>
         
         <p><b>4. 關鍵點位：</b><br>
-        壓力：布林上軌 {bb_up:.2f} | 支撐：月線 {ma20:.2f}</p>
+        壓力：布林上軌 {bb_up:.2f} | 支撐：月線 {ma20:.2f} / 季線 {ma60:.2f}</p>
         
         <hr style="border-top: 1px dashed #666;">
         <p style="font-size:1.3rem; font-weight:bold; color:{action_color} !important;">
@@ -524,55 +534,99 @@ try:
             st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
             st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
+        # 生成報告
         st.markdown(generate_report(display_name, target, latest, latest_inst_dict, df), unsafe_allow_html=True)
         
-        # K 線圖
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
-        fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='orange', width=1), name='MA5'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA20'], line=dict(color='cyan', width=1), name='MA20'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['BB_UP'], line=dict(color='gray', width=1, dash='dot'), name='布林上軌'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['BB_LO'], line=dict(color='gray', width=1, dash='dot'), name='布林下軌'), row=1, col=1)
-        
-        colors = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
-        fig.add_trace(go.Bar(x=df.index.strftime('%Y-%m-%d'), y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
-        
-        fig.update_layout(
-            template="plotly_white",
-            height=500, 
-            xaxis_rangeslider_visible=False, 
-            margin=dict(l=0, r=0, t=0, b=0), 
-            paper_bgcolor='rgba(255, 255, 255, 1)', 
-            plot_bgcolor='rgba(255, 255, 255, 1)' 
+        # --- 升級版 K 線圖 (仿 Yahoo 風格) ---
+        # 建立 3 層子圖：K線(含MA), 成交量, KD
+        fig = make_subplots(
+            rows=3, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.03, 
+            row_heights=[0.5, 0.2, 0.3],
+            subplot_titles=("", "成交量", "KD 指標")
         )
+
+        # 1. K 線與均線 (主圖)
+        # K 線 (紅漲綠跌)
+        fig.add_trace(go.Candlestick(
+            x=df.index.strftime('%Y-%m-%d'), 
+            open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
+            name='K線',
+            increasing_line_color='#ff4b4b', increasing_fillcolor='#ff4b4b',
+            decreasing_line_color='#00c853', decreasing_fillcolor='#00c853'
+        ), row=1, col=1)
+        
+        # 均線 (仿 Yahoo 配色：MA5藍, MA10紫, MA20橘, MA60黃/綠)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='#2962ff', width=1), name='MA5'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA10'], line=dict(color='#aa00ff', width=1), name='MA10'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA20'], line=dict(color='#ff6d00', width=1), name='MA20'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA60'], line=dict(color='#ffd600', width=1), name='MA60'), row=1, col=1)
+
+        # 2. 成交量 (中層)
+        colors_vol = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
+        fig.add_trace(go.Bar(
+            x=df.index.strftime('%Y-%m-%d'), 
+            y=df['Volume'], 
+            marker_color=colors_vol, 
+            name='成交量'
+        ), row=2, col=1)
+
+        # 3. KD 指標 (下層)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['K'], line=dict(color='#2962ff', width=1), name='K9'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['D'], line=dict(color='#ff6d00', width=1), name='D9'), row=3, col=1)
+
+        # 設定圖表樣式 (深色背景 + 移除滑桿)
+        fig.update_layout(
+            template="plotly_dark",
+            height=800, # 加高圖表
+            margin=dict(l=0, r=0, t=30, b=0),
+            xaxis_rangeslider_visible=False,
+            xaxis3_rangeslider_visible=False,
+            paper_bgcolor='rgba(0,0,0,0)', # 透明背景融入網頁
+            plot_bgcolor='rgba(0,0,0,0)',
+            hovermode='x unified',
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        # 修正 X 軸 (移除休市日空隙)
+        fig.update_xaxes(type='category', tickangle=0, nticks=10)
+        
         st.plotly_chart(fig, use_container_width=True)
         
-        t1, t2, t3 = st.columns(3)
-        t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
-        t2.metric("K (9)", f"{latest['K']:.1f}")
-        t3.metric("D (9)", f"{latest['D']:.1f}")
+        # 底部 Tab 區塊
+        tab1, tab2 = st.tabs(["📉 詳細指標", "🏛️ 法人籌碼"])
         
-        # 法人圖表區
-        st.markdown("### 🏛️ 法人籌碼變化 (近30日)")
-        if inst_df is not None and not inst_df.empty:
-            fig_inst = go.Figure()
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#FBBC05'))
+        with tab1:
+            t1, t2, t3, t4 = st.columns(4)
+            t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
+            t2.metric("K (9)", f"{latest['K']:.1f}")
+            t3.metric("D (9)", f"{latest['D']:.1f}")
+            t4.metric("MACD", f"{latest['MACD']:.2f}")
             
-            fig_inst.update_layout(
-                barmode='group',
-                template="plotly_white",
-                height=400,
-                margin=dict(l=0, r=0, t=30, b=0),
-                paper_bgcolor='rgba(255, 255, 255, 1)',
-                plot_bgcolor='rgba(255, 255, 255, 1)',
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-            fig_inst.update_xaxes(autorange="reversed")
-            st.plotly_chart(fig_inst, use_container_width=True)
-        else:
-            st.info("此股票無法人籌碼資料。")
+        with tab2:
+            if inst_df is not None and not inst_df.empty:
+                # 顯示法人買賣變化圖表 (Bar Chart)
+                st.subheader("法人買賣變化 (近30日)")
+                fig_inst = go.Figure()
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
+                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#FBBC05'))
+                
+                fig_inst.update_layout(
+                    barmode='group',
+                    template="plotly_dark",
+                    height=400,
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                fig_inst.update_xaxes(autorange="reversed")
+                st.plotly_chart(fig_inst, use_container_width=True)
+            else:
+                st.info("此股票無法人籌碼資料。")
 
 except Exception as e:
     st.error(f"發生錯誤: {e}")

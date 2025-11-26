@@ -27,7 +27,6 @@ def get_base64_of_bin_file(bin_file):
 def set_png_as_page_bg(png_file):
     if not os.path.exists(png_file): return
     bin_str = get_base64_of_bin_file(png_file)
-    if not bin_str: return
     page_bg_img = '''
     <style>
     .stApp {
@@ -112,12 +111,11 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
     .stRadio > div {
-        display: flex; flex-direction: row; gap: 5px;
-        background-color: #ffffff;
-        padding: 5px; border-radius: 25px; /* 圓角 */
+        display: flex; flex-direction: row; gap: 0px;
+        background-color: #f0f0f0;
+        padding: 4px; border-radius: 8px;
         width: 100%;
         justify-content: space-between;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .stRadio div[role="radiogroup"] > label {
         flex: 1;
@@ -285,7 +283,7 @@ with st.spinner("載入數據..."):
 
 c_search, c_hot = st.columns([3, 1])
 with c_search:
-    target_input = st.text_input("🔍 搜尋股票 (輸入代號或名稱)", value="")
+    target_input = st.text_input("🔍 輸入代號或名稱搜尋 (如: 2330, NVDA)", value="")
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 
@@ -358,9 +356,11 @@ try:
         fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#1f77b4', width=1.2), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#ff7f0e', width=1.2), name='D9'), row=3, col=1)
 
-        # 設定預設範圍：最近 45 根 (不擠在一起)
-        if len(df) > 45:
-            fig.update_xaxes(range=[df.index[-45], df.index[-1]], row=1, col=1)
+        # 設定預設範圍：最近 60 根 (不擠在一起)
+        if len(df) > 60:
+            start_idx = df.index[-60]
+            end_idx = df.index[-1]
+            fig.update_xaxes(range=[start_idx, end_idx], row=1, col=1)
 
         # Layout: 移除滑桿，啟用 Pan (拖曳) 和 Zoom (縮放)
         fig.update_layout(
@@ -381,9 +381,9 @@ try:
         
         # 只顯示 KD 卡片 (其他不要)
         kd_color = "#ef5350" if latest['K'] > latest['D'] else "#26a69a"
-        kd_text = "黃金交叉 🚀" if latest['K'] > latest['D'] else "死亡交叉 📉"
+        kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
         st.markdown(f"""
-        <div class="kd-card" style="border-left: 8px solid {kd_color};">
+        <div class="kd-card" style="border-left: 6px solid {kd_color};">
             <div class="kd-title">KD 指標 (9,3,3)</div>
             <div style="text-align:right;">
                 <div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div>
@@ -403,7 +403,7 @@ try:
             fig_inst = go.Figure()
             fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#1f77b4'))
             fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9467bd'))
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e377c2'))
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e91e63'))
             fig_inst.update_layout(barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_inst, use_container_width=True)
             st.dataframe(inst_df.sort_values('Date', ascending=False).head(10), use_container_width=True)

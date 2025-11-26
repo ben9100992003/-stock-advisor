@@ -18,13 +18,11 @@ st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide
 
 # --- 2. 背景圖片與 CSS 設定 ---
 def get_base64_of_bin_file(bin_file):
-    """讀取圖片並轉為 base64 編碼"""
     try:
         with open(bin_file, 'rb') as f:
             data = f.read()
         return base64.b64encode(data).decode()
-    except:
-        return ""
+    except: return ""
 
 def set_png_as_page_bg(png_file):
     if not os.path.exists(png_file): return
@@ -52,11 +50,12 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 搜尋框優化 */
+    /* 頂部搜尋框 */
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: rgba(255, 255, 255, 0.95);
         color: #000;
         border-radius: 8px;
+        border: 2px solid #FFD700;
     }
     
     /* 分析報告容器 */
@@ -82,7 +81,7 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* 詳細指標卡片 */
+    /* 指標卡片 */
     .indicator-card {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 10px;
@@ -113,33 +112,37 @@ st.markdown("""
     /* 標題 */
     h1, h2 { text-shadow: 2px 2px 5px #000; }
     
-    /* 週期按鈕優化 (橫向排列，更像 Tab) */
+    /* 週期按鈕優化 */
     .stRadio > div {
         display: flex;
         flex-direction: row;
-        gap: 5px;
-        background-color: rgba(255, 255, 255, 0.1);
-        padding: 8px;
+        gap: 10px;
+        background-color: rgba(0,0,0,0.6);
+        padding: 10px;
         border-radius: 8px;
-        overflow-x: auto; /* 允許手機橫向捲動 */
+        overflow-x: auto;
+        justify-content: center;
     }
+    .stRadio label { color: white !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. 資料串接邏輯 ---
 
-# 擴充股票代號對照表 (中文搜尋核心)
+# 擴充股票代號對照表 (50+ 檔)
 STOCK_NAMES = {
     # 台股權值
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
     "1216.TW": "統一", "2002.TW": "中鋼", "2886.TW": "兆豐金", "2884.TW": "玉山金", "2892.TW": "第一金",
+    "1101.TW": "台泥", "1102.TW": "亞泥", "1301.TW": "台塑", "1303.TW": "南亞", "1326.TW": "台化",
+    "2912.TW": "統一超", "3008.TW": "大立光", "5871.TW": "中租-KY", "5876.TW": "上海商銀", "2880.TW": "華南金",
     # AI / 電腦
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
     "2357.TW": "華碩", "2324.TW": "仁寶", "3017.TW": "奇鋐", "3037.TW": "欣興", "2379.TW": "瑞昱",
     # 航運 / 傳產
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
-    "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY", "1605.TW": "華新", "1101.TW": "台泥",
+    "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY", "1605.TW": "華新", 
     # 面板 / 記憶體
     "2409.TW": "友達", "3481.TW": "群創", "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏",
     # ETF
@@ -150,55 +153,69 @@ STOCK_NAMES = {
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
     "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR",
     "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾", "SMCI": "美超微", "ARM": "安謀", "MU": "美光",
-    "V": "Visa", "MA": "萬事達卡", "JPM": "摩根大通", "BAC": "美國銀行", "WMT": "沃爾瑪", "KO": "可口可樂"
+    "V": "Visa", "MA": "萬事達卡", "JPM": "摩根大通", "BAC": "美國銀行", "WMT": "沃爾瑪", "KO": "可口可樂",
+    "SPY": "SPDR標普500 ETF", "QQQ": "Invesco納斯達克100 ETF", "SOXX": "iShares半導體ETF"
 }
 
 @st.cache_data(ttl=3600)
 def get_market_hot_stocks():
-    """取得台美股熱門交易清單"""
-    hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454", "2382", "2303", "2615", "3231"] # 預設備援
-    hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN", "META", "GOOGL", "AVGO"] # 預設美股
+    hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454", "2382", "2303", "2615", "3231"]
+    hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN", "META", "GOOGL", "AVGO"]
     
-    # 1. 抓台股熱門 (FinMind)
     try:
         dl = DataLoader(token=FINMIND_API_TOKEN)
         latest_trade_date = dl.taiwan_stock_daily_adj(
             stock_id="2330", 
             start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         ).iloc[-1]['date']
-        
         df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
-        # 取成交量前 15 名
-        if not df.empty:
-            hot_tw = df.sort_values(by='Trading_Volume', ascending=False).head(15)['stock_id'].tolist()
-    except Exception:
-        pass
-
-    # 2. 美股維持預設清單 (因 Yahoo Trending API 不穩定)
+        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(15)
+        if not top_df.empty:
+            hot_tw = top_df['stock_id'].tolist()
+    except: pass
     
     return hot_tw, hot_us
 
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
+    """FinMind 法人資料抓取 (修復版)"""
     if ".TW" not in ticker: return None
     stock_id = ticker.replace(".TW", "")
     dl = DataLoader(token=FINMIND_API_TOKEN)
+    
     try:
-        start_date = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d') # 抓 90 天
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
+        
+        # 計算淨買賣超
         df['net'] = df['buy'] - df['sell']
-        dates = sorted(df['date'].unique())
-        result_list = []
-        for d in dates:
-            day_df = df[df['date'] == d]
-            def get_net(key):
-                v = day_df[day_df['name'].str.contains(key)]['net'].sum()
-                return int(v / 1000)
-            result_list.append({
-                'Date': d, 'Foreign': get_net('外資'), 'Trust': get_net('投信'), 'Dealer': get_net('自營')
-            })
-        return pd.DataFrame(result_list)
+        
+        # 整理數據：日期、外資、投信、自營
+        # 先轉成 pivot table 確保每一天都有這三個欄位
+        pivot_df = df.pivot_table(index='date', columns='name', values='net', aggfunc='sum').fillna(0)
+        
+        # 重新命名與篩選
+        rename_map = {}
+        for col in pivot_df.columns:
+            if '外資' in col: rename_map[col] = 'Foreign'
+            elif '投信' in col: rename_map[col] = 'Trust'
+            elif '自營' in col: rename_map[col] = 'Dealer'
+            
+        pivot_df = pivot_df.rename(columns=rename_map)
+        
+        # 確保欄位存在
+        for col in ['Foreign', 'Trust', 'Dealer']:
+            if col not in pivot_df.columns: pivot_df[col] = 0
+            
+        # 單位換算 (股 -> 張)
+        pivot_df = (pivot_df / 1000).astype(int)
+        
+        # 重設 index 為欄位
+        pivot_df = pivot_df.reset_index()
+        pivot_df = pivot_df.rename(columns={'date': 'Date'})
+        
+        return pivot_df
     except:
         return None
 
@@ -237,8 +254,18 @@ def get_institutional_data_yahoo(ticker):
             if c in df_clean.columns: df_clean[c] = df_clean[c].apply(clean)
             else: df_clean[c] = 0
             
-        df_clean['Date'] = df_clean['Date'].apply(lambda x: f"{datetime.now().year}/{x}" if len(x)<=5 else x)
-        return df_clean.head(30)
+        # Yahoo 日期格式處理
+        def clean_date(d):
+            # 假設今年
+            if isinstance(d, str) and '/' in d and len(d) <= 5:
+                return f"{datetime.now().year}/{d}"
+            return str(d).replace('-', '/')
+            
+        df_clean['Date'] = df_clean['Date'].apply(clean_date)
+        
+        # 排序 (舊->新) 以符合畫圖邏輯
+        df_clean = df_clean.sort_values('Date')
+        return df_clean
     except:
         return None
 
@@ -292,6 +319,9 @@ def analyze_market_index(ticker_symbol, name):
         
         change = price - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
+        
+        status = "震盪"
+        color = "#ffffff"
         
         if price > ma20:
             status = "多頭強勢" if k > d else "多頭回檔"
@@ -376,29 +406,23 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
     </div>
     """
 
-# --- 5. UI 介面 (Top Search) ---
+# --- 5. UI 介面 ---
 
 # 標題
 st.markdown("<h1 style='text-align: center; text-shadow: 2px 2px 8px #000; margin-bottom: 20px;'>🦖 武吉拉 Wujila 投資決策系統</h1>", unsafe_allow_html=True)
 
-# 1. 搜尋與過濾邏輯
+# 1. 搜尋與過濾
 with st.spinner("大數據運算中..."):
     hot_tw, hot_us = get_market_hot_stocks()
 
 search_options = []
-
-# A. 台股熱門 Top 10
 for t in hot_tw:
     t_key = f"{t}.TW" if t.isdigit() else t
     name = STOCK_NAMES.get(t_key, t)
     search_options.append(f"🇹🇼 熱門：{name} ({t_key})")
-
-# B. 美股熱門 Top 10
 for t in hot_us:
     name = STOCK_NAMES.get(t, t)
     search_options.append(f"🇺🇸 熱門：{name} ({t})")
-
-# C. 其他權值股 (補充)
 seen = set(hot_tw + hot_us)
 for t_key, name in STOCK_NAMES.items():
     raw = t_key.replace(".TW", "")
@@ -429,10 +453,10 @@ with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=Fal
 
 st.markdown("---")
 
-# --- K 線週期與連結區 (重構佈局：週期選單置於標題區塊) ---
+# --- 主畫面數據分析 ---
 try:
-    # 嘗試抓取名稱
     stock = yf.Ticker(target)
+    # 嘗試取得中文名稱
     name = STOCK_NAMES.get(target, None)
     if not name:
         try:
@@ -444,21 +468,11 @@ try:
             if not name: name = stock.info.get('longName', target)
         except: name = target
 
-    # 預設日線
-    data_period_default = "2y"
-    interval_default = "1d"
+    # 標題與週期選單 (並排)
+    c_header, c_menu = st.columns([1, 2])
     
-    # 建立標題與選單區塊
-    c_header, c_menu = st.columns([2, 2])
-    with c_header:
-        # 先顯示標題 (不抓資料)
-        st.markdown(f"<h1 style='text-shadow:2px 2px 4px black; margin:0;'>{name} ({target})</h1>", unsafe_allow_html=True)
-        # 連結按鈕
-        st.link_button(f"前往 Yahoo 股市", f"https://tw.stock.yahoo.com/quote/{target}")
-
     with c_menu:
-        # 週期選單 (與標題平行)
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True) # Spacer
+        # K 線週期選單
         interval_map = {"日K": "1d", "週K": "1wk", "月K": "1mo", "60分": "60m", "30分": "30m", "15分": "15m", "5分": "5m"}
         selected_interval_label = st.radio("K 線週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
         interval = interval_map[selected_interval_label]
@@ -477,18 +491,25 @@ try:
         pct = (chg / df['Close'].iloc[-2]) * 100
         color = "#ff4b4b" if chg >= 0 else "#00c853"
         
-        # 在標題下方補上價格資訊
-        st.markdown(f"<h2 style='color:{color};text-shadow:1px 1px 2px black; margin-top:-20px;'>{latest['Close']:.2f} <small>({chg:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
-        
+        with c_header:
+            st.markdown(f"<h2 style='text-shadow:2px 2px 4px black; margin:0;'>{name} ({target})</h2>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='color:{color};text-shadow:1px 1px 2px black; margin:0;'>{latest['Close']:.2f} <small>({chg:+.2f} / {pct:+.2f}%)</small></h3>", unsafe_allow_html=True)
+
         # 抓取法人
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
         
-        # --- K 線圖 (Range Slider) ---
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
+        # --- K 線圖 (Yahoo 風格) ---
+        fig = make_subplots(
+            rows=3, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.02, 
+            row_heights=[0.6, 0.2, 0.2],
+            subplot_titles=("", "", "")
+        )
         
-        # 主圖
-        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#c0392b', decreasing_line_color='#27ae60'), row=1, col=1)
+        # 1. 主圖
+        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ff0000', decreasing_line_color='#009900'), row=1, col=1)
         
         ma_list = [('MA5','blue'), ('MA10','purple'), ('MA20','orange'), ('MA60','green'), ('MA120','brown')]
         if interval in ["1d", "1wk", "1mo"]: ma_list.append(('MA240','gray'))
@@ -496,29 +517,26 @@ try:
         for ma, c in ma_list:
             if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
             
-        # 成交量
-        colors = ['#c0392b' if r['Open'] < r['Close'] else '#27ae60' for i, r in df.iterrows()]
+        # 2. 成交量
+        colors = ['#ff0000' if r['Open'] < r['Close'] else '#009900' for i, r in df.iterrows()]
         fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
         
-        # KD
-        fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#2980b9', width=1.2), name='K9'), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#e67e22', width=1.2), name='D9'), row=3, col=1)
+        # 3. KD
+        fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#0099FF', width=1.2), name='K9'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#FF9900', width=1.2), name='D9'), row=3, col=1)
         
-        # 移除 Range Selector 按鈕，只保留下方 Range Slider
-        fig.update_xaxes(
-            rangeslider_visible=False, # 主圖不顯示，統一用最下方的
-            row=1, col=1
+        # 版面設定
+        fig.update_layout(
+            template="plotly_white", height=800, 
+            margin=dict(l=10, r=10, t=10, b=10), 
+            legend=dict(orientation="h", y=1.01),
+            dragmode='pan',
+            hovermode='x unified',
+            # 十字線
+            xaxis=dict(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash'),
+            yaxis=dict(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash')
         )
-        
-        # 設定最下方子圖的 Range Slider (全域控制)
-        fig.update_xaxes(
-            rangeslider_visible=True,
-            rangeslider_thickness=0.05,
-            row=3, col=1
-        )
-        
-        fig.update_layout(template="plotly_white", height=800, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.02), dragmode='pan')
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
         
         # 報告
         st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)

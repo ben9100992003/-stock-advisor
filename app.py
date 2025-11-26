@@ -9,7 +9,7 @@ import base64
 import os
 import requests
 from FinMind.data import DataLoader
-import xml.etree.ElementTree as ET # 用於解析 RSS 新聞
+import xml.etree.ElementTree as ET 
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (極簡白底風格) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -43,7 +43,7 @@ def set_png_as_page_bg(png_file):
     '''
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 設定背景圖片 (使用您上傳的財富哥吉拉圖)
+# 設定背景圖片 (使用您上傳的哥吉拉圖)
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
@@ -210,21 +210,28 @@ def get_institutional_data_finmind(ticker):
         start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
+        
+        def normalize_name(n):
+            if '外資' in n or 'Foreign' in n: return 'Foreign'
+            if '投信' in n or 'Trust' in n: return 'Trust'
+            if '自營' in n or 'Dealer' in n: return 'Dealer'
+            return 'Other'
+            
+        df['norm_name'] = df['name'].apply(normalize_name)
         df['net'] = df['buy'] - df['sell']
-        pivot_df = df.pivot_table(index='date', columns='name', values='net', aggfunc='sum').fillna(0)
-        rename_map = {}
-        for col in pivot_df.columns:
-            if '外資' in col: rename_map[col] = 'Foreign'
-            elif '投信' in col: rename_map[col] = 'Trust'
-            elif '自營' in col: rename_map[col] = 'Dealer'
-        pivot_df = pivot_df.rename(columns=rename_map)
+        
+        pivot_df = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
+        
         for col in ['Foreign', 'Trust', 'Dealer']:
             if col not in pivot_df.columns: pivot_df[col] = 0
+            
         pivot_df = (pivot_df / 1000).astype(int)
         pivot_df = pivot_df.reset_index()
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
+        
         return pivot_df
-    except: return None
+    except Exception as e:
+        return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
@@ -257,14 +264,16 @@ def get_institutional_data_yahoo(ticker):
         df_clean['Date'] = df_clean['Date'].apply(lambda x: f"{datetime.now().year}/{x}" if len(x)<=5 else x)
         df_clean['Date'] = pd.to_datetime(df_clean['Date'])
         df_clean.set_index('Date', inplace=True)
-        return df_clean.sort_index().reset_index()[['Date', 'Foreign', 'Trust', 'Dealer']].head(30)
+        res = df_clean.sort_index().reset_index()[['Date', 'Foreign', 'Trust', 'Dealer']].head(30)
+        res['Date'] = res['Date'].dt.strftime('%Y/%m/%d')
+        return res
     except: return None
 
 @st.cache_data(ttl=300)
 def get_google_news(ticker):
     try:
         query_ticker = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
-        if ".TW" not in ticker and ".TWO" not in ticker and len(ticker) < 5:
+        if ".TW" not in ticker and len(ticker) < 5:
              query_ticker = f"{ticker} stock"
         url = f"https://news.google.com/rss/search?q={query_ticker}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         resp = requests.get(url)

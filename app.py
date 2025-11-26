@@ -131,15 +131,31 @@ st.markdown("""
 
 # --- 3. 資料串接邏輯 ---
 
-# 內建對照表 (僅供顯示中文名稱，搜尋不再受限於此)
+# 擴充股票代號對照表 (僅供顯示中文名稱，搜尋不再受限於此)
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
+    "1216.TW": "統一", "2002.TW": "中鋼", "2886.TW": "兆豐金", "2884.TW": "玉山金", "2892.TW": "第一金",
+    "1101.TW": "台泥", "1102.TW": "亞泥", "1301.TW": "台塑", "1303.TW": "南亞", "1326.TW": "台化",
+    "2912.TW": "統一超", "3008.TW": "大立光", "5871.TW": "中租-KY", "5876.TW": "上海商銀", "2880.TW": "華南金",
+    # AI / 電腦
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
+    "2357.TW": "華碩", "2324.TW": "仁寶", "3017.TW": "奇鋐", "3037.TW": "欣興", "2379.TW": "瑞昱",
+    # 航運 / 傳產
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
+    "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY", "1605.TW": "華新", 
+    # 面板 / 記憶體
+    "2409.TW": "友達", "3481.TW": "群創", "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏",
+    # ETF
     "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", "00929.TW": "復華台灣科技優息", 
+    "00919.TW": "群益台灣精選高息", "00940.TW": "元大台灣價值高息", "00632R.TW": "元大台灣50反1", "006208.TW": "富邦台50",
+    "00713.TW": "元大台灣高息低波", "00939.TW": "統一台灣高息動能",
+    # 美股
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
-    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛"
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR",
+    "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾", "SMCI": "美超微", "ARM": "安謀", "MU": "美光",
+    "V": "Visa", "MA": "萬事達卡", "JPM": "摩根大通", "BAC": "美國銀行", "WMT": "沃爾瑪", "KO": "可口可樂",
+    "SPY": "SPDR標普500 ETF", "QQQ": "Invesco納斯達克100 ETF", "SOXX": "iShares半導體ETF"
 }
 
 @st.cache_data(ttl=3600)
@@ -219,12 +235,14 @@ def get_institutional_data_yahoo(ticker):
             elif '投信' in s: new_cols[c] = 'Trust'
             elif '自營' in s: new_cols[c] = 'Dealer'
         target_df = target_df.rename(columns=new_cols)
+        
         if 'Date' not in target_df.columns: return None
         
         df_clean = target_df.copy()
         def clean(x):
             if isinstance(x, str): return int(x.replace(',','').replace('+',''))
             return int(x) if isinstance(x, (int, float)) else 0
+            
         for c in ['Foreign', 'Trust', 'Dealer']:
             if c in df_clean.columns: df_clean[c] = df_clean[c].apply(clean)
             else: df_clean[c] = 0

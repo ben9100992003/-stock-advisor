@@ -18,7 +18,6 @@ st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide
 
 # --- 2. 背景圖片與 CSS 設定 ---
 def get_base64_of_bin_file(bin_file):
-    """讀取圖片並轉為 base64 編碼"""
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
@@ -48,7 +47,7 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 搜尋框優化 */
+    /* 搜尋框 */
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: rgba(255, 255, 255, 0.95);
         color: #000;
@@ -78,7 +77,7 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* 詳細指標卡片 */
+    /* 指標卡片 */
     .indicator-card {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 10px;
@@ -108,46 +107,54 @@ st.markdown("""
     
     /* 標題 */
     h1, h2 { text-shadow: 2px 2px 5px #000; }
-    
-    /* Radio Button 優化 (橫向排列) */
-    .stRadio > div {
-        display: flex;
-        flex-direction: row;
-        gap: 10px;
-        background-color: rgba(0,0,0,0.5);
-        padding: 10px;
-        border-radius: 10px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. 資料串接邏輯 ---
 
+# 擴充股票代號對照表 (中文化核心)
 STOCK_NAMES = {
+    # 台股權值
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
+    "1216.TW": "統一", "2002.TW": "中鋼", "2886.TW": "兆豐金", "2884.TW": "玉山金", "2892.TW": "第一金",
+    # AI / 電腦
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
+    "2357.TW": "華碩", "2324.TW": "仁寶", "3017.TW": "奇鋐", "3037.TW": "欣興", "2379.TW": "瑞昱",
+    # 航運 / 傳產
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
-    "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏", "2409.TW": "友達", "3481.TW": "群創",
+    "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY", "1605.TW": "華新", "1101.TW": "台泥",
+    # 面板 / 記憶體
+    "2409.TW": "友達", "3481.TW": "群創", "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏",
+    # ETF
     "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", "00929.TW": "復華台灣科技優息", 
     "00919.TW": "群益台灣精選高息", "00940.TW": "元大台灣價值高息", "00632R.TW": "元大台灣50反1", "006208.TW": "富邦台50",
+    "00713.TW": "元大台灣高息低波", "00939.TW": "統一台灣高息動能",
+    # 美股
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
-    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR"
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR",
+    "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾", "SMCI": "美超微", "ARM": "安謀", "MU": "美光",
+    "V": "Visa", "MA": "萬事達卡", "JPM": "摩根大通", "BAC": "美國銀行", "WMT": "沃爾瑪", "KO": "可口可樂"
 }
 
 @st.cache_data(ttl=3600)
-def get_top_volume_stocks():
+def get_market_hot_stocks():
+    """取得台美股熱門交易清單"""
+    hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454"] # 預設
+    hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN"] # 預設
+    
+    # 1. 抓台股熱門 (FinMind)
     try:
         dl = DataLoader(token=FINMIND_API_TOKEN)
-        latest_trade_date = dl.taiwan_stock_daily_adj(
-            stock_id="2330", 
-            start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        ).iloc[-1]['date']
-        df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
-        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(20)
-        return top_df['stock_id'].tolist()
-    except:
-        return ["2330", "2317", "2603", "2609", "3231", "2454"] 
+        latest_date = dl.taiwan_stock_daily_adj(stock_id="2330", start_date=(datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')).iloc[-1]['date']
+        df = dl.taiwan_stock_daily_adj(start_date=latest_date)
+        hot_tw = df.sort_values(by='Trading_Volume', ascending=False).head(10)['stock_id'].tolist()
+    except: pass
+
+    # 2. 抓美股熱門 (Yahoo Finance Trending) - 備用方案
+    # 因 yfinance 抓 trending 較慢，這裡維持固定清單擴充
+    
+    return hot_tw, hot_us
 
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
@@ -170,8 +177,7 @@ def get_institutional_data_finmind(ticker):
                 'Date': d, 'Foreign': get_net('外資'), 'Trust': get_net('投信'), 'Dealer': get_net('自營')
             })
         return pd.DataFrame(result_list)
-    except:
-        return None
+    except: return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
@@ -210,8 +216,7 @@ def get_institutional_data_yahoo(ticker):
             
         df_clean['Date'] = df_clean['Date'].apply(lambda x: f"{datetime.now().year}/{x}" if len(x)<=5 else x)
         return df_clean.head(30)
-    except:
-        return None
+    except: return None
 
 # --- 4. 技術指標與大盤分析 ---
 
@@ -227,6 +232,9 @@ def calculate_indicators(df):
     df['BB_UP'] = df['MA20'] + 2 * df['STD']
     df['BB_LO'] = df['MA20'] - 2 * df['STD']
     df['VOL_MA5'] = df['Volume'].rolling(5).mean()
+    
+    # 乖離率 (Bias) - 新增
+    df['BIAS_20'] = (df['Close'] - df['MA20']) / df['MA20'] * 100
     
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
@@ -248,7 +256,7 @@ def calculate_indicators(df):
     
     return df
 
-def analyze_market_index(ticker_symbol):
+def analyze_market_index(ticker_symbol, name):
     try:
         stock = yf.Ticker(ticker_symbol)
         df = stock.history(period="6mo")
@@ -256,153 +264,224 @@ def analyze_market_index(ticker_symbol):
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         price = latest['Close']
-        ma20 = latest['MA20']
+        ma5, ma20, ma60 = latest['MA5'], latest['MA20'], latest['MA60']
         k, d = latest['K'], latest['D']
         
         change = price - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
         
+        # 市場氣氛判斷
+        sentiment = "中性"
+        color = "#ffffff"
+        
         if price > ma20:
-            status = "多頭強勢" if k > d else "多頭回檔"
-            color = "#ff4b4b" if k > d else "#ff9100"
+            if price > ma5 and k > d:
+                sentiment = "🔥 貪婪 (多頭強勢)"
+                color = "#ff4b4b"
+            elif k < d:
+                sentiment = "⚠️ 警戒 (多頭回檔)"
+                color = "#ff9100"
+            else:
+                sentiment = "📈 偏多 (緩步墊高)"
+                color = "#ff4b4b"
         else:
-            status = "空方修正" if k < d else "跌深反彈"
-            color = "#00c853" if k < d else "#ffff00"
+            if price < ma5 and k < d:
+                sentiment = "❄️ 恐慌 (空頭修正)"
+                color = "#00c853"
+            elif k > d:
+                sentiment = "🌤️ 反彈 (跌深回穩)"
+                color = "#ffff00"
+            else:
+                sentiment = "📉 偏空 (弱勢整理)"
+                color = "#00c853"
+                
+        # 支撐壓力
+        support = ma60 if price > ma60 else latest['MA120']
+        pressure = ma20 if price < ma20 else (ma5 * 1.05)
+        
+        comment = f"目前 {name} 呈現<b>{sentiment}</b>格局。KD({k:.1f}) {'金叉' if k>d else '死叉'}。短壓 {pressure:.0f}，短撐 {support:.0f}。"
             
-        return {"price": price, "change": change, "pct": pct, "status": status, "color": color, "comment": f"均線{price>ma20}月線，KD{k>d}交叉"}
+        return {"price": price, "change": change, "pct": pct, "status": sentiment, "color": color, "comment": comment}
     except:
         return None
 
 def generate_narrative_report(name, ticker, latest, inst_df, df):
     price = latest['Close']
-    ma5, ma20, ma60 = latest['MA5'], latest['MA20'], latest['MA60']
+    ma5, ma20, ma60, ma120 = latest['MA5'], latest['MA20'], latest['MA60'], latest['MA120']
     k, d = latest['K'], latest['D']
     vol, vol_ma5 = latest['Volume'], latest['VOL_MA5']
+    bias_20 = latest['BIAS_20']
     
-    trend = "多頭" if price > ma20 else "空頭"
-    trend_detail = "股價站穩月線之上，趨勢偏多。" if price > ma20 else "股價跌破月線，短線轉弱。"
-    if price > ma5 and ma5 > ma20: trend_detail += " 且沿 5 日線強勢上攻。"
-    
-    inst_text = "籌碼中性"
+    # 1. 趨勢與乖離
+    trend_html = f"<b>{name} ({ticker})</b> 收盤 <b>{price:.2f}</b>。"
+    if price > ma20:
+        trend_html += " 股價站穩<b>月線</b>之上，多方控盤。"
+        if price > ma60: trend_html += " 且位於<b>季線</b>之上，中長線保護短線。"
+    else:
+        trend_html += " 股價跌破<b>月線</b>，短線轉弱。"
+        
+    if bias_20 > 10: trend_html += " 唯<b>月線乖離率</b>過大 (>10%)，需留意短線過熱拉回風險。"
+    elif bias_20 < -10: trend_html += " 唯<b>月線乖離率</b>過低 (<-10%)，醞釀技術性反彈。"
+
+    # 2. 量價結構
+    vol_html = "量價方面，"
+    if vol > 1.5 * vol_ma5:
+        vol_status = "價漲量增" if price > df['Open'].iloc[-1] else "爆量長黑"
+        vol_html += f"今日呈現<b>「{vol_status}」</b>，交投熱絡。"
+    elif vol < 0.6 * vol_ma5:
+        vol_html += "今日呈現<b>「量縮整理」</b>，觀望氣氛濃。"
+    else:
+        vol_html += "成交量維持常態，供需穩定。"
+
+    # 3. 籌碼大數據
+    inst_html = "籌碼方面，"
     if inst_df is not None and not inst_df.empty:
         last = inst_df.iloc[-1]
         total = last['Foreign'] + last['Trust'] + last['Dealer']
-        if total > 2000: inst_text = "法人大舉買超，籌碼強勢"
-        elif total < -2000: inst_text = "法人調節賣超，籌碼鬆動"
-        else: inst_text = "法人買賣超幅度不大，觀望氣氛濃"
+        buy_sell = "買超" if total > 0 else "賣超"
+        color = "#ff4b4b" if total > 0 else "#00c853"
+        inst_html += f"法人單日合計<span style='color:{color}'><b>{buy_sell} {abs(total):,} 張</b></span>。"
         
-    kd_sig = "黃金交叉" if k > d else "死亡交叉"
-    vol_sig = "價漲量增" if vol > vol_ma5 * 1.2 and price > df['Open'].iloc[-1] else "量縮整理"
+        # 統計近 10 日
+        recent_10 = inst_df.tail(10)
+        f_sum = recent_10['Foreign'].sum()
+        if f_sum > 10000: inst_html += " 近10日外資累計大買，波段籌碼安定。"
+        elif f_sum < -10000: inst_html += " 近10日外資累計大賣，上方套牢壓力重。"
+    else:
+        inst_html += "暫無最新數據。"
+
+    # 4. 技術指標
+    tech_html = f"指標方面，KD ({k:.1f}, {d:.1f}) "
+    if k > d: tech_html += "呈現<b>黃金交叉</b>，動能轉強。"
+    else: tech_html += "呈現<b>死亡交叉</b>，動能轉弱。"
     
+    if latest['RSI'] > 75: tech_html += " RSI 進入<b>超買區</b>，勿追高。"
+    
+    # 5. 建議
+    advice = "觀望"
+    adv_color = "#ffffff"
+    if price > ma20 and k > d:
+        advice = "趨勢偏多，順勢操作，沿 5 日線持有。"
+        adv_color = "#ff4b4b"
+    elif price < ma20 and k < d:
+        advice = "趨勢偏空，保守觀望，靜待落底。"
+        adv_color = "#00c853"
+    else:
+        advice = "區間震盪，建議在季線與月線間操作。"
+        adv_color = "#ffff00"
+
     return f"""
     <div class="glass-container">
-        <h3>📊 武吉拉深度分析</h3>
-        <p><b>1. 趨勢結構：</b>{trend_detail} 目前收盤 {price:.2f}，支撐看月線 {ma20:.2f}。</p>
-        <p><b>2. 量價分析：</b>今日呈現 <b>{vol_sig}</b> 格局。</p>
-        <p><b>3. 籌碼解讀：</b>{inst_text}。</p>
-        <p><b>4. 技術指標：</b>KD 指標 ({k:.1f}, {d:.1f}) 呈現 <b>{kd_sig}</b>。</p>
+        <h3>📊 武吉拉大數據深度分析</h3>
+        <p><b>1. 趨勢與乖離：</b><br>{trend_html}</p>
+        <p><b>2. 量價結構：</b><br>{vol_html}</p>
+        <p><b>3. 籌碼大數據：</b><br>{inst_html}</p>
+        <p><b>4. 技術指標：</b><br>{tech_html}</p>
         <hr style="border-top: 1px dashed #aaa;">
-        <p style="font-size: 1.2rem; font-weight: bold; color: #ffcc00;">💡 建議：{ '偏多操作' if price>ma20 and k>d else '保守觀望' }</p>
+        <p style="font-size: 1.2rem; font-weight: bold; color: {adv_color};">💡 建議：{advice}</p>
     </div>
     """
 
-# --- 5. UI 介面 (Top Search) ---
+# --- 6. UI 介面 (Top Search) ---
 
 # 標題
 st.markdown("<h1 style='text-align: center; text-shadow: 2px 2px 8px #000; margin-bottom: 20px;'>🦖 武吉拉 Wujila 投資決策系統</h1>", unsafe_allow_html=True)
 
 # 1. 搜尋與過濾邏輯
-with st.spinner("正在掃描市場熱門股..."):
-    hot_tickers = get_top_volume_stocks()
+with st.spinner("大數據運算中..."):
+    hot_tw, hot_us = get_market_hot_stocks()
 
 search_options = []
-for t in hot_tickers:
+
+# A. 台股熱門 Top 10
+for t in hot_tw:
     t_key = f"{t}.TW" if t.isdigit() else t
     name = STOCK_NAMES.get(t_key, t)
-    search_options.append(f"🔥 {name} ({t_key})")
+    search_options.append(f"🇹🇼 熱門：{name} ({t_key})")
 
-seen_tickers = set(hot_tickers)
+# B. 美股熱門 Top 10
+for t in hot_us:
+    name = STOCK_NAMES.get(t, t)
+    search_options.append(f"🇺🇸 熱門：{name} ({t})")
+
+# C. 其他權值股 (補充)
+seen = set(hot_tw + hot_us)
 for t_key, name in STOCK_NAMES.items():
-    raw_ticker = t_key.replace(".TW", "")
-    if raw_ticker not in seen_tickers:
+    raw = t_key.replace(".TW", "")
+    if raw not in seen:
         search_options.append(f"{name} ({t_key})")
 
 default_index = 0
 for i, opt in enumerate(search_options):
-    if "2330" in opt:
-        default_index = i
-        break
+    if "2330" in opt: default_index = i; break
 
 # 頂部搜尋框
-selected_search = st.selectbox(
-    "🔍 請輸入股票代號或中文名稱搜尋 (例如：2330, 台積電, NVDA)",
-    options=search_options,
-    index=default_index
-)
+selected_search = st.selectbox("🔍 請輸入股票代號或中文名稱搜尋 (包含台美股熱門)", options=search_options, index=default_index)
 target = selected_search.split("(")[-1].replace(")", "")
 
 # --- 大盤指數展開區 ---
-with st.expander("🌍 查看今日大盤盤勢 (台股 / 美股)", expanded=False):
+with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
     with t1:
-        tw = analyze_market_index("^TWII")
-        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
+        tw = analyze_market_index("^TWII", "加權指數")
+        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['comment']}</div></div>", unsafe_allow_html=True)
     with t2:
-        us = analyze_market_index("^IXIC")
-        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
+        us = analyze_market_index("^IXIC", "那斯達克")
+        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['comment']}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# --- 3. 主畫面數據分析 (重構順序: 標題 -> 週期 -> K線 -> 報告) ---
+# --- K 線週期與連結區 ---
+col_k, col_link = st.columns([3, 1])
+with col_k:
+    interval_map = {"日K": "1d", "週K": "1wk", "月K": "1mo", "60分": "60m", "30分": "30m", "15分": "15m", "5分": "5m"}
+    selected_interval_label = st.radio("K 線週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
+    interval = interval_map[selected_interval_label]
+    data_period = "2y" if interval in ["1d", "1wk", "1mo"] else "60d"
+with col_link:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.link_button(f"前往 Yahoo 股市", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
+
+# --- 3. 主畫面數據分析 ---
 try:
-    # 1. 先抓取基本報價 (快)
+    # 嘗試抓取名稱
     stock = yf.Ticker(target)
-    # 先用 5 天資料抓最新價格，避免讀取大量資料卡住標題
-    df_fast = stock.history(period="5d")
+    # 優先使用本地字典，找不到才用 API
+    name = STOCK_NAMES.get(target, None)
+    if not name:
+        # 嘗試去 Yahoo 抓中文名 (備援)
+        try:
+            if ".TW" in target:
+                url = f"https://tw.stock.yahoo.com/quote/{target}"
+                r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+                if "title" in r.text:
+                    name = r.text.split("<title>")[1].split("</title>")[0].split(" - ")[0]
+            if not name: name = stock.info.get('longName', target)
+        except: name = target
+
+    df = stock.history(period=data_period, interval=interval)
     
-    if df_fast.empty:
+    if df.empty:
         st.error(f"找不到 {target} 的資料，請確認代號是否正確。")
     else:
-        # 顯示標題與價格
-        latest_fast = df_fast.iloc[-1]
-        info = stock.info
-        name = STOCK_NAMES.get(target, info.get('longName', target))
-        chg = latest_fast['Close'] - df_fast['Close'].iloc[-2]
-        pct = (chg / df_fast['Close'].iloc[-2]) * 100
-        color = "#ff4b4b" if chg >= 0 else "#00c853"
-        
-        col_header, col_yahoo = st.columns([3, 1])
-        with col_header:
-            st.markdown(f"<h1 style='text-shadow:2px 2px 4px black; margin:0;'>{name} ({target})</h1>", unsafe_allow_html=True)
-            st.markdown(f"<h2 style='color:{color};text-shadow:1px 1px 2px black; margin:0;'>{latest_fast['Close']:.2f} <small>({chg:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
-        with col_yahoo:
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.link_button(f"前往 Yahoo 股市", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
-
-        # 2. K 線週期選單 (移到標題下方)
-        st.write("") # Spacer
-        interval_map = {"日K": "1d", "週K": "1wk", "月K": "1mo", "60分": "60m", "30分": "30m", "15分": "15m", "5分": "5m"}
-        # 使用 columns 讓 radio 變成類似按鈕列
-        c_radio, _ = st.columns([3, 1])
-        with c_radio:
-            selected_interval_label = st.radio("K 線週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
-        
-        interval = interval_map[selected_interval_label]
-        data_period = "2y" if interval in ["1d", "1wk", "1mo"] else "60d"
-
-        # 3. 抓取詳細歷史資料 (慢)
-        df = stock.history(period=data_period, interval=interval)
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
-        # 4. 抓取法人 (FinMind)
+        chg = latest['Close'] - df['Close'].iloc[-2]
+        pct = (chg / df['Close'].iloc[-2]) * 100
+        color = "#ff4b4b" if chg >= 0 else "#00c853"
+        
+        # 標題
+        st.markdown(f"<h1 style='text-shadow:2px 2px 4px black; margin:0;'>{name} ({target})</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color:{color};text-shadow:1px 1px 2px black; margin:0;'>{latest['Close']:.2f} <small>({chg:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
+        
+        # 抓取法人
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
         
-        # 5. K 線圖 (Range Slider)
+        # K 線圖
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
         
-        # 主圖
         fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#c0392b', decreasing_line_color='#27ae60'), row=1, col=1)
         
         ma_list = [('MA5','blue'), ('MA10','purple'), ('MA20','orange'), ('MA60','green'), ('MA120','brown')]
@@ -411,18 +490,14 @@ try:
         for ma, c in ma_list:
             if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
             
-        # 成交量
         colors = ['#c0392b' if r['Open'] < r['Close'] else '#27ae60' for i, r in df.iterrows()]
         fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
         
-        # KD
         fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#2980b9', width=1.2), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#e67e22', width=1.2), name='D9'), row=3, col=1)
         
-        # Range Slider
         fig.update_xaxes(
-            rangeslider_visible=True, 
-            rangeslider_thickness=0.05,
+            rangeslider_visible=True, rangeslider_thickness=0.05,
             rangeselector=dict(
                 buttons=list([
                     dict(count=1, label="1月", step="month", stepmode="backward"),
@@ -432,22 +507,16 @@ try:
                     dict(step="all", label="全部")
                 ]),
                 font=dict(color="black"), bgcolor="#f0f0f0"
-            ),
-            row=1, col=1
+            ), row=1, col=1
         )
         
-        fig.update_layout(
-            template="plotly_white", height=900, 
-            margin=dict(l=10, r=10, t=10, b=10), 
-            legend=dict(orientation="h", y=1.02),
-            dragmode='pan'
-        )
+        fig.update_layout(template="plotly_white", height=900, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h", y=1.02), dragmode='pan')
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
         
-        # 6. 分析報告 (移到圖表下方)
+        # 報告
         st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
         
-        # --- 詳細指標 ---
+        # 詳細指標
         st.subheader("📊 詳細指標解讀")
         c1, c2, c3, c4 = st.columns(4)
         

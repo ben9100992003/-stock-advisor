@@ -16,7 +16,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (玻璃擬態 + 白底卡片) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -87,27 +87,54 @@ st.markdown("""
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
-    /* 4. KD 指標卡片 (特別優化) */
+    /* 4. KD 指標卡片 */
     .kd-card {
         background-color: #fff;
-        border-left: 8px solid #2962ff;
+        border-left: 6px solid #2962ff;
         border-radius: 8px;
         padding: 15px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         display: flex;
         align-items: center;
         justify-content: space-between;
+        margin-top: 10px;
     }
-    .kd-title { font-size: 1.2rem; font-weight: bold; color: #555; }
-    .kd-val { font-size: 1.8rem; font-weight: 900; color: #000; }
-    .kd-tag { padding: 4px 12px; border-radius: 20px; color: white; font-weight: bold; }
+    .kd-title { font-size: 1.1rem; font-weight: bold; color: #555; }
+    .kd-val { font-size: 1.5rem; font-weight: 800; color: #000; }
+    .kd-tag { padding: 4px 12px; border-radius: 20px; color: white; font-weight: bold; font-size: 0.9rem; }
 
-    /* 5. Tab */
+    /* 5. Tab 與週期按鈕 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important; font-size: 1.1rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
+    /* 週期按鈕樣式 (仿 App) */
+    .stRadio > div {
+        display: flex; flex-direction: row; gap: 0px;
+        background-color: #f0f0f0;
+        padding: 4px; border-radius: 8px;
+        width: 100%;
+        justify-content: space-between;
+    }
+    .stRadio div[role="radiogroup"] > label {
+        flex: 1;
+        text-align: center;
+        background-color: transparent;
+        padding: 6px 0;
+        border-radius: 6px;
+        margin: 0;
+        color: #666 !important;
+        font-weight: bold;
+        border: none;
+        display: flex; justify-content: center;
+    }
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] {
+        background-color: #26a69a !important; /* 綠色選中 */
+        color: #fff !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
@@ -127,7 +154,7 @@ STOCK_NAMES = {
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
-    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜"
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR"
 }
 
 @st.cache_data(ttl=3600)
@@ -206,26 +233,23 @@ def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
-    df['MA60'] = df['Close'].rolling(60).mean()
-    df['MA120'] = df['Close'].rolling(120).mean()
-    df['MA240'] = df['Close'].rolling(240).mean()
-    df['VOL_MA5'] = df['Volume'].rolling(5).mean()
     
+    # KD (9,3,3)
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    df['J'] = 3 * df['K'] - 2 * df['D']
     
     return df
 
 def generate_narrative_report(name, ticker, latest, inst_df, df):
     price = latest['Close']
-    ma5, ma20 = latest['MA5'], latest['MA20']
+    ma20 = latest['MA20']
     k, d = latest['K'], latest['D']
     
     trend = "多頭" if price > ma20 else "空頭"
+    
     inst_text = "籌碼中性"
     if inst_df is not None and not inst_df.empty:
         total = inst_df.iloc[-1][['Foreign', 'Trust', 'Dealer']].sum()
@@ -256,7 +280,7 @@ with st.spinner("載入數據..."):
 # 搜尋
 c_search, c_hot = st.columns([3, 1])
 with c_search:
-    target_input = st.text_input("🔍 輸入代號或名稱搜尋 (如: 2330, NVDA)", value="")
+    target_input = st.text_input("🔍 輸入代號或名稱 (如: 2330, NVDA)", value="")
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 
@@ -301,62 +325,49 @@ try:
     tab1, tab2, tab3 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼"])
     
     with tab1:
-        # K 線操作區 (上方週期按鈕)
+        # 週期按鈕 (仿 App)
         interval_map = {"分時": "1m", "日": "1d", "週": "1wk", "月": "1mo", "60分": "60m"}
         period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
         
         interval = interval_map[period_label]
         data_period = "2y" if interval in ["1d", "1wk", "1mo"] else "5d"
         
-        # 抓取詳細資料
         df = stock.history(period=data_period, interval=interval)
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
-        # K 線圖
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
+        # K 線圖 (乾淨版)
+        fig = make_subplots(rows=1, cols=1) # 只要一個主圖
         
-        # 1. K線
-        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ef5350', decreasing_line_color='#26a69a'), row=1, col=1)
-        for ma, c in [('MA5','#1f77b4'), ('MA10','#9467bd'), ('MA20','#ff7f0e'), ('MA60','#bcbd22'), ('MA120','#8c564b')]:
-            if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
+        # K線
+        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ef5350', decreasing_line_color='#26a69a'))
+        # 均線
+        for ma, c in [('MA5','#1f77b4'), ('MA10','#ff9800'), ('MA20','#9c27b0')]:
+            if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma))
+            
+        # 設定顯示範圍：最近 45 根 (避免太密)
+        if len(df) > 45:
+            start_view = df.index[-45]
+            end_view = df.index[-1]
+            fig.update_xaxes(range=[start_view, end_view])
 
-        # 2. 成交量
-        colors_vol = ['#ef5350' if r['Open'] < r['Close'] else '#26a69a' for i, r in df.iterrows()]
-        fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=colors_vol, name='成交量'), row=2, col=1)
-
-        # 3. KD
-        fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#1f77b4', width=1.2), name='K9'), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#ff7f0e', width=1.2), name='D9'), row=3, col=1)
-
-        # 設定範圍：預設顯示最近 60 根
-        if len(df) > 60:
-            start_idx = df.index[-60]
-            end_idx = df.index[-1]
-            fig.update_xaxes(range=[start_idx, end_idx], row=1, col=1)
-
-        # Layout: 固定範圍 (Fixed Range) 解決亂跑問題
+        # Layout: 移除滑桿，啟用拖曳 (Pan)
         fig.update_layout(
-            template="plotly_white", height=700,
+            template="plotly_white", height=450,
             margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", y=1.01, x=0),
-            dragmode='pan',
-            xaxis=dict(fixedrange=True), # 主圖鎖定，強制用下方 Slider
-            yaxis=dict(fixedrange=False), # Y軸可動
+            legend=dict(orientation="h", y=1.02, x=0),
+            dragmode='pan', # 手指拖曳
+            xaxis_rangeslider_visible=False, # 移除下方滑桿
+            yaxis=dict(fixedrange=False) # Y軸可動
         )
         
-        # Range Slider (僅底部顯示)
-        fig.update_xaxes(rangeslider_visible=False, row=1, col=1)
-        fig.update_xaxes(rangeslider_visible=True, rangeslider_thickness=0.08, row=3, col=1)
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
         
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 只顯示 KD 數值 (其他不要)
-        st.markdown("<br>", unsafe_allow_html=True)
+        # 只顯示 KD 卡片
         kd_color = "#ef5350" if latest['K'] > latest['D'] else "#26a69a"
-        kd_text = "黃金交叉 🚀" if latest['K'] > latest['D'] else "死亡交叉 📉"
+        kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
         st.markdown(f"""
-        <div class="kd-card" style="border-left: 8px solid {kd_color};">
+        <div class="kd-card" style="border-left: 6px solid {kd_color};">
             <div class="kd-title">KD 指標 (9,3,3)</div>
             <div style="text-align:right;">
                 <div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div>
@@ -375,11 +386,10 @@ try:
             st.markdown(f"<div class='content-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
             fig_inst = go.Figure()
             fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#1f77b4'))
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9467bd'))
-            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e377c2'))
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e91e63'))
             fig_inst.update_layout(barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_inst, use_container_width=True)
-            st.dataframe(inst_df.sort_values('Date', ascending=False).head(10), use_container_width=True)
         else:
             st.info("無法人籌碼資料")
 

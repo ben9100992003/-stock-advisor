@@ -16,7 +16,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (修復版) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -28,24 +28,21 @@ def set_png_as_page_bg(png_file):
     if not os.path.exists(png_file): return
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
-    
-    # 使用單引號包覆 CSS，避免與 f-string 衝突
-    page_bg_img = f'''
+    page_bg_img = '''
     <style>
-    .stApp {{
-        background-image: url("data:image/png;base64,{bin_str}");
+    .stApp {
+        background-image: url("data:image/png;base64,%s");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
-    }}
+    }
     </style>
-    '''
+    ''' % bin_str
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
 set_png_as_page_bg('bg.png')
 
-# 主樣式表 (確保所有括號正確)
 st.markdown("""
     <style>
     .stApp { color: #333; }
@@ -108,48 +105,50 @@ st.markdown("""
     .kd-val { font-size: 1.5rem; font-weight: 800; color: #000; }
     .kd-tag { padding: 4px 12px; border-radius: 20px; color: white; font-weight: bold; font-size: 0.9rem; }
 
-    /* 5. Tab 與週期按鈕 */
+    /* 5. Tab 與週期按鈕 (優化間距) */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important; font-size: 1.1rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
+    /* 週期按鈕樣式 (膠囊樣式，增加間距) */
     .stRadio > div {
-        display: flex; flex-direction: row; gap: 0px;
+        display: flex; 
+        flex-direction: row; 
+        gap: 8px; /* 增加按鈕間距 */
         background-color: #f0f0f0;
-        padding: 4px; border-radius: 8px;
+        padding: 6px 8px; /* 增加內距 */
+        border-radius: 25px;
         width: 100%;
-        justify-content: space-between;
+        justify-content: space-between; /* 平均分配空間 */
+        flex-wrap: wrap; /* 允許換行，避免手機螢幕過窄時擠在一起 */
     }
     .stRadio div[role="radiogroup"] > label {
         flex: 1;
         text-align: center;
         background-color: transparent;
-        padding: 6px 0;
-        border-radius: 6px;
+        padding: 8px 4px;
+        border-radius: 20px;
         margin: 0;
         color: #666 !important;
         font-weight: bold;
         border: none;
         display: flex; justify-content: center;
         cursor: pointer;
+        white-space: nowrap; /* 防止文字換行 */
+        min-width: 45px; /* 設定最小寬度 */
     }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #26a69a !important;
         color: #fff !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
-    /* 連結按鈕 (修正語法) */
-    .stLinkButton a { 
-        background-color: #fff !important; 
-        color: #333 !important; 
-        border: 1px solid #ccc !important; 
-        font-weight: bold !important; 
-    }
+    /* 連結按鈕 */
+    .stLinkButton a { background-color: #fff !important; color: #333 !important; border: 1px solid #ccc !important; font-weight: bold; }
     
     /* 標題 */
     h1, h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
@@ -305,7 +304,7 @@ try:
     info = stock.info
     name = STOCK_NAMES.get(target, info.get('longName', target))
     
-    # 報價卡片
+    # 頂部報價卡片
     df_fast = stock.history(period="5d")
     if not df_fast.empty:
         latest_fast = df_fast.iloc[-1]
@@ -336,13 +335,29 @@ try:
     
     with tab1:
         # 週期按鈕
-        interval_map = {"分時": "1m", "日": "1d", "週": "1wk", "月": "1mo", "60分": "60m"}
+        interval_map = {
+            "1分": "1m", "5分": "5m", "10分": "5m", # Yahoo API 不支援10分，改抓5分
+            "30分": "30m", "60分": "60m", 
+            "日": "1d", "週": "1wk", "月": "1mo"
+        }
         period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
         
         interval = interval_map[period_label]
-        data_period = "2y" if interval in ["1d", "1wk", "1mo"] else "5d"
+        
+        # 根據週期決定抓取資料區間
+        # Yahoo 分時資料限制: 1m(7d), 5m(60d), 60m(730d)
+        if interval == "1m": data_period = "7d"
+        elif interval in ["5m", "15m", "30m"]: data_period = "60d"
+        elif interval == "60m": data_period = "1y" 
+        else: data_period = "2y"
         
         df = stock.history(period=data_period, interval=interval)
+        
+        # 10分線特殊處理：重新取樣
+        if period_label == "10分":
+             agg_dict = {'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}
+             df = df.resample('10min').agg(agg_dict).dropna()
+
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
@@ -353,7 +368,7 @@ try:
         for ma, c in [('MA5','#1f77b4'), ('MA10','#9467bd'), ('MA20','#ff7f0e'), ('MA60','#bcbd22'), ('MA120','#8c564b')]:
             if ma in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df[ma], line=dict(color=c, width=1), name=ma))
 
-        # 設定顯示範圍：最近 45 根
+        # 設定預設範圍：最近 45 根
         if len(df) > 45:
             fig.update_xaxes(range=[df.index[-45], df.index[-1]])
 
@@ -362,10 +377,10 @@ try:
             template="plotly_white", height=450,
             margin=dict(l=10, r=10, t=10, b=10),
             legend=dict(orientation="h", y=1.02, x=0),
-            dragmode='pan', # 拖曳模式
+            dragmode='pan',
             hovermode='x unified',
             xaxis=dict(rangeslider_visible=False, fixedrange=False), # 允許 X 軸移動
-            yaxis=dict(fixedrange=True) # 鎖定 Y 軸，避免拖曳時亂跑
+            yaxis=dict(fixedrange=True) # 鎖定 Y 軸
         )
         
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False, 'doubleClick': 'reset+autosize'})
@@ -402,5 +417,3 @@ try:
 
 except Exception as e:
     st.error(f"無法取得資料，請確認代號是否正確。({e})")
-
-

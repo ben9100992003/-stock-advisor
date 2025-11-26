@@ -18,13 +18,18 @@ st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide
 
 # --- 2. 背景圖片與 CSS 設定 ---
 def get_base64_of_bin_file(bin_file):
-    with open(bin_file, 'rb') as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
+    """讀取圖片並轉為 base64 編碼"""
+    try:
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except:
+        return ""
 
 def set_png_as_page_bg(png_file):
     if not os.path.exists(png_file): return
     bin_str = get_base64_of_bin_file(png_file)
+    if not bin_str: return
     page_bg_img = '''
     <style>
     .stApp {
@@ -123,31 +128,55 @@ st.markdown("""
 
 # --- 3. 資料串接邏輯 ---
 
+# 擴充股票代號對照表 (中文搜尋核心)
 STOCK_NAMES = {
+    # 台股權值
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
+    "1216.TW": "統一", "2002.TW": "中鋼", "2886.TW": "兆豐金", "2884.TW": "玉山金", "2892.TW": "第一金",
+    # AI / 電腦
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
+    "2357.TW": "華碩", "2324.TW": "仁寶", "3017.TW": "奇鋐", "3037.TW": "欣興", "2379.TW": "瑞昱",
+    # 航運 / 傳產
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
-    "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏", "2409.TW": "友達", "3481.TW": "群創",
+    "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY", "1605.TW": "華新", "1101.TW": "台泥",
+    # 面板 / 記憶體
+    "2409.TW": "友達", "3481.TW": "群創", "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏",
+    # ETF
     "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", "00929.TW": "復華台灣科技優息", 
     "00919.TW": "群益台灣精選高息", "00940.TW": "元大台灣價值高息", "00632R.TW": "元大台灣50反1", "006208.TW": "富邦台50",
+    "00713.TW": "元大台灣高息低波", "00939.TW": "統一台灣高息動能",
+    # 美股
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
-    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR"
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR",
+    "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾", "SMCI": "美超微", "ARM": "安謀", "MU": "美光",
+    "V": "Visa", "MA": "萬事達卡", "JPM": "摩根大通", "BAC": "美國銀行", "WMT": "沃爾瑪", "KO": "可口可樂"
 }
 
 @st.cache_data(ttl=3600)
-def get_top_volume_stocks():
+def get_market_hot_stocks():
+    """取得台美股熱門交易清單"""
+    hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454", "2382", "2303", "2615", "3231"] # 預設備援
+    hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN", "META", "GOOGL", "AVGO"] # 預設美股
+    
+    # 1. 抓台股熱門 (FinMind)
     try:
         dl = DataLoader(token=FINMIND_API_TOKEN)
         latest_trade_date = dl.taiwan_stock_daily_adj(
             stock_id="2330", 
             start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         ).iloc[-1]['date']
+        
         df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
-        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(20)
-        return top_df['stock_id'].tolist()
-    except:
-        return ["2330", "2317", "2603", "2609", "3231", "2454"] 
+        # 取成交量前 15 名
+        if not df.empty:
+            hot_tw = df.sort_values(by='Trading_Volume', ascending=False).head(15)['stock_id'].tolist()
+    except Exception:
+        pass
+
+    # 2. 美股維持預設清單 (因 Yahoo Trending API 不穩定)
+    
+    return hot_tw, hot_us
 
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
@@ -250,7 +279,7 @@ def calculate_indicators(df):
     
     return df
 
-def analyze_market_index(ticker_symbol):
+def analyze_market_index(ticker_symbol, name):
     try:
         stock = yf.Ticker(ticker_symbol)
         df = stock.history(period="6mo")
@@ -271,7 +300,8 @@ def analyze_market_index(ticker_symbol):
             status = "空方修正" if k < d else "跌深反彈"
             color = "#00c853" if k < d else "#ffff00"
             
-        return {"price": price, "change": change, "pct": pct, "status": status, "color": color, "comment": f"均線{price>ma20}月線，KD{k>d}交叉"}
+        comment = f"KD指標({k:.1f}/{d:.1f})。市場氣氛：{status}。"
+        return {"price": price, "change": change, "pct": pct, "status": status, "color": color, "comment": comment}
     except:
         return None
 
@@ -380,18 +410,22 @@ for i, opt in enumerate(search_options):
     if "2330" in opt: default_index = i; break
 
 # 頂部搜尋框
-selected_search = st.selectbox("🔍 請輸入股票代號或中文名稱搜尋 (包含台美股熱門)", options=search_options, index=default_index)
+selected_search = st.selectbox(
+    "🔍 請輸入股票代號或中文名稱搜尋 (包含台美股熱門)",
+    options=search_options,
+    index=default_index
+)
 target = selected_search.split("(")[-1].replace(")", "")
 
 # --- 大盤指數展開區 ---
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
     with t1:
-        tw = analyze_market_index("^TWII")
-        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['comment']}</div></div>", unsafe_allow_html=True)
+        tw = analyze_market_index("^TWII", "加權指數")
+        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
     with t2:
-        us = analyze_market_index("^IXIC")
-        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['comment']}</div></div>", unsafe_allow_html=True)
+        us = analyze_market_index("^IXIC", "那斯達克")
+        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 

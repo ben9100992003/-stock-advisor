@@ -16,7 +16,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (修復版：避免 f-string 錯誤) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -29,27 +29,24 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
-    # 使用 format 避免 f-string 語法衝突
-    page_bg_img = """
+    page_bg_img = f'''
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{}");
+        background-image: url("data:image/png;base64,{bin_str}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
     </style>
-    """.format(bin_str)
+    '''
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
 set_png_as_page_bg('bg.png')
 
-# 主 CSS 樣式
 st.markdown("""
     <style>
-    /* 全局字體深色 (適應白底卡片) */
-    .stApp { color: #333333; }
+    .stApp { color: #333; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
@@ -70,18 +67,45 @@ st.markdown("""
     .stat-label { color: #888; font-size: 0.8rem; }
     .stat-val { color: #000; font-weight: bold; }
 
-    /* 2. 內容卡片 */
+    /* 2. 內容卡片 (分析報告專用) */
     .content-card {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 16px;
-        padding: 20px;
+        padding: 25px;
         margin-bottom: 20px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         color: #000 !important;
     }
-    .content-card h3 { color: #000 !important; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-    .content-card p, .content-card li { color: #333 !important; font-size: 1rem; line-height: 1.6; }
-    .content-card b { color: #000; }
+    .content-card h3 { 
+        color: #000 !important; 
+        border-bottom: 3px solid #FFD700; 
+        padding-bottom: 10px; 
+        margin-bottom: 15px;
+        font-weight: 800 !important;
+    }
+    .content-card h4 {
+        color: #2962ff !important;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-weight: 700 !important;
+    }
+    .content-card p, .content-card li { 
+        color: #333 !important; 
+        font-size: 1.05rem; 
+        line-height: 1.6; 
+        margin-bottom: 8px;
+    }
+    .content-card b { color: #000 !important; font-weight: 900; }
+    
+    /* 表格樣式 */
+    .analysis-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 0.95rem;
+    }
+    .analysis-table th { background-color: #f0f0f0; padding: 8px; text-align: left; color: #333; }
+    .analysis-table td { border-bottom: 1px solid #eee; padding: 8px; color: #333; }
 
     /* 3. 搜尋框 */
     .stTextInput > div > div > input {
@@ -96,9 +120,9 @@ st.markdown("""
     .kd-card {
         background-color: #fff;
         border-left: 6px solid #2962ff;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -257,33 +281,111 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    df['J'] = 3 * df['K'] - 2 * df['D']
+    
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
-def generate_narrative_report(name, ticker, latest, inst_df, df):
+def generate_narrative_report(name, ticker, latest, inst_df, df, info):
+    # 基本數據
     price = latest['Close']
-    ma20 = latest['MA20']
+    ma5, ma10, ma20 = latest['MA5'], latest['MA10'], latest['MA20']
+    ma60 = latest['MA60']
     k, d = latest['K'], latest['D']
+    vol = latest['Volume']
+    date_str = latest.name.strftime('%Y-%m-%d')
     
-    trend = "多頭" if price > ma20 else "空頭"
-    inst_text = "籌碼中性"
+    # 1. 技術指標分析
+    ma_trend = ""
+    if price > ma5 and ma5 > ma10 and ma10 > ma20:
+        ma_trend = "呈現<b>多頭排列</b> (MA5 > MA10 > MA20)，短線趨勢強勁，股價沿 5 日線攀升。"
+    elif price < ma5 and ma5 < ma10 and ma10 < ma20:
+        ma_trend = "呈現<b>空頭排列</b> (MA5 < MA10 < MA20)，上方均線層層反壓，建議保守。"
+    elif price > ma20:
+        ma_trend = "股價站穩<b>月線</b>之上，中期趨勢偏多。"
+    else:
+        ma_trend = "股價跌破<b>月線</b>，短線轉弱進入整理。"
+
+    kd_status = "黃金交叉" if k > d else "死亡交叉"
+    kd_desc = f"KD 指標目前為 ({k:.1f}, {d:.1f})，呈現<b>{kd_status}</b>。"
+    if k > 80: kd_desc += " 位於高檔鈍化區，留意隨時可能回檔。"
+    elif k < 20: kd_desc += " 位於低檔超賣區，隨時醞釀反彈。"
+
+    # 2. 籌碼面分析
+    inst_table_html = ""
+    inst_desc = "暫無法人數據。"
     if inst_df is not None and not inst_df.empty:
-        total = inst_df.iloc[-1][['Foreign', 'Trust', 'Dealer']].sum()
-        if total > 1000: inst_text = "法人買超"
-        elif total < -1000: inst_text = "法人賣超"
+        last = inst_df.iloc[-1]
+        f_val, t_val, d_val = last['Foreign'], last['Trust'], last['Dealer']
+        total = f_val + t_val + d_val
         
-    kd_sig = "黃金交叉" if k > d else "死亡交叉"
-    advice = "偏多操作" if price > ma20 and k > d else "保守觀望"
+        # 籌碼趨勢判斷
+        recent_5 = inst_df.tail(5)['Foreign'].sum()
+        f_trend = "外資近期偏多操作" if recent_5 > 0 else "外資近期偏空調節"
+        
+        inst_desc = f"本日三大法人合計 {'買超' if total>0 else '賣超'} {abs(total):,} 張。{f_trend}。"
+        
+        inst_table_html = f"""
+        <table class="analysis-table">
+            <tr><th>法人</th><th>買賣超 (張)</th></tr>
+            <tr><td>外資</td><td style="color:{'red' if f_val>0 else 'green'}">{f_val:,}</td></tr>
+            <tr><td>投信</td><td style="color:{'red' if t_val>0 else 'green'}">{t_val:,}</td></tr>
+            <tr><td>自營商</td><td style="color:{'red' if d_val>0 else 'green'}">{d_val:,}</td></tr>
+        </table>
+        """
+
+    # 3. 公司題材 (嘗試獲取)
+    sector = info.get('sector', '未知產業')
+    industry = info.get('industry', '未知細分')
+    summary = info.get('longBusinessSummary', '暫無詳細說明。')[:100] + "..."
     
+    # 4. 進出場建議 (規則引擎)
+    # 支撐：最近的均線 (MA10 或 MA20)
+    support = ma10 if price > ma10 else (ma20 if price > ma20 else ma60)
+    # 壓力：MA5 (若在之下) 或 前高 (模擬：收盤價 * 1.05)
+    resistance = ma5 if price < ma5 else (price * 1.05)
+    
+    entry_signal = ""
+    exit_signal = ""
+    
+    if price > ma20 and k > d:
+        action = "偏多操作"
+        entry_signal = f"拉回至 5 日線 {ma5:.2f} 附近不破可視為買點。"
+        exit_signal = f"跌破月線 {ma20:.2f} 則建議停利或停損。"
+    elif price < ma20 and k < d:
+        action = "保守觀望"
+        entry_signal = f"需等待股價重新站回月線 {ma20:.2f} 再行佈局。"
+        exit_signal = f"反彈至月線 {ma20:.2f} 附近遇壓可考慮減碼。"
+    else:
+        action = "區間震盪"
+        entry_signal = f"箱型區間下緣 {support:.2f} 附近嘗試低接。"
+        exit_signal = f"箱型區間上緣 {resistance:.2f} 附近獲利了結。"
+
     return f"""
     <div class="content-card">
-        <h3>📊 武吉拉深度分析</h3>
-        <p><b>1. 趨勢：</b>{trend}格局。收盤 {price:.2f}，月線 {ma20:.2f}。</p>
-        <p><b>2. 籌碼：</b>{inst_text}。</p>
-        <p><b>3. 指標：</b>KD {kd_sig} (K:{k:.1f})。</p>
-        <hr style="border-top: 1px dashed #aaa;">
-        <p style="font-size: 1.2rem; font-weight: bold; color: #2962ff;">💡 建議：{advice}</p>
+        <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
+        <p style="font-size:0.9rem; color:#666;">資料日期: {date_str}</p>
+        
+        <h4>1. 技術指標分析</h4>
+        <p>{ma_trend}</p>
+        <p>{kd_desc}</p>
+        
+        <h4>2. 三大法人籌碼</h4>
+        <p>{inst_desc}</p>
+        {inst_table_html}
+        
+        <h4>3. 公司基本面</h4>
+        <p><b>產業：</b>{sector} / {industry}</p>
+        <p><b>簡介：</b>{summary}</p>
+        
+        <h4>4. 💡 進出場建議 ({action})</h4>
+        <p><b>🟢 進場參考：</b>{entry_signal}</p>
+        <p><b>🔴 出場參考：</b>{exit_signal}</p>
+        <p><i>(註：以上分析僅供參考，投資人應獨立判斷並自負風險。)</i></p>
     </div>
     """
 
@@ -416,7 +518,7 @@ try:
             fig.update_xaxes(
                 showspikes=True, spikemode='across', spikesnap='cursor', 
                 showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
-                rangeslider_visible=False,
+                rangeslider_visible=False, # 確保子圖也沒滑桿
                 row=row, col=1
             )
             fig.update_yaxes(
@@ -429,7 +531,7 @@ try:
         config = {
             'scrollZoom': True, 
             'displayModeBar': False,
-            'doubleClick': 'reset+autosize' # 雙擊重置/放大
+            'doubleClick': 'reset+autosize'
         }
         st.plotly_chart(fig, use_container_width=True, config=config)
         
@@ -449,7 +551,7 @@ try:
     with tab2:
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
-        st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
+        st.markdown(generate_narrative_report(name, target, latest, inst_df, df, info), unsafe_allow_html=True)
 
     with tab3:
         if inst_df is not None and not inst_df.empty:

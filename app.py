@@ -112,19 +112,21 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
+    /* 週期按鈕樣式 (仿 App 膠囊) */
     .stRadio > div {
         display: flex; flex-direction: row; gap: 0px;
         background-color: #f0f0f0;
-        padding: 4px; border-radius: 8px;
+        padding: 4px; border-radius: 25px;
         width: 100%;
         justify-content: space-between;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
     }
     .stRadio div[role="radiogroup"] > label {
         flex: 1;
         text-align: center;
         background-color: transparent;
-        padding: 6px 0;
-        border-radius: 6px;
+        padding: 8px 0;
+        border-radius: 20px;
         margin: 0;
         color: #666 !important;
         font-weight: bold;
@@ -135,7 +137,7 @@ st.markdown("""
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #26a69a !important;
         color: #fff !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
     /* 隱藏預設 Metric */
@@ -159,6 +161,7 @@ st.markdown("""
 
 # --- 3. 資料串接邏輯 ---
 
+# 內建對照表 (僅供顯示中文名稱，搜尋不再受限於此)
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",

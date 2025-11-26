@@ -9,6 +9,7 @@ import base64
 import os
 import requests
 from FinMind.data import DataLoader
+import xml.etree.ElementTree as ET # 用於解析 RSS 新聞
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -16,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 ---
+# --- 2. CSS 樣式 (極簡白底風格) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -138,6 +139,24 @@ st.markdown("""
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
+    /* 新聞樣式 */
+    .news-item {
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .news-item a {
+        text-decoration: none;
+        color: #333 !important;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+    .news-item a:hover { color: #2962ff !important; }
+    .news-meta {
+        font-size: 0.85rem;
+        color: #888;
+        margin-top: 5px;
+    }
+
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
@@ -240,6 +259,31 @@ def get_institutional_data_yahoo(ticker):
         return df_clean.sort_index().reset_index()[['Date', 'Foreign', 'Trust', 'Dealer']].head(30)
     except: return None
 
+@st.cache_data(ttl=300)
+def get_google_news(ticker):
+    """使用 Google News RSS 抓取個股新聞 (穩定版)"""
+    try:
+        # 處理代號，例如 2330.TW -> 2330+TW (Google search query format)
+        query_ticker = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
+        if ".TW" not in ticker and len(ticker) < 5: # 美股
+             query_ticker = f"{ticker} stock"
+             
+        url = f"https://news.google.com/rss/search?q={query_ticker}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        resp = requests.get(url)
+        root = ET.fromstring(resp.content)
+        
+        news_list = []
+        for item in root.findall('.//item')[:10]: # 取前 10 則
+            news_list.append({
+                'title': item.find('title').text,
+                'link': item.find('link').text,
+                'pubDate': item.find('pubDate').text,
+                'source': item.find('source').text if item.find('source') is not None else 'Google News'
+            })
+        return news_list
+    except Exception as e:
+        return []
+
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
@@ -264,28 +308,18 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
     k, d = latest['K'], latest['D']
     
     trend = "多頭" if price > ma20 else "空頭"
-    
-    # 法人籌碼分析
     inst_text = "籌碼中性"
     inst_detail = ""
     
     if inst_df is not None and not inst_df.empty:
         last_row = inst_df.iloc[-1]
-        foreign = last_row['Foreign']
-        trust = last_row['Trust']
-        dealer = last_row['Dealer']
-        total = foreign + trust + dealer
+        f_val, t_val, d_val = last_row['Foreign'], last_row['Trust'], last_row['Dealer']
+        total = f_val + t_val + d_val
         
         if total > 1000: inst_text = "法人買超"
         elif total < -1000: inst_text = "法人賣超"
         
-        inst_detail = f"""
-        <br>三大法人買賣超數據：<br>
-        • 外資：{foreign:,} 張<br>
-        • 投信：{trust:,} 張<br>
-        • 自營商：{dealer:,} 張<br>
-        • 合計：{total:,} 張
-        """
+        inst_detail = f"外資: {f_val:,} / 投信: {t_val:,} / 自營: {d_val:,}"
         
     kd_sig = "黃金交叉" if k > d else "死亡交叉"
     advice = "偏多操作" if price > ma20 and k > d else "保守觀望"
@@ -294,7 +328,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
     <div class="content-card">
         <h3>📊 武吉拉深度分析</h3>
         <p><b>1. 趨勢：</b>{trend}格局。收盤 {price:.2f}，月線 {ma20:.2f}。</p>
-        <p><b>2. 籌碼：</b>{inst_text}。{inst_detail}</p>
+        <p><b>2. 籌碼：</b>{inst_text}。<br><span style='font-size:0.9rem;color:#666;'>({inst_detail})</span></p>
         <p><b>3. 指標：</b>KD {kd_sig} (K:{k:.1f})。</p>
         <hr style="border-top: 1px dashed #aaa;">
         <p style="font-size: 1.2rem; font-weight: bold; color: #2962ff;">💡 建議：{advice}</p>
@@ -352,7 +386,7 @@ try:
         """, unsafe_allow_html=True)
     
     # 分頁
-    tab1, tab2, tab3 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞"])
     
     with tab1:
         # 週期按鈕
@@ -376,7 +410,7 @@ try:
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
-        # K 線圖 (極簡 + 同步十字線)
+        # K 線圖
         fig = make_subplots(
             rows=3, cols=1, 
             shared_xaxes=True, 
@@ -398,56 +432,36 @@ try:
         fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#1f77b4', width=1.2), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#ff7f0e', width=1.2), name='D9'), row=3, col=1)
 
-        # 設定預設顯示範圍 (智慧判斷)
+        # 設定預設顯示範圍
         if len(df) > 0:
             end_idx = df.index[-1]
-            # 分時線: 顯示最近一日 (約 60~100 根)
             if interval in ["1m", "5m", "10m", "30m", "60m"]:
-                 # 回推一天前
                  start_idx = end_idx - timedelta(days=1)
-                 # 確保不超過資料起始點
                  if start_idx < df.index[0]: start_idx = df.index[0]
             else:
-                 # 日線以上: 顯示最近 45 根
                  if len(df) > 45: start_idx = df.index[-45]
                  else: start_idx = df.index[0]
-            
             fig.update_xaxes(range=[start_idx, end_idx], row=1, col=1)
 
-        # Layout: 極簡 + 十字線連動 + 手機雙擊放大
+        # Layout
         fig.update_layout(
             template="plotly_white", height=700,
             margin=dict(l=10, r=10, t=10, b=10),
             legend=dict(orientation="h", y=1.01, x=0),
-            dragmode='pan', # 啟用平移拖曳
-            hovermode='x unified', # 啟用統一十字線
-            xaxis=dict(rangeslider_visible=False), # 移除下方滑桿
-            yaxis=dict(fixedrange=False) # 允許 Y 軸縮放
+            dragmode='pan', 
+            hovermode='x unified',
+            xaxis=dict(rangeslider_visible=False), 
+            yaxis=dict(fixedrange=False) 
         )
         
-        # 設定十字線樣式 (Spikes)
+        # 設定十字線
         for row in [1, 2, 3]:
-            fig.update_xaxes(
-                showspikes=True, spikemode='across', spikesnap='cursor', 
-                showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
-                rangeslider_visible=False, # 確保子圖也沒滑桿
-                row=row, col=1
-            )
-            fig.update_yaxes(
-                showspikes=True, spikemode='across', spikesnap='cursor', 
-                showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
-                row=row, col=1
-            )
+            fig.update_xaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="grey", spikethickness=1, rangeslider_visible=False, row=row, col=1)
+            fig.update_yaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="grey", spikethickness=1, row=row, col=1)
             
-        # 手機雙擊放大 (Autosize)
-        config = {
-            'scrollZoom': True, 
-            'displayModeBar': False,
-            'doubleClick': 'reset+autosize'
-        }
-        st.plotly_chart(fig, use_container_width=True, config=config)
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False, 'doubleClick': 'reset+autosize'})
         
-        # 只顯示 KD 指標卡片
+        # KD 卡片
         kd_color = "#ef5350" if latest['K'] > latest['D'] else "#26a69a"
         kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
         st.markdown(f"""
@@ -466,6 +480,9 @@ try:
         st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
 
     with tab3:
+        inst_df = get_institutional_data_finmind(target) # 再抓一次確保
+        if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
+        
         if inst_df is not None and not inst_df.empty:
             st.markdown(f"<div class='content-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
             fig_inst = go.Figure()
@@ -474,8 +491,23 @@ try:
             fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e91e63'))
             fig_inst.update_layout(barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_inst, use_container_width=True)
+            st.dataframe(inst_df.sort_values('Date', ascending=False).head(10), use_container_width=True)
         else:
-            st.info("無法人籌碼資料")
+            st.info("無法人籌碼資料 (資料源連線失敗或該股無資料)")
+            
+    with tab4:
+        st.markdown("<div class='content-card'><h3>📰 個股相關新聞</h3></div>", unsafe_allow_html=True)
+        news_list = get_google_news(target)
+        if news_list:
+            for news in news_list:
+                st.markdown(f"""
+                <div class="content-card news-item">
+                    <a href="{news['link']}" target="_blank">{news['title']}</a>
+                    <div class="news-meta">{news['pubDate']} | {news['source']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("暫無相關新聞")
 
 except Exception as e:
     st.error(f"無法取得資料，請確認代號是否正確。({e})")

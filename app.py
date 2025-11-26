@@ -16,7 +16,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 ---
+# --- 2. CSS 樣式 (強制顯色修復版) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -46,73 +46,88 @@ set_png_as_page_bg('bg.png')
 
 st.markdown("""
     <style>
-    .stApp { color: #333; }
+    /* 全局設定：主要文字顏色 */
+    .stApp { color: #333333; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 1. 頂部報價卡片 */
+    /* --- 1. 頂部報價卡片 (強制黑字) --- */
     .quote-card {
         background-color: #ffffff;
         border-radius: 16px;
         padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         margin-bottom: 15px;
     }
-    .stock-title { font-size: 1.4rem; font-weight: bold; color: #000; margin-bottom: 5px; }
-    .stock-id { font-size: 1rem; color: #666; }
-    .price-big { font-size: 3.2rem; font-weight: 800; line-height: 1; margin: 10px 0; }
-    .price-change { font-size: 1.1rem; font-weight: bold; }
-    .stats-grid { display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.9rem; color: #555; }
+    /* 強制卡片內所有文字為黑色，避免被深色模式影響 */
+    .quote-card div, .quote-card span, .quote-card p {
+        color: #000000 !important;
+    }
+    .stock-title { font-size: 1.5rem !important; font-weight: 900 !important; margin-bottom: 5px; }
+    .stock-id { font-size: 1.1rem !important; color: #555 !important; }
+    .price-big { font-size: 3.5rem !important; font-weight: 800 !important; line-height: 1; margin: 10px 0; }
+    .price-change { font-size: 1.2rem !important; font-weight: bold !important; }
+    
+    .stats-grid { display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 10px;}
     .stat-box { text-align: right; }
-    .stat-label { color: #888; font-size: 0.8rem; }
-    .stat-val { color: #000; font-weight: bold; }
+    .stat-label { color: #666 !important; font-size: 0.85rem !important; }
+    .stat-val { color: #000 !important; font-weight: bold !important; font-size: 1.1rem !important; }
 
-    /* 2. 內容卡片 */
+    /* --- 2. 內容卡片 (分析、K線容器) (強制黑字) --- */
     .content-card {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 16px;
         padding: 20px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        color: #000 !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
-    .content-card h3 { color: #000 !important; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-    .content-card p, .content-card li { color: #333 !important; font-size: 1rem; line-height: 1.6; }
-    .content-card b { color: #000; }
+    .content-card h3 { 
+        color: #000000 !important; 
+        border-bottom: 2px solid #ddd; 
+        padding-bottom: 10px; 
+        font-weight: 800 !important;
+    }
+    .content-card p, .content-card li, .content-card div { 
+        color: #222222 !important; 
+        font-size: 1.05rem !important; 
+        line-height: 1.6 !important; 
+    }
+    .content-card b { color: #000000 !important; font-weight: 900 !important; }
 
-    /* 3. 搜尋框 */
+    /* --- 3. 搜尋框優化 --- */
     .stTextInput > div > div > input {
-        background-color: #ffffff;
-        color: #000;
-        border: 2px solid #eee;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 2px solid #FFD700 !important;
         border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        font-weight: bold;
     }
+    .stTextInput label { color: #ffffff !important; text-shadow: 1px 1px 2px black; }
 
-    /* 4. KD 指標卡片 */
+    /* --- 4. KD 指標卡片 --- */
     .kd-card {
-        background-color: #fff;
-        border-left: 6px solid #2962ff;
-        border-radius: 8px;
-        padding: 15px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        background-color: #ffffff;
+        border-left: 8px solid #2962ff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         display: flex;
         align-items: center;
         justify-content: space-between;
         margin-top: 10px;
         margin-bottom: 20px;
     }
-    .kd-title { font-size: 1.1rem; font-weight: bold; color: #555; }
-    .kd-val { font-size: 1.5rem; font-weight: 800; color: #000; }
-    .kd-tag { padding: 4px 12px; border-radius: 20px; color: white; font-weight: bold; font-size: 0.9rem; }
+    .kd-title { font-size: 1.3rem !important; font-weight: bold !important; color: #333 !important; }
+    .kd-val { font-size: 2.2rem !important; font-weight: 900 !important; color: #000 !important; }
+    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white !important; font-weight: bold; font-size: 1rem; }
 
-    /* 5. Tab 與週期按鈕 */
+    /* --- 5. Tab 與週期按鈕 --- */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        color: #ffffff !important; font-size: 1.1rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        color: #ffffff !important; font-size: 1.2rem !important; font-weight: bold !important; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
-    /* 週期按鈕樣式 (仿 App 膠囊) */
+    /* 週期按鈕樣式 (仿 App 膠囊) - 強制修正文字顏色 */
     .stRadio > div {
         display: flex; flex-direction: row; gap: 0px;
         background-color: #f0f0f0;
@@ -128,40 +143,45 @@ st.markdown("""
         padding: 8px 0;
         border-radius: 20px;
         margin: 0;
-        color: #666 !important;
-        font-weight: bold;
         border: none;
         display: flex; justify-content: center;
         cursor: pointer;
     }
+    /* 一般狀態文字顏色 */
+    .stRadio div[role="radiogroup"] > label p {
+        color: #666666 !important; 
+        font-weight: bold !important;
+        font-size: 1rem !important;
+    }
+    /* 選中狀態 */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #26a69a !important;
-        color: #fff !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    /* 選中狀態文字顏色 */
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] p {
+        color: #ffffff !important;
     }
 
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
     /* 連結按鈕 */
-    .stLinkButton a { 
-        background-color: #fff !important; 
-        color: #333 !important; 
-        border: 1px solid #ccc !important; 
-        font-weight: bold !important; 
-    }
+    .stLinkButton a { background-color: #fff !important; color: #333 !important; border: 1px solid #ccc !important; font-weight: bold; }
     
     /* 標題 */
-    h1, h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
+    h1 { text-shadow: 3px 3px 6px #000; color: white !important; font-weight: 900; margin-bottom: 20px; }
+    h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
     
-    /* Plotly Tooltip */
-    .plotly-notifier { visibility: hidden; }
+    /* Plotly 圖表文字顏色強制為黑 */
+    .js-plotly-plot .plotly .main-svg {
+        background: white !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. 資料串接邏輯 ---
 
-# 內建對照表 (僅供顯示中文名稱，搜尋不再受限於此)
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
@@ -257,7 +277,18 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    df['J'] = 3 * df['K'] - 2 * df['D']
+    
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
+    
+    exp12 = df['Close'].ewm(span=12).mean()
+    exp26 = df['Close'].ewm(span=26).mean()
+    df['MACD'] = exp12 - exp26
+    df['Signal'] = df['MACD'].ewm(span=9).mean()
+    df['Hist'] = df['MACD'] - df['Signal']
     
     return df
 
@@ -400,7 +431,7 @@ try:
             
             fig.update_xaxes(range=[start_idx, end_idx], row=1, col=1)
 
-        # Layout: 極簡 + 十字線連動
+        # Layout: 極簡 + 十字線連動 + 手機雙擊放大
         fig.update_layout(
             template="plotly_white", height=700,
             margin=dict(l=10, r=10, t=10, b=10),
@@ -416,7 +447,7 @@ try:
             fig.update_xaxes(
                 showspikes=True, spikemode='across', spikesnap='cursor', 
                 showline=True, spikedash='dash', spikecolor="grey", spikethickness=1,
-                rangeslider_visible=False, # 確保子圖也沒滑桿
+                rangeslider_visible=False,
                 row=row, col=1
             )
             fig.update_yaxes(
@@ -425,11 +456,11 @@ try:
                 row=row, col=1
             )
             
-        # 手機雙擊放大
+        # 手機雙擊放大 (Autosize)
         config = {
             'scrollZoom': True, 
             'displayModeBar': False,
-            'doubleClick': 'reset+autosize'
+            'doubleClick': 'reset+autosize' # 雙擊重置/放大
         }
         st.plotly_chart(fig, use_container_width=True, config=config)
         

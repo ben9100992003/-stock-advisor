@@ -16,7 +16,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (強制顯色修復版) ---
+# --- 2. CSS 樣式 (修復版：避免 f-string 錯誤) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -29,112 +29,98 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
-    page_bg_img = f'''
+    # 使用 format 避免 f-string 語法衝突
+    page_bg_img = """
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{bin_str}");
+        background-image: url("data:image/png;base64,{}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
     </style>
-    '''
+    """.format(bin_str)
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
 set_png_as_page_bg('bg.png')
 
+# 主 CSS 樣式
 st.markdown("""
     <style>
-    /* 全局設定：主要文字顏色 */
+    /* 全局字體深色 (適應白底卡片) */
     .stApp { color: #333333; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* --- 1. 頂部報價卡片 (強制黑字) --- */
+    /* 1. 頂部報價卡片 */
     .quote-card {
         background-color: #ffffff;
         border-radius: 16px;
         padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         margin-bottom: 15px;
     }
-    /* 強制卡片內所有文字為黑色，避免被深色模式影響 */
-    .quote-card div, .quote-card span, .quote-card p {
-        color: #000000 !important;
-    }
-    .stock-title { font-size: 1.5rem !important; font-weight: 900 !important; margin-bottom: 5px; }
-    .stock-id { font-size: 1.1rem !important; color: #555 !important; }
-    .price-big { font-size: 3.5rem !important; font-weight: 800 !important; line-height: 1; margin: 10px 0; }
-    .price-change { font-size: 1.2rem !important; font-weight: bold !important; }
-    
-    .stats-grid { display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.9rem; border-top: 1px solid #eee; padding-top: 10px;}
+    .stock-title { font-size: 1.4rem; font-weight: bold; color: #000; margin-bottom: 5px; }
+    .stock-id { font-size: 1rem; color: #666; }
+    .price-big { font-size: 3.2rem; font-weight: 800; line-height: 1; margin: 10px 0; }
+    .price-change { font-size: 1.1rem; font-weight: bold; }
+    .stats-grid { display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.9rem; color: #555; }
     .stat-box { text-align: right; }
-    .stat-label { color: #666 !important; font-size: 0.85rem !important; }
-    .stat-val { color: #000 !important; font-weight: bold !important; font-size: 1.1rem !important; }
+    .stat-label { color: #888; font-size: 0.8rem; }
+    .stat-val { color: #000; font-weight: bold; }
 
-    /* --- 2. 內容卡片 (分析、K線容器) (強制黑字) --- */
+    /* 2. 內容卡片 */
     .content-card {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 16px;
         padding: 20px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        color: #000 !important;
     }
-    .content-card h3 { 
-        color: #000000 !important; 
-        border-bottom: 2px solid #ddd; 
-        padding-bottom: 10px; 
-        font-weight: 800 !important;
-    }
-    .content-card p, .content-card li, .content-card div { 
-        color: #222222 !important; 
-        font-size: 1.05rem !important; 
-        line-height: 1.6 !important; 
-    }
-    .content-card b { color: #000000 !important; font-weight: 900 !important; }
+    .content-card h3 { color: #000 !important; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .content-card p, .content-card li { color: #333 !important; font-size: 1rem; line-height: 1.6; }
+    .content-card b { color: #000; }
 
-    /* --- 3. 搜尋框優化 --- */
+    /* 3. 搜尋框 */
     .stTextInput > div > div > input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 2px solid #FFD700 !important;
-        border-radius: 10px;
-        font-weight: bold;
-    }
-    .stTextInput label { color: #ffffff !important; text-shadow: 1px 1px 2px black; }
-
-    /* --- 4. KD 指標卡片 --- */
-    .kd-card {
         background-color: #ffffff;
-        border-left: 8px solid #2962ff;
+        color: #000;
+        border: 2px solid #eee;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* 4. KD 指標卡片 */
+    .kd-card {
+        background-color: #fff;
+        border-left: 6px solid #2962ff;
         border-radius: 12px;
         padding: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         display: flex;
         align-items: center;
         justify-content: space-between;
         margin-top: 10px;
         margin-bottom: 20px;
     }
-    .kd-title { font-size: 1.3rem !important; font-weight: bold !important; color: #333 !important; }
-    .kd-val { font-size: 2.2rem !important; font-weight: 900 !important; color: #000 !important; }
-    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white !important; font-weight: bold; font-size: 1rem; }
+    .kd-title { font-size: 1.3rem; font-weight: bold; color: #444; }
+    .kd-val { font-size: 2rem; font-weight: 900; color: #000; }
+    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white; font-weight: bold; font-size: 1rem; }
 
-    /* --- 5. Tab 與週期按鈕 --- */
+    /* 5. Tab 與週期按鈕 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        color: #ffffff !important; font-size: 1.2rem !important; font-weight: bold !important; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        color: #ffffff !important; font-size: 1.1rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
     
-    /* 週期按鈕樣式 (仿 App 膠囊) - 強制修正文字顏色 */
     .stRadio > div {
         display: flex; flex-direction: row; gap: 0px;
         background-color: #f0f0f0;
-        padding: 4px; border-radius: 25px;
+        padding: 4px; border-radius: 8px;
         width: 100%;
         justify-content: space-between;
-        box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
     }
     .stRadio div[role="radiogroup"] > label {
         flex: 1;
@@ -143,40 +129,34 @@ st.markdown("""
         padding: 8px 0;
         border-radius: 20px;
         margin: 0;
+        color: #666 !important;
+        font-weight: bold;
         border: none;
         display: flex; justify-content: center;
         cursor: pointer;
     }
-    /* 一般狀態文字顏色 */
-    .stRadio div[role="radiogroup"] > label p {
-        color: #666666 !important; 
-        font-weight: bold !important;
-        font-size: 1rem !important;
-    }
-    /* 選中狀態 */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #26a69a !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    /* 選中狀態文字顏色 */
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] p {
-        color: #ffffff !important;
+        color: #fff !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
     /* 連結按鈕 */
-    .stLinkButton a { background-color: #fff !important; color: #333 !important; border: 1px solid #ccc !important; font-weight: bold; }
+    .stLinkButton a { 
+        background-color: #fff !important; 
+        color: #333 !important; 
+        border: 1px solid #ccc !important; 
+        font-weight: bold !important; 
+    }
     
     /* 標題 */
-    h1 { text-shadow: 3px 3px 6px #000; color: white !important; font-weight: 900; margin-bottom: 20px; }
-    h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
+    h1, h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
     
-    /* Plotly 圖表文字顏色強制為黑 */
-    .js-plotly-plot .plotly .main-svg {
-        background: white !important;
-    }
+    /* Plotly Tooltip */
+    .plotly-notifier { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -277,18 +257,7 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    
-    delta = df['Close'].diff()
-    u = delta.clip(lower=0)
-    d = -1 * delta.clip(upper=0)
-    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
-    df['RSI'] = 100 - (100 / (1 + rs))
-    
-    exp12 = df['Close'].ewm(span=12).mean()
-    exp26 = df['Close'].ewm(span=26).mean()
-    df['MACD'] = exp12 - exp26
-    df['Signal'] = df['MACD'].ewm(span=9).mean()
-    df['Hist'] = df['MACD'] - df['Signal']
+    df['J'] = 3 * df['K'] - 2 * df['D']
     
     return df
 
@@ -491,6 +460,7 @@ try:
             fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e91e63'))
             fig_inst.update_layout(barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"))
             st.plotly_chart(fig_inst, use_container_width=True)
+            st.dataframe(inst_df.sort_values('Date', ascending=False).head(10), use_container_width=True)
         else:
             st.info("無法人籌碼資料")
 

@@ -48,58 +48,45 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 卡片通用樣式 */
-    .recommendation-box, .analysis-text, .market-summary-box {
-        background-color: rgba(20, 20, 20, 0.9) !important;
+    /* 半透明容器樣式 (用於文字報告) */
+    .glass-container {
+        background-color: rgba(0, 0, 0, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 15px;
+        padding: 25px;
         margin-bottom: 20px;
-        color: #ffffff !important;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
     }
     
-    .recommendation-box { border-left: 6px solid #ff4b4b; }
-    
-    /* 側邊欄的大盤分析小卡 */
+    /* 側邊欄卡片 */
     .market-summary-box {
         padding: 15px;
         font-size: 0.9rem;
         border-left: 4px solid #FFD700;
         margin-bottom: 10px;
-        background-color: rgba(30, 30, 30, 0.95) !important;
+        background-color: rgba(30, 30, 30, 0.95);
+        border-radius: 8px;
     }
 
-    /* 強制 Metric 樣式 */
+    /* Metric 指標樣式 */
     [data-testid="stMetric"] {
-        background-color: rgba(30, 30, 30, 0.9) !important;
+        background-color: rgba(40, 40, 40, 0.9) !important;
         padding: 15px !important;
         border-radius: 10px !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5) !important;
         text-align: center;
     }
-    
-    [data-testid="stMetricLabel"] {
-        color: #aaaaaa !important;
-        font-size: 1rem !important;
-        font-weight: bold !important;
-    }
-    
-    [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-        font-size: 1.8rem !important;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-    }
+    [data-testid="stMetricLabel"] { color: #cccccc !important; }
+    [data-testid="stMetricValue"] { color: #ffffff !important; }
 
     /* Tab 樣式 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
-        font-weight: 900;
-        font-size: 1.1rem;
+        font-weight: bold;
     }
-    .stMarkdown p, .stCaption { color: #f0f0f0 !important; }
-    h1, h2, h3 { text-shadow: 2px 2px 4px #000000; }
+    .stMarkdown p, .stCaption { color: #e0e0e0 !important; }
+    h1, h2, h3, h4 { text-shadow: 2px 2px 4px #000000; color: #fff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,13 +99,9 @@ except ImportError:
     FINMIND_AVAILABLE = False
 
 STOCK_NAMES = {
-    "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海",
-    "3231.TW": "緯創", "2382.TW": "廣達", "2303.TW": "聯電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金",
-    "2618.TW": "長榮航", "2610.TW": "華航", "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息",
-    "2354.TW": "鴻準", "3481.TW": "群創", "2409.TW": "友達", "2888.TW": "新光金",
-    "NVDA": "輝達 (NVIDIA)", "TSLA": "特斯拉 (Tesla)", "AAPL": "蘋果 (Apple)", "AMD": "超微 (AMD)", "PLTR": "Palantir",
-    "MSFT": "微軟 (Microsoft)", "GOOGL": "谷歌 (Alphabet)", "AMZN": "亞馬遜 (Amazon)", "META": "Meta", "NFLX": "網飛 (Netflix)",
-    "INTC": "英特爾 (Intel)", "TSM": "台積電 ADR", "QCOM": "高通 (Qualcomm)", "AVGO": "博通 (Broadcom)"
+    "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2603.TW": "長榮", "2609.TW": "陽明",
+    "2303.TW": "聯電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2382.TW": "廣達", "3231.TW": "緯創",
+    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir"
 }
 
 @st.cache_data(ttl=3600)
@@ -141,33 +124,46 @@ def get_top_volume_stocks():
 def get_institutional_data_yahoo(ticker):
     if ".TW" not in ticker: return None
     try:
+        # 強化版 Headers，模擬真實瀏覽器行為
         url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://tw.stock.yahoo.com/',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         }
         r = requests.get(url, headers=headers)
         r.encoding = 'utf-8'
+        
         dfs = pd.read_html(r.text)
         if not dfs: return None
         
         target_df = None
+        # 搜尋所有表格，只要有日期跟買賣超關鍵字就抓
         for df in dfs:
-            if any('外資' in str(col) for col in df.columns) and any('日期' in str(col) for col in df.columns):
+            cols_str = " ".join([str(c) for c in df.columns])
+            if '日期' in cols_str and ('外資' in cols_str or '買賣超' in cols_str):
                 target_df = df
                 break
         
         if target_df is None or target_df.empty: return None
         
-        target_df.columns = [str(c).replace(' ', '') for c in target_df.columns]
-        date_col = next((c for c in target_df.columns if '日期' in c), None)
-        f_col = next((c for c in target_df.columns if '外資' in c and '持股' not in c), None)
-        t_col = next((c for c in target_df.columns if '投信' in c), None)
-        d_col = next((c for c in target_df.columns if '自營' in c), None)
+        # 重新命名欄位以利存取 (模糊比對)
+        new_cols = {}
+        for col in target_df.columns:
+            c_str = str(col)
+            if '日期' in c_str: new_cols[col] = 'Date'
+            elif '外資' in c_str and '持股' not in c_str: new_cols[col] = 'Foreign'
+            elif '投信' in c_str: new_cols[col] = 'Trust'
+            elif '自營' in c_str: new_cols[col] = 'Dealer'
+            
+        target_df = target_df.rename(columns=new_cols)
+        
+        # 檢查必要欄位是否存在
+        if 'Date' not in target_df.columns or 'Foreign' not in target_df.columns:
+            return None
 
-        if not date_col or not f_col: return None
-
-        df_clean = target_df[[date_col, f_col, t_col, d_col]].copy()
-        df_clean.columns = ['Date', 'Foreign', 'Trust', 'Dealer']
+        # 數據清洗
+        df_clean = target_df.copy()
         
         def clean_num(x):
             if isinstance(x, (int, float)): return int(x)
@@ -178,7 +174,10 @@ def get_institutional_data_yahoo(ticker):
             return 0
             
         for col in ['Foreign', 'Trust', 'Dealer']:
-            df_clean[col] = df_clean[col].apply(clean_num)
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].apply(clean_num)
+            else:
+                df_clean[col] = 0 # 若缺欄位補 0
             
         def clean_date(d):
             if isinstance(d, str) and '/' in d and len(d) <= 5:
@@ -188,38 +187,15 @@ def get_institutional_data_yahoo(ticker):
         df_clean['Date'] = df_clean['Date'].apply(clean_date)
         return df_clean.head(30)
 
-    except Exception:
-        return None
-
-@st.cache_data(ttl=300)
-def get_institutional_data_finmind(ticker):
-    if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
-    stock_id = ticker.replace(".TW", "")
-    dl = DataLoader()
-    try:
-        start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
-        df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
-        if df.empty: return None
-        df['net'] = df['buy'] - df['sell']
-        dates = sorted(df['date'].unique(), reverse=True)
-        result_data = []
-        for d in dates:
-            day_df = df[df['date'] == d]
-            def get_net(key):
-                v = day_df[day_df['name'].str.contains(key)]['net'].sum()
-                return int(v / 1000) 
-            result_data.append({
-                'Date': d, 'Foreign': get_net('外資'), 'Trust': get_net('投信'), 'Dealer': get_net('自營')
-            })
-        return pd.DataFrame(result_data).head(30)
-    except:
+    except Exception as e:
+        # print(f"Yahoo Error: {e}")
         return None
 
 # --- 4. 技術指標與大盤分析函式 ---
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
-    df['MA10'] = df['Close'].rolling(10).mean() # 新增 MA10
+    df['MA10'] = df['Close'].rolling(10).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
     df['MA60'] = df['Close'].rolling(60).mean()
     
@@ -254,7 +230,6 @@ def calculate_indicators(df):
     return df
 
 def analyze_market_index(ticker_symbol):
-    """大盤指數深度自動分析"""
     try:
         stock = yf.Ticker(ticker_symbol)
         df = stock.history(period="6mo")
@@ -265,244 +240,167 @@ def analyze_market_index(ticker_symbol):
         price = latest['Close']
         change = price - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
-        
-        ma5 = latest['MA5']
         ma20 = latest['MA20']
-        ma60 = latest['MA60']
         k, d = latest['K'], latest['D']
         
-        # 趨勢判斷
-        status = "震盪"
+        status = "震盪整理"
         color = "#ffffff"
+        comment = "市場觀望氣氛濃，建議保守操作。"
         
-        trend_desc = ""
-        if price > ma20 and ma20 > ma60:
-            trend_desc = "多頭排列，趨勢強勁。"
-            status = "多頭強勢"
-            color = "#ff4b4b"
-        elif price < ma20 and ma20 < ma60:
-            trend_desc = "空頭排列，壓力沉重。"
-            status = "空頭修正"
-            color = "#00c853"
-        elif price > ma20:
-            trend_desc = "站上月線，嘗試轉強。"
-            status = "多方反攻"
-            color = "#ff9100"
+        if price > ma20:
+            if k > d:
+                status = "多頭強勢"
+                color = "#ff4b4b"
+                comment = "指數站穩月線且 KD 黃金交叉，多方控盤，可積極操作。"
+            else:
+                status = "多頭回檔"
+                color = "#ff9100"
+                comment = "指數雖在月線之上但面臨技術性修正，留意月線支撐。"
         else:
-            trend_desc = "跌破月線，弱勢整理。"
-            status = "弱勢整理"
-            color = "#00e676"
-
-        kd_desc = "黃金交叉" if k > d else "死亡交叉"
-        comment = f"{trend_desc} KD{kd_desc} (K:{k:.1f})。支撐看季線 {ma60:.0f}，壓力看月線 {ma20:.0f}。"
+            if k < d:
+                status = "空方修正"
+                color = "#00c853"
+                comment = "指數跌破月線且 KD 死亡交叉，趨勢偏弱，現金為王。"
+            else:
+                status = "跌深反彈"
+                color = "#ffff00"
+                comment = "KD 低檔黃金交叉，短線醞釀反彈，但上方壓力仍重。"
                 
         return {
-            "price": price,
-            "change": change,
-            "pct": pct,
-            "status": status,
-            "color": color,
-            "comment": comment,
-            "ma20": ma20
+            "price": price, "change": change, "pct": pct,
+            "status": status, "color": color, "comment": comment
         }
     except:
         return None
 
-# --- 5. 深度分析報告生成 (核心升級) ---
-def generate_report(name, ticker, latest, inst_data_dict, df):
+# --- 5. 深度分析報告 (文字敘述版) ---
+def generate_narrative_report(name, ticker, latest, inst_data_dict, df):
     price = latest['Close']
     vol = latest['Volume']
-    vol_ma5 = latest['VOL_MA5']
-    
-    ma5 = latest['MA5']
-    ma10 = latest['MA10']
-    ma20 = latest['MA20']
-    ma60 = latest['MA60']
-    
+    ma5, ma20, ma60 = latest['MA5'], latest['MA20'], latest['MA60']
     k, d = latest['K'], latest['D']
-    rsi = latest['RSI']
-    macd_hist = latest['Hist']
     
-    bb_up = latest['BB_UP']
-    bb_lo = latest['BB_LO']
-    
-    # 1. 趨勢結構
-    trend_str = ""
-    if price > ma5 and ma5 > ma10 and ma10 > ma20:
-        trend_str = "極短線強勢多頭排列，五日線不破續攻。"
-    elif price > ma20 and ma20 > ma60:
-        trend_str = "中長線多頭排列格局，趨勢穩健向上。"
-    elif price < ma20 and ma20 < ma60:
-        trend_str = "均線呈現空頭排列，上方層層反壓，不宜躁進。"
-    elif price > ma20:
-        trend_str = "股價站穩月線之上，中期趨勢具支撐，短線震盪。"
+    # 趨勢敘述
+    trend_desc = ""
+    if price > ma20:
+        trend_desc = f"**{name} ({ticker})** 目前股價站穩月線之上，顯示中期趨勢具備支撐。"
+        if price > ma5 and ma5 > ma20:
+            trend_desc += " 短線沿著 5 日均線強勢上攻，多頭架構完整。"
     else:
-        trend_str = "股價跌破月線，中期趨勢轉弱，需觀察季線防守力道。"
-        
-    # 2. 資金動能
-    momentum_str = ""
-    if macd_hist > 0 and k > d:
-        momentum_str = "MACD 紅柱與 KD 金叉雙重確認，上漲動能充沛。"
-    elif macd_hist < 0 and k < d:
-        momentum_str = "MACD 綠柱與 KD 死叉同步，下跌壓力增強，小心修正。"
-    elif k > 80:
-        momentum_str = "KD 指標進入高檔鈍化區 (>80)，強者恆強，但需留意乖離過大。"
-    elif k < 20:
-        momentum_str = "KD 指標進入低檔超賣區 (<20)，隨時醞釀技術性反彈。"
-    else:
-        momentum_str = f"KD 指標 ({k:.1f}/{d:.1f}) 位於中性區間，等待方向確認。"
+        trend_desc = f"**{name} ({ticker})** 股價跌破月線，短線進入整理修正階段。"
+        if price < ma60:
+            trend_desc += " 且目前位於季線之下，上方套牢賣壓沈重，需等待落底訊號。"
 
-    # 3. 籌碼分析
-    inst_text = "資料更新中..."
-    inst_conclusion = "籌碼動向不明。"
+    # 籌碼敘述
+    inst_desc = "籌碼方面，"
     if inst_data_dict:
         f_val = inst_data_dict['Foreign']
         t_val = inst_data_dict['Trust']
-        d_val = inst_data_dict['Dealer']
-        total = f_val + t_val + d_val
+        total = f_val + t_val + inst_data_dict['Dealer']
+        date_str = inst_data_dict['Date']
         
-        inst_text = f"""
-        外資: <span style='color:{'#ff4b4b' if f_val>0 else '#00c853'}'>{f_val:,}</span> 張 | 
-        投信: <span style='color:{'#ff4b4b' if t_val>0 else '#00c853'}'>{t_val:,}</span> 張 | 
-        自營: <span style='color:{'#ff4b4b' if d_val>0 else '#00c853'}'>{d_val:,}</span> 張 
-        (合計: {total:,} 張)
-        """
+        inst_desc += f"截至 {date_str}，三大法人合計{'買超' if total>0 else '賣超'} {abs(total):,} 張。"
+        if f_val > 1000: inst_desc += " 其中外資展現買盤誠意，為推升股價主力。"
+        elif f_val < -1000: inst_desc += " 唯外資近期調節動作頻頻，需留意提款壓力。"
         
-        if total > 5000: inst_conclusion = "法人大舉買進，籌碼面強勢偏多。"
-        elif total < -5000: inst_conclusion = "法人大幅調節賣出，籌碼面偏空，需避開鋒頭。"
-        elif t_val > 1000: inst_conclusion = "投信積極佈局認養，關注作帳行情。"
-        elif f_val < -2000 and price > ma20: inst_conclusion = "外資逆勢調節，需留意高檔出貨風險。"
-        else: inst_conclusion = "法人買賣超幅度不大，市場觀望氣氛濃。"
+        if t_val > 500: inst_desc += " 值得注意的是，投信正積極佈局，可能與季底作帳行情有關。"
     else:
-        inst_text = "無法取得今日法人資料 (Yahoo 來源連線中...)"
+        inst_desc += "暫無最新法人買賣超數據 (通常於下午 3 點後更新)，建議稍後再確認。"
 
-    # 4. 價量分析
-    vol_str = ""
-    if vol > 1.5 * vol_ma5:
-        vol_str = "今日爆量" + ("長紅，買盤積極進駐。" if price > df['Open'].iloc[-1] else "長黑，恐有主力出貨嫌疑。")
-    elif vol < 0.6 * vol_ma5:
-        vol_str = "今日量縮整理，市場觀望，等待變盤。"
+    # 技術指標敘述
+    tech_desc = f"技術指標部分，KD 目前數值為 ({k:.1f}, {d:.1f})，"
+    if k > d:
+        tech_desc += "呈現**黃金交叉**，短線動能轉強，有利多方表態。"
     else:
-        vol_str = "成交量維持常態水平，量價結構平穩。"
+        tech_desc += "呈現**死亡交叉**，短線動能轉弱，可能面臨回檔整理。"
+        
+    if latest['RSI'] > 70: tech_desc += " 需留意 RSI 指標已進入高檔區，慎防追高風險。"
+    elif latest['RSI'] < 30: tech_desc += " 不過 RSI 指標已進入超賣區，隨時有機會出現技術性反彈。"
 
-    # 5. 綜合建議
-    strategy = ""
-    action_color = "#ffffff"
-    
+    # 總結建議
+    advice = ""
+    adv_color = "#ffffff"
     if price > ma20 and k > d:
-        strategy = f"偏多操作。建議沿 5 日線 ({ma5:.1f}) 操作，跌破 10 日線 ({ma10:.1f}) 減碼。"
-        action_color = "#ff4b4b" # 紅
+        advice = "綜合研判：趨勢偏多。建議可沿 5 日線操作，若拉回不破月線可視為買點。"
+        adv_color = "#ff4b4b" # 紅
     elif price < ma20 and k < d:
-        strategy = f"偏空觀望。上方月線 ({ma20:.1f}) 壓力重，支撐看布林下軌 ({bb_lo:.1f})。"
-        action_color = "#00c853" # 綠
-    elif price > bb_up:
-        strategy = "股價觸及布林上軌，短線乖離過大，不宜追高，可分批獲利。"
-        action_color = "#ff9100" # 橘
-    elif price < bb_lo:
-        strategy = "股價觸及布林下軌，短線乖離過大，可留意搶反彈機會。"
-        action_color = "#ffff00" # 黃
+        advice = "綜合研判：趨勢偏空。建議保守觀望，等待股價重新站回月線再行佈局。"
+        adv_color = "#00c853" # 綠
     else:
-        strategy = f"區間震盪。建議在月線 ({ma20:.1f}) 與季線 ({ma60:.1f}) 之間來回操作。"
+        advice = "綜合研判：區間震盪。目前多空拉鋸，建議在月線與季線之間區間操作。"
+        adv_color = "#ffff00" # 黃
 
-    # 組合成 HTML 報告
-    html = f"""
-    <div class="analysis-text">
-        <h3 style="border-bottom: 2px solid #555; padding-bottom: 10px;">🦖 武吉拉深度完整分析</h3>
-        
-        <p><b>1. 趨勢結構：</b><br>
-        {trend_str}</p>
-        
-        <p><b>2. 資金動能：</b><br>
-        {momentum_str} {vol_str}</p>
-        
-        <p><b>3. 籌碼解讀：</b><br>
-        {inst_conclusion}<br>
-        <span style="font-size:0.9em; color:#ccc;">{inst_text}</span></p>
-        
-        <p><b>4. 關鍵點位：</b><br>
-        壓力：布林上軌 {bb_up:.2f} | 支撐：月線 {ma20:.2f} / 季線 {ma60:.2f}</p>
-        
-        <hr style="border-top: 1px dashed #666;">
-        <p style="font-size:1.3rem; font-weight:bold; color:{action_color} !important;">
-        💡 操作策略：{strategy}
-        </p>
-    </div>
+    # 組合 Markdown
+    report_md = f"""
+    ### 📊 武吉拉深度完整分析
+    
+    {trend_desc}
+    
+    {inst_desc}
+    
+    {tech_desc}
+    
+    ---
+    #### 💡 {advice}
     """
-    return html
+    return report_md, adv_color
 
 # --- 6. 主程式介面 ---
 
 with st.sidebar:
     st.header("🦖 武吉拉選股")
     
-    with st.spinner("正在掃描市場熱門股..."):
+    with st.spinner("正在掃描市場..."):
         hot_stocks_list = get_top_volume_stocks()
         
     all_hot_stocks = hot_stocks_list + ["NVDA", "TSLA", "AAPL", "AMD", "PLTR"]
     
-    options_with_names = []
-    for ticker in all_hot_stocks:
-        ticker_key = f"{ticker}.TW" if ticker.isdigit() else ticker
-        name = STOCK_NAMES.get(ticker_key, ticker) 
-        options_with_names.append(f"{name} ({ticker})")
-
-    selected_option = st.selectbox("🔥 本日熱門成交 Top 15", options=options_with_names)
-    selected_ticker = selected_option.split("(")[-1].replace(")", "")
+    options = [f"{STOCK_NAMES.get(t, t)} ({t})" for t in all_hot_stocks]
+    sel_opt = st.selectbox("🔥 熱門成交 Top 15", options=options)
+    sel_ticker = sel_opt.split("(")[-1].replace(")", "")
 
     st.markdown("---")
     
-    # --- 每日大盤盤勢分析區塊 ---
-    st.subheader("🌍 每日大盤盤勢分析")
-    
-    idx_tab1, idx_tab2 = st.tabs(["🇹🇼 台股盤勢", "🇺🇸 美股盤勢"])
+    # 大盤分析區塊
+    st.subheader("🌍 每日大盤")
+    idx_tab1, idx_tab2 = st.tabs(["🇹🇼 台股", "🇺🇸 美股"])
     
     with idx_tab1:
-        tw_data = analyze_market_index("^TWII")
-        if tw_data:
+        tw = analyze_market_index("^TWII")
+        if tw:
             st.markdown(f"""
             <div class="market-summary-box">
-                <div style="font-size:1.2rem; font-weight:bold; color:{tw_data['color']}">
-                    加權指數: {tw_data['price']:.0f}
-                    <span style="font-size:0.8rem">({tw_data['change']:+.0f} / {tw_data['pct']:+.2f}%)</span>
+                <div style="font-size:1.2rem; font-weight:bold; color:{tw['color']}">
+                    加權: {tw['price']:.0f} <span style="font-size:0.8rem">({tw['change']:+.0f})</span>
                 </div>
                 <div style="margin-top:5px;">
-                    <b>狀態：{tw_data['status']}</b><br>
-                    <span style="font-size:0.85rem; color:#ddd;">{tw_data['comment']}</span>
+                    <b>{tw['status']}</b><br><span style="color:#ddd;font-size:0.85rem">{tw['comment']}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.info("資料讀取中...")
 
     with idx_tab2:
-        us_data = analyze_market_index("^IXIC") # Nasdaq
-        if us_data:
+        us = analyze_market_index("^IXIC")
+        if us:
             st.markdown(f"""
             <div class="market-summary-box" style="border-left: 4px solid #00BFFF;">
-                <div style="font-size:1.2rem; font-weight:bold; color:{us_data['color']}">
-                    Nasdaq: {us_data['price']:.0f}
-                    <span style="font-size:0.8rem">({us_data['change']:+.0f} / {us_data['pct']:+.2f}%)</span>
+                <div style="font-size:1.2rem; font-weight:bold; color:{us['color']}">
+                    Nasdaq: {us['price']:.0f} <span style="font-size:0.8rem">({us['change']:+.0f})</span>
                 </div>
                 <div style="margin-top:5px;">
-                    <b>狀態：{us_data['status']}</b><br>
-                    <span style="font-size:0.85rem; color:#ddd;">{us_data['comment']}</span>
+                    <b>{us['status']}</b><br><span style="color:#ddd;font-size:0.85rem">{us['comment']}</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.info("資料讀取中...")
             
     st.markdown("---")
-    # --- 大盤區塊結束 ---
-
-    user_input = st.text_input("或輸入代號 (如 2330, NVDA)", value="")
-    
-    target = user_input.upper() if user_input else selected_ticker
+    user_input = st.text_input("輸入代號 (如 2330)", value="")
+    target = user_input.upper() if user_input else sel_ticker
     if target.isdigit(): target += ".TW" 
 
-    st.link_button(f"前往 Yahoo 股市 ({target})", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
+    st.link_button(f"前往 Yahoo ({target})", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
 
-# 右側主畫面：個股分析
+# 右側主畫面
 try:
     stock = yf.Ticker(target)
     df = stock.history(period="6mo")
@@ -512,121 +410,56 @@ try:
     else:
         df = calculate_indicators(df)
         latest = df.iloc[-1]
+        name = STOCK_NAMES.get(target, stock.info.get('longName', target))
         
-        display_name = STOCK_NAMES.get(target, stock.info.get('longName', target))
-        
-        # 雙重保險抓取法人資料
+        # 抓取法人 (強化版)
         inst_df = get_institutional_data_yahoo(target)
-        if inst_df is None:
-            inst_df = get_institutional_data_finmind(target)
-        
-        # 準備最新法人數據
-        latest_inst_dict = None
-        if inst_df is not None and not inst_df.empty:
-            latest_inst_dict = inst_df.iloc[0].to_dict()
+        latest_inst_dict = inst_df.iloc[0].to_dict() if inst_df is not None and not inst_df.empty else None
 
+        # 標題
         change = latest['Close'] - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
         color = "#ff4b4b" if change >= 0 else "#00c853"
         
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
-            st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='margin-bottom:0; text-shadow: 2px 2px 4px #000;'>{name} ({target})</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color:{color}; margin-top:0; text-shadow: 1px 1px 2px #000;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        # 生成報告
-        st.markdown(generate_report(display_name, target, latest, latest_inst_dict, df), unsafe_allow_html=True)
+        # 顯示文字報告 (使用 st.markdown)
+        report_md, adv_color = generate_narrative_report(name, target, latest, latest_inst_dict, df)
         
-        # --- 升級版 K 線圖 (仿 Yahoo 風格) ---
-        # 建立 3 層子圖：K線(含MA), 成交量, KD
-        fig = make_subplots(
-            rows=3, cols=1, 
-            shared_xaxes=True, 
-            vertical_spacing=0.03, 
-            row_heights=[0.5, 0.2, 0.3],
-            subplot_titles=("", "成交量", "KD 指標")
-        )
-
-        # 1. K 線與均線 (主圖)
-        # K 線 (紅漲綠跌)
-        fig.add_trace(go.Candlestick(
-            x=df.index.strftime('%Y-%m-%d'), 
-            open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
-            name='K線',
-            increasing_line_color='#ff4b4b', increasing_fillcolor='#ff4b4b',
-            decreasing_line_color='#00c853', decreasing_fillcolor='#00c853'
-        ), row=1, col=1)
+        with st.container():
+            st.markdown(f"""<div class="glass-container">""", unsafe_allow_html=True)
+            st.markdown(report_md)
+            st.markdown("</div>", unsafe_allow_html=True)
         
-        # 均線 (仿 Yahoo 配色：MA5藍, MA10紫, MA20橘, MA60黃/綠)
+        # K 線圖
+        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.2, 0.3], vertical_spacing=0.03)
+        
+        # K線
+        fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ff4b4b', decreasing_line_color='#00c853'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='#2962ff', width=1), name='MA5'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA10'], line=dict(color='#aa00ff', width=1), name='MA10'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA20'], line=dict(color='#ff6d00', width=1), name='MA20'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA60'], line=dict(color='#ffd600', width=1), name='MA60'), row=1, col=1)
-
-        # 2. 成交量 (中層)
-        colors_vol = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
-        fig.add_trace(go.Bar(
-            x=df.index.strftime('%Y-%m-%d'), 
-            y=df['Volume'], 
-            marker_color=colors_vol, 
-            name='成交量'
-        ), row=2, col=1)
-
-        # 3. KD 指標 (下層)
+        
+        # 成交量
+        colors = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
+        fig.add_trace(go.Bar(x=df.index.strftime('%Y-%m-%d'), y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
+        
+        # KD
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['K'], line=dict(color='#2962ff', width=1), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['D'], line=dict(color='#ff6d00', width=1), name='D9'), row=3, col=1)
-
-        # 設定圖表樣式 (深色背景 + 移除滑桿)
-        fig.update_layout(
-            template="plotly_dark",
-            height=800, # 加高圖表
-            margin=dict(l=0, r=0, t=30, b=0),
-            xaxis_rangeslider_visible=False,
-            xaxis3_rangeslider_visible=False,
-            paper_bgcolor='rgba(0,0,0,0)', # 透明背景融入網頁
-            plot_bgcolor='rgba(0,0,0,0)',
-            hovermode='x unified',
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
         
-        # 修正 X 軸 (移除休市日空隙)
-        fig.update_xaxes(type='category', tickangle=0, nticks=10)
-        
+        fig.update_layout(template="plotly_dark", height=800, xaxis_rangeslider_visible=False, xaxis3_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
         
-        # 底部 Tab 區塊
-        tab1, tab2 = st.tabs(["📉 詳細指標", "🏛️ 法人籌碼"])
-        
-        with tab1:
-            t1, t2, t3, t4 = st.columns(4)
-            t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
-            t2.metric("K (9)", f"{latest['K']:.1f}")
-            t3.metric("D (9)", f"{latest['D']:.1f}")
-            t4.metric("MACD", f"{latest['MACD']:.2f}")
-            
-        with tab2:
-            if inst_df is not None and not inst_df.empty:
-                # 顯示法人買賣變化圖表 (Bar Chart)
-                st.subheader("法人買賣變化 (近30日)")
-                fig_inst = go.Figure()
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#FBBC05'))
-                
-                fig_inst.update_layout(
-                    barmode='group',
-                    template="plotly_dark",
-                    height=400,
-                    margin=dict(l=0, r=0, t=30, b=0),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                fig_inst.update_xaxes(autorange="reversed")
-                st.plotly_chart(fig_inst, use_container_width=True)
-            else:
-                st.info("此股票無法人籌碼資料。")
+        # 法人圖表
+        if inst_df is not None and not inst_df.empty:
+            st.subheader("🏛️ 法人買賣變化")
+            fig_inst = go.Figure()
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
+            fig_inst.update_layout(barmode='group', template="plotly_dark", height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(autorange="reversed"))
+            st.plotly_chart(fig_inst, use_container_width=True)
 
 except Exception as e:
-    st.error(f"發生錯誤: {e}")
+    st.error(f"系統忙碌中，請稍後再試: {e}")

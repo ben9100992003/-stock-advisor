@@ -48,7 +48,8 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    .recommendation-box, .analysis-text {
+    /* 卡片通用樣式 */
+    .recommendation-box, .analysis-text, .market-summary-box {
         background-color: rgba(20, 20, 20, 0.85) !important;
         border: 1px solid rgba(255, 255, 255, 0.2);
         backdrop-filter: blur(10px);
@@ -59,7 +60,16 @@ st.markdown("""
     }
     
     .recommendation-box { border-left: 6px solid #ff4b4b; }
+    
+    /* 側邊欄的大盤分析小卡 */
+    .market-summary-box {
+        padding: 15px;
+        font-size: 0.9rem;
+        border-left: 4px solid #FFD700;
+        margin-bottom: 10px;
+    }
 
+    /* 強制 Metric 樣式 */
     [data-testid="stMetric"] {
         background-color: rgba(30, 30, 30, 0.9) !important;
         padding: 15px !important;
@@ -81,6 +91,7 @@ st.markdown("""
         text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
     }
 
+    /* Tab 樣式 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
         font-weight: 900;
@@ -127,31 +138,25 @@ def get_top_volume_stocks():
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
-    """第一層：Yahoo 爬蟲"""
     if ".TW" not in ticker: return None
     try:
         url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         r = requests.get(url, headers=headers)
         r.encoding = 'utf-8'
-        
-        # 強制解析表格
         dfs = pd.read_html(r.text)
         if not dfs: return None
         
         target_df = None
         for df in dfs:
-            # 尋找關鍵字
             if any('外資' in str(col) for col in df.columns) and any('日期' in str(col) for col in df.columns):
                 target_df = df
                 break
         
         if target_df is None or target_df.empty: return None
         
-        # 欄位標準化
         target_df.columns = [str(c).replace(' ', '') for c in target_df.columns]
         date_col = next((c for c in target_df.columns if '日期' in c), None)
         f_col = next((c for c in target_df.columns if '外資' in c and '持股' not in c), None)
@@ -163,7 +168,6 @@ def get_institutional_data_yahoo(ticker):
         df_clean = target_df[[date_col, f_col, t_col, d_col]].copy()
         df_clean.columns = ['Date', 'Foreign', 'Trust', 'Dealer']
         
-        # 數據清洗
         def clean_num(x):
             if isinstance(x, (int, float)): return int(x)
             if isinstance(x, str):
@@ -175,60 +179,43 @@ def get_institutional_data_yahoo(ticker):
         for col in ['Foreign', 'Trust', 'Dealer']:
             df_clean[col] = df_clean[col].apply(clean_num)
             
-        # 確保日期格式 (Yahoo 可能是 11/25，需加上年份)
         def clean_date(d):
             if isinstance(d, str) and '/' in d and len(d) <= 5:
                 return f"{datetime.now().year}/{d}"
             return d
         
         df_clean['Date'] = df_clean['Date'].apply(clean_date)
-        
-        # 回傳前 30 筆
         return df_clean.head(30)
 
-    except Exception as e:
-        # print(f"Yahoo Error: {e}") 
+    except Exception:
         return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
-    """第二層：FinMind 備援 (如果 Yahoo 失敗)"""
     if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
-    
     stock_id = ticker.replace(".TW", "")
     dl = DataLoader()
     try:
         start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
-
-        # 轉成寬表格格式 (Pivot) 模擬 Yahoo 格式
-        # FinMind: date, name(外資/投信..), buy, sell
         df['net'] = df['buy'] - df['sell']
-        
-        # 建立日期清單
         dates = sorted(df['date'].unique(), reverse=True)
         result_data = []
-        
         for d in dates:
             day_df = df[df['date'] == d]
-            
             def get_net(key):
                 v = day_df[day_df['name'].str.contains(key)]['net'].sum()
-                return int(v / 1000) # FinMind 單位是股，轉張
-            
+                return int(v / 1000) 
             result_data.append({
-                'Date': d,
-                'Foreign': get_net('外資'),
-                'Trust': get_net('投信'),
-                'Dealer': get_net('自營')
+                'Date': d, 'Foreign': get_net('外資'), 'Trust': get_net('投信'), 'Dealer': get_net('自營')
             })
-            
         return pd.DataFrame(result_data).head(30)
     except:
         return None
 
-# --- 4. 技術指標運算 ---
+# --- 4. 技術指標與大盤分析函式 ---
+
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
@@ -252,11 +239,61 @@ def calculate_indicators(df):
     exp26 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp12 - exp26
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    
     return df
 
-# --- 5. 分析報告生成 ---
-def generate_report(name, ticker, latest, inst_df, df):
+def analyze_market_index(ticker_symbol):
+    """大盤指數自動分析"""
+    try:
+        stock = yf.Ticker(ticker_symbol)
+        df = stock.history(period="3mo")
+        if df.empty: return None
+        
+        df = calculate_indicators(df)
+        latest = df.iloc[-1]
+        price = latest['Close']
+        change = price - df['Close'].iloc[-2]
+        pct = (change / df['Close'].iloc[-2]) * 100
+        ma20 = latest['MA20']
+        k, d = latest['K'], latest['D']
+        
+        # 趨勢判斷文字生成
+        status = "盤整"
+        color = "#ffffff"
+        comment = ""
+        
+        if price > ma20:
+            if k > d:
+                status = "多頭強勢"
+                color = "#ff4b4b"
+                comment = "指數站上月線且 KD 黃金交叉，短線動能強勁，偏多操作。"
+            else:
+                status = "多頭回檔"
+                color = "#ff9100"
+                comment = "雖在月線之上但 KD 修正中，留意支撐是否有守。"
+        else:
+            if k < d:
+                status = "空方修正"
+                color = "#00c853"
+                comment = "指數跌破月線且 KD 死亡交叉，趨勢偏弱，建議保守觀望。"
+            else:
+                status = "跌深反彈"
+                color = "#ffff00"
+                comment = "KD 低檔交叉向上，醞釀反彈，但上方月線仍有壓。"
+                
+        return {
+            "price": price,
+            "change": change,
+            "pct": pct,
+            "status": status,
+            "color": color,
+            "comment": comment,
+            "ma20": ma20
+        }
+    except:
+        return None
+
+# --- 5. 個股報告生成 ---
+def generate_report(name, ticker, latest, inst_data_dict, df):
     price = latest['Close']
     ma20 = latest['MA20']
     k, d = latest['K'], latest['D']
@@ -264,24 +301,20 @@ def generate_report(name, ticker, latest, inst_df, df):
     trend = "多頭強勢 🔥" if price > ma20 else "空方修正 🧊"
     if price > latest['MA5'] and price > ma20 and price > latest['MA60']: trend = "全面噴發 🚀"
     
-    # 法人數據處理
-    inst_text = "資料讀取中..."
-    source_text = ""
-    
-    if inst_df is not None and not inst_df.empty:
-        last = inst_df.iloc[0]
-        f_val, t_val, d_val = last['Foreign'], last['Trust'], last['Dealer']
+    inst_text = "資料更新中..."
+    if inst_data_dict:
+        f_val = inst_data_dict['Foreign']
+        t_val = inst_data_dict['Trust']
+        d_val = inst_data_dict['Dealer']
         total = f_val + t_val + d_val
-        
         inst_text = f"""
         外資: <span style='color:{'#ff4b4b' if f_val>0 else '#00c853'}'>{f_val:,}</span> 張 | 
         投信: <span style='color:{'#ff4b4b' if t_val>0 else '#00c853'}'>{t_val:,}</span> 張 | 
         自營: <span style='color:{'#ff4b4b' if d_val>0 else '#00c853'}'>{d_val:,}</span> 張 
         (合計: {total:,} 張)
         """
-        source_text = f"(資料來源: Yahoo/FinMind | 日期: {last['Date']})"
     else:
-        inst_text = "無法取得法人資料 (系統連線異常)"
+        inst_text = "無法取得今日法人資料 (Yahoo 來源連線中...)"
     
     action = "觀望"
     if price > ma20 and k > d: action = "偏多操作 (拉回找買點)"
@@ -295,7 +328,6 @@ def generate_report(name, ticker, latest, inst_df, df):
         <p><b>【趨勢燈號】</b>：{trend}</p>
         <p><b>【價量結構】</b>：收盤 {price:.2f}，成交量 {int(latest['Volume']/1000):,} 張。</p>
         <p><b>【法人籌碼】</b>：{inst_text}</p>
-        <p style="font-size:0.8em; color:#aaa;">{source_text}</p>
         <p><b>【關鍵指標】</b>：KD({k:.1f}/{d:.1f}) {'黃金交叉' if k>d else '死亡交叉'} | RSI: {latest['RSI']:.1f}</p>
         <p><b>【支撐壓力】</b>：月線 {ma20:.2f} 為重要多空分水嶺。</p>
         <hr>
@@ -304,7 +336,7 @@ def generate_report(name, ticker, latest, inst_df, df):
     """
     return html
 
-# --- 6. 主程式邏輯 ---
+# --- 6. 主程式介面 ---
 
 with st.sidebar:
     st.header("🦖 武吉拉選股")
@@ -324,6 +356,51 @@ with st.sidebar:
     selected_ticker = selected_option.split("(")[-1].replace(")", "")
 
     st.markdown("---")
+    
+    # --- 新增：每日大盤盤勢分析區塊 ---
+    st.subheader("🌍 每日大盤盤勢分析")
+    
+    idx_tab1, idx_tab2 = st.tabs(["🇹🇼 台股盤勢", "🇺🇸 美股盤勢"])
+    
+    with idx_tab1:
+        tw_data = analyze_market_index("^TWII")
+        if tw_data:
+            st.markdown(f"""
+            <div class="market-summary-box">
+                <div style="font-size:1.2rem; font-weight:bold; color:{tw_data['color']}">
+                    加權指數: {tw_data['price']:.0f}
+                    <span style="font-size:0.8rem">({tw_data['change']:+.0f} / {tw_data['pct']:+.2f}%)</span>
+                </div>
+                <div style="margin-top:5px;">
+                    <b>狀態：{tw_data['status']}</b><br>
+                    <span style="font-size:0.85rem; color:#ddd;">{tw_data['comment']}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("資料讀取中...")
+
+    with idx_tab2:
+        us_data = analyze_market_index("^IXIC") # Nasdaq
+        if us_data:
+            st.markdown(f"""
+            <div class="market-summary-box" style="border-left: 4px solid #00BFFF;">
+                <div style="font-size:1.2rem; font-weight:bold; color:{us_data['color']}">
+                    Nasdaq: {us_data['price']:.0f}
+                    <span style="font-size:0.8rem">({us_data['change']:+.0f} / {us_data['pct']:+.2f}%)</span>
+                </div>
+                <div style="margin-top:5px;">
+                    <b>狀態：{us_data['status']}</b><br>
+                    <span style="font-size:0.85rem; color:#ddd;">{us_data['comment']}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("資料讀取中...")
+            
+    st.markdown("---")
+    # --- 大盤區塊結束 ---
+
     user_input = st.text_input("或輸入代號 (如 2330, NVDA)", value="")
     
     target = user_input.upper() if user_input else selected_ticker
@@ -331,6 +408,7 @@ with st.sidebar:
 
     st.link_button(f"前往 Yahoo 股市 ({target})", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
 
+# 右側主畫面：個股分析
 try:
     stock = yf.Ticker(target)
     df = stock.history(period="6mo")
@@ -348,6 +426,11 @@ try:
         if inst_df is None:
             inst_df = get_institutional_data_finmind(target)
         
+        # 準備最新法人數據
+        latest_inst_dict = None
+        if inst_df is not None and not inst_df.empty:
+            latest_inst_dict = inst_df.iloc[0].to_dict()
+
         change = latest['Close'] - df['Close'].iloc[-2]
         pct = (change / df['Close'].iloc[-2]) * 100
         color = "#ff4b4b" if change >= 0 else "#00c853"
@@ -357,9 +440,9 @@ try:
             st.markdown(f"<h1 style='margin-bottom:0;'>{display_name} ({target})</h1>", unsafe_allow_html=True)
             st.markdown(f"<h2 style='color:{color}; margin-top:0;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        st.markdown(generate_report(display_name, target, latest, inst_df, df), unsafe_allow_html=True)
+        st.markdown(generate_report(display_name, target, latest, latest_inst_dict, df), unsafe_allow_html=True)
         
-        # 技術面 K 線圖
+        # K 線圖
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
         fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='orange', width=1), name='MA5'), row=1, col=1)
@@ -377,49 +460,32 @@ try:
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # 底部 Tab 區塊
-        tab1, tab2 = st.tabs(["📉 詳細指標", "🏛️ 法人籌碼"])
+        t1, t2, t3 = st.columns(3)
+        t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
+        t2.metric("K (9)", f"{latest['K']:.1f}")
+        t3.metric("D (9)", f"{latest['D']:.1f}")
         
-        with tab1:
-            t1, t2, t3 = st.columns(3)
-            t1.metric("RSI (14)", f"{latest['RSI']:.1f}")
-            t2.metric("K (9)", f"{latest['K']:.1f}")
-            t3.metric("D (9)", f"{latest['D']:.1f}")
+        # 法人圖表區
+        st.markdown("### 🏛️ 法人籌碼變化 (近30日)")
+        if inst_df is not None and not inst_df.empty:
+            fig_inst = go.Figure()
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4'))
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4'))
+            fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#FBBC05'))
             
-        with tab2:
-            if inst_df is not None and not inst_df.empty:
-                # 顯示法人買賣變化圖表 (Bar Chart)
-                st.subheader("法人買賣變化 (近30日)")
-                fig_inst = go.Figure()
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4285F4')) # 藍
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#A142F4')) # 紫
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#FBBC05')) # 黃/橘
-                
-                fig_inst.update_layout(
-                    barmode='group',
-                    template="plotly_white",
-                    height=400,
-                    margin=dict(l=0, r=0, t=30, b=0),
-                    paper_bgcolor='rgba(255, 255, 255, 1)',
-                    plot_bgcolor='rgba(255, 255, 255, 1)',
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                )
-                # 如果是 Yahoo 來源，最新的在上面，需要反轉畫圖順序
-                fig_inst.update_xaxes(autorange="reversed")
-                st.plotly_chart(fig_inst, use_container_width=True)
-                
-                # 顯示最新數據 Metrics
-                m1, m2, m3 = st.columns(3)
-                last = inst_df.iloc[0]
-                def c_val(v): return "normal" if v > 0 else "inverse"
-                m1.metric("外資", f"{last['Foreign']:,}", delta=f"{last['Foreign']:,}", delta_color=c_val(last['Foreign']))
-                m2.metric("投信", f"{last['Trust']:,}", delta=f"{last['Trust']:,}", delta_color=c_val(last['Trust']))
-                m3.metric("自營商", f"{last['Dealer']:,}", delta=f"{last['Dealer']:,}", delta_color=c_val(last['Dealer']))
-                st.caption(f"資料來源: Yahoo/FinMind | 日期: {last['Date']}")
-            else:
-                st.info("目前無法人資料或非台股標的。")
+            fig_inst.update_layout(
+                barmode='group',
+                template="plotly_white",
+                height=400,
+                margin=dict(l=0, r=0, t=30, b=0),
+                paper_bgcolor='rgba(255, 255, 255, 1)',
+                plot_bgcolor='rgba(255, 255, 255, 1)',
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            fig_inst.update_xaxes(autorange="reversed")
+            st.plotly_chart(fig_inst, use_container_width=True)
+        else:
+            st.info("此股票無法人籌碼資料。")
 
 except Exception as e:
     st.error(f"發生錯誤: {e}")
-
-

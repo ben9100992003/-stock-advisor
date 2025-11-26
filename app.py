@@ -48,17 +48,38 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 半透明容器樣式 (用於文字報告) */
+    /* 半透明容器樣式 (核心修復) */
     .glass-container {
-        background-color: rgba(0, 0, 0, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 15px;
-        padding: 25px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(5px);
+        background-color: rgba(0, 0, 0, 0.75); /* 加深背景透明度 */
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        color: #ffffff !important; /* 強制文字白色 */
     }
     
+    /* 報告中的標題與文字 */
+    .glass-container h3 {
+        color: #ffcc00 !important;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        text-shadow: 1px 1px 2px black;
+    }
+    .glass-container p {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        margin-bottom: 15px;
+        color: #f0f0f0 !important;
+    }
+    .glass-container b {
+        color: #ffffff;
+        font-weight: 700;
+    }
+
     /* 側邊欄卡片 */
     .market-summary-box {
         padding: 15px;
@@ -71,14 +92,14 @@ st.markdown("""
 
     /* Metric 指標樣式 */
     [data-testid="stMetric"] {
-        background-color: rgba(40, 40, 40, 0.9) !important;
+        background-color: rgba(40, 40, 40, 0.85) !important;
         padding: 15px !important;
         border-radius: 10px !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         text-align: center;
     }
     [data-testid="stMetricLabel"] { color: #cccccc !important; }
-    [data-testid="stMetricValue"] { color: #ffffff !important; }
+    [data-testid="stMetricValue"] { color: #ffffff !important; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
 
     /* Tab 樣式 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
@@ -86,7 +107,7 @@ st.markdown("""
         font-weight: bold;
     }
     .stMarkdown p, .stCaption { color: #e0e0e0 !important; }
-    h1, h2, h3, h4 { text-shadow: 2px 2px 4px #000000; color: #fff !important; }
+    h1, h2 { text-shadow: 2px 2px 4px #000000; color: #fff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -124,7 +145,6 @@ def get_top_volume_stocks():
 def get_institutional_data_yahoo(ticker):
     if ".TW" not in ticker: return None
     try:
-        # 強化版 Headers，模擬真實瀏覽器行為
         url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -138,7 +158,6 @@ def get_institutional_data_yahoo(ticker):
         if not dfs: return None
         
         target_df = None
-        # 搜尋所有表格，只要有日期跟買賣超關鍵字就抓
         for df in dfs:
             cols_str = " ".join([str(c) for c in df.columns])
             if '日期' in cols_str and ('外資' in cols_str or '買賣超' in cols_str):
@@ -147,7 +166,6 @@ def get_institutional_data_yahoo(ticker):
         
         if target_df is None or target_df.empty: return None
         
-        # 重新命名欄位以利存取 (模糊比對)
         new_cols = {}
         for col in target_df.columns:
             c_str = str(col)
@@ -158,11 +176,9 @@ def get_institutional_data_yahoo(ticker):
             
         target_df = target_df.rename(columns=new_cols)
         
-        # 檢查必要欄位是否存在
         if 'Date' not in target_df.columns or 'Foreign' not in target_df.columns:
             return None
 
-        # 數據清洗
         df_clean = target_df.copy()
         
         def clean_num(x):
@@ -177,7 +193,7 @@ def get_institutional_data_yahoo(ticker):
             if col in df_clean.columns:
                 df_clean[col] = df_clean[col].apply(clean_num)
             else:
-                df_clean[col] = 0 # 若缺欄位補 0
+                df_clean[col] = 0
             
         def clean_date(d):
             if isinstance(d, str) and '/' in d and len(d) <= 5:
@@ -188,7 +204,6 @@ def get_institutional_data_yahoo(ticker):
         return df_clean.head(30)
 
     except Exception as e:
-        # print(f"Yahoo Error: {e}")
         return None
 
 # --- 4. 技術指標與大盤分析函式 ---
@@ -199,12 +214,9 @@ def calculate_indicators(df):
     df['MA20'] = df['Close'].rolling(20).mean()
     df['MA60'] = df['Close'].rolling(60).mean()
     
-    # 布林通道 (20, 2)
     df['STD'] = df['Close'].rolling(20).std()
     df['BB_UP'] = df['MA20'] + 2 * df['STD']
     df['BB_LO'] = df['MA20'] - 2 * df['STD']
-    
-    # 成交量均線
     df['VOL_MA5'] = df['Volume'].rolling(5).mean()
     
     low_min = df['Low'].rolling(9).min()
@@ -273,7 +285,7 @@ def analyze_market_index(ticker_symbol):
     except:
         return None
 
-# --- 5. 深度分析報告 (文字敘述版) ---
+# --- 5. 深度分析報告 (HTML 生成版) ---
 def generate_narrative_report(name, ticker, latest, inst_data_dict, df):
     price = latest['Close']
     vol = latest['Volume']
@@ -281,47 +293,51 @@ def generate_narrative_report(name, ticker, latest, inst_data_dict, df):
     k, d = latest['K'], latest['D']
     
     # 趨勢敘述
-    trend_desc = ""
+    trend_html = ""
     if price > ma20:
-        trend_desc = f"**{name} ({ticker})** 目前股價站穩月線之上，顯示中期趨勢具備支撐。"
+        trend_html = f"<b>{name} ({ticker})</b> 目前股價站穩月線之上，顯示中期趨勢具備支撐。"
         if price > ma5 and ma5 > ma20:
-            trend_desc += " 短線沿著 5 日均線強勢上攻，多頭架構完整。"
+            trend_html += " 短線沿著 5 日均線強勢上攻，多頭架構完整。"
     else:
-        trend_desc = f"**{name} ({ticker})** 股價跌破月線，短線進入整理修正階段。"
+        trend_html = f"<b>{name} ({ticker})</b> 股價跌破月線，短線進入整理修正階段。"
         if price < ma60:
-            trend_desc += " 且目前位於季線之下，上方套牢賣壓沈重，需等待落底訊號。"
+            trend_html += " 且目前位於季線之下，上方套牢賣壓沈重，需等待落底訊號。"
 
     # 籌碼敘述
-    inst_desc = "籌碼方面，"
+    inst_html = "籌碼方面，"
     if inst_data_dict:
         f_val = inst_data_dict['Foreign']
         t_val = inst_data_dict['Trust']
         total = f_val + t_val + inst_data_dict['Dealer']
         date_str = inst_data_dict['Date']
         
-        inst_desc += f"截至 {date_str}，三大法人合計{'買超' if total>0 else '賣超'} {abs(total):,} 張。"
-        if f_val > 1000: inst_desc += " 其中外資展現買盤誠意，為推升股價主力。"
-        elif f_val < -1000: inst_desc += " 唯外資近期調節動作頻頻，需留意提款壓力。"
+        buy_sell_color = "#ff4b4b" if total > 0 else "#00c853"
+        buy_sell_text = "買超" if total > 0 else "賣超"
         
-        if t_val > 500: inst_desc += " 值得注意的是，投信正積極佈局，可能與季底作帳行情有關。"
+        inst_html += f"截至 {date_str}，三大法人合計 <span style='color:{buy_sell_color}'>{buy_sell_text} {abs(total):,} 張</span>。"
+        if f_val > 1000: inst_html += " 其中外資展現買盤誠意，為推升股價主力。"
+        elif f_val < -1000: inst_html += " 唯外資近期調節動作頻頻，需留意提款壓力。"
+        
+        if t_val > 500: inst_html += " 值得注意的是，投信正積極佈局，可能與季底作帳行情有關。"
     else:
-        inst_desc += "暫無最新法人買賣超數據 (通常於下午 3 點後更新)，建議稍後再確認。"
+        inst_html += "暫無最新法人買賣超數據 (通常於下午 3 點後更新)，建議稍後再確認。"
 
     # 技術指標敘述
-    tech_desc = f"技術指標部分，KD 目前數值為 ({k:.1f}, {d:.1f})，"
-    if k > d:
-        tech_desc += "呈現**黃金交叉**，短線動能轉強，有利多方表態。"
-    else:
-        tech_desc += "呈現**死亡交叉**，短線動能轉弱，可能面臨回檔整理。"
+    kd_status = "黃金交叉" if k > d else "死亡交叉"
+    kd_color = "#ff4b4b" if k > d else "#00c853"
+    tech_html = f"技術指標部分，KD 目前數值為 ({k:.1f}, {d:.1f})，呈現 <span style='color:{kd_color}'><b>{kd_status}</b></span>。"
+    
+    if k > d: tech_html += " 短線動能轉強，有利多方表態。"
+    else: tech_html += " 短線動能轉弱，可能面臨回檔整理。"
         
-    if latest['RSI'] > 70: tech_desc += " 需留意 RSI 指標已進入高檔區，慎防追高風險。"
-    elif latest['RSI'] < 30: tech_desc += " 不過 RSI 指標已進入超賣區，隨時有機會出現技術性反彈。"
+    if latest['RSI'] > 70: tech_html += " <br>⚠️ RSI 指標進入高檔區，慎防追高風險。"
+    elif latest['RSI'] < 30: tech_html += " <br>✅ RSI 指標進入超賣區，隨時有機會出現技術性反彈。"
 
     # 總結建議
     advice = ""
     adv_color = "#ffffff"
     if price > ma20 and k > d:
-        advice = "綜合研判：趨勢偏多。建議可沿 5 日線操作，若拉回不破月線可視為買點。"
+        advice = "綜合研判：趨勢偏多。建議沿 5 日線操作，若拉回不破月線可視為買點。"
         adv_color = "#ff4b4b" # 紅
     elif price < ma20 and k < d:
         advice = "綜合研判：趨勢偏空。建議保守觀望，等待股價重新站回月線再行佈局。"
@@ -330,20 +346,20 @@ def generate_narrative_report(name, ticker, latest, inst_data_dict, df):
         advice = "綜合研判：區間震盪。目前多空拉鋸，建議在月線與季線之間區間操作。"
         adv_color = "#ffff00" # 黃
 
-    # 組合 Markdown
-    report_md = f"""
-    ### 📊 武吉拉深度完整分析
-    
-    {trend_desc}
-    
-    {inst_desc}
-    
-    {tech_desc}
-    
-    ---
-    #### 💡 {advice}
+    # 組合 HTML
+    html_report = f"""
+    <div class="glass-container">
+        <h3>📊 武吉拉深度完整分析</h3>
+        <p><b>1. 趨勢結構：</b><br>{trend_html}</p>
+        <p><b>2. 籌碼解讀：</b><br>{inst_html}</p>
+        <p><b>3. 關鍵指標：</b><br>{tech_html}</p>
+        <hr style="border-top: 1px dashed #aaa;">
+        <p style="font-size: 1.2rem; font-weight: bold; color: {adv_color} !important;">
+            💡 {advice}
+        </p>
+    </div>
     """
-    return report_md, adv_color
+    return html_report
 
 # --- 6. 主程式介面 ---
 
@@ -424,13 +440,9 @@ try:
         st.markdown(f"<h1 style='margin-bottom:0; text-shadow: 2px 2px 4px #000;'>{name} ({target})</h1>", unsafe_allow_html=True)
         st.markdown(f"<h2 style='color:{color}; margin-top:0; text-shadow: 1px 1px 2px #000;'>{latest['Close']:.2f} <small>({change:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        # 顯示文字報告 (使用 st.markdown)
-        report_md, adv_color = generate_narrative_report(name, target, latest, latest_inst_dict, df)
-        
-        with st.container():
-            st.markdown(f"""<div class="glass-container">""", unsafe_allow_html=True)
-            st.markdown(report_md)
-            st.markdown("</div>", unsafe_allow_html=True)
+        # 顯示分析報告 (HTML 版)
+        report_html = generate_narrative_report(name, target, latest, latest_inst_dict, df)
+        st.markdown(report_html, unsafe_allow_html=True)
         
         # K 線圖
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.2, 0.3], vertical_spacing=0.03)

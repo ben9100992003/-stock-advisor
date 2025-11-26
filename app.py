@@ -221,6 +221,14 @@ def calculate_indicators(df):
     df['MA20'] = df['Close'].rolling(20).mean()
     df['MA60'] = df['Close'].rolling(60).mean()
     
+    # 布林通道 (20, 2)
+    df['STD'] = df['Close'].rolling(20).std()
+    df['BB_UP'] = df['MA20'] + 2 * df['STD']
+    df['BB_LO'] = df['MA20'] - 2 * df['STD']
+    
+    # 成交量均線
+    df['VOL_MA5'] = df['Volume'].rolling(5).mean()
+    
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
@@ -239,6 +247,8 @@ def calculate_indicators(df):
     exp26 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp12 - exp26
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    df['Hist'] = df['MACD'] - df['Signal']
+    
     return df
 
 def analyze_market_index(ticker_symbol):
@@ -292,46 +302,120 @@ def analyze_market_index(ticker_symbol):
     except:
         return None
 
-# --- 5. 個股報告生成 ---
+# --- 5. 深度分析報告生成 (核心升級) ---
 def generate_report(name, ticker, latest, inst_data_dict, df):
     price = latest['Close']
+    vol = latest['Volume']
+    vol_ma5 = latest['VOL_MA5']
+    
+    ma5 = latest['MA5']
     ma20 = latest['MA20']
+    ma60 = latest['MA60']
+    
     k, d = latest['K'], latest['D']
+    rsi = latest['RSI']
+    macd_hist = latest['Hist']
     
-    trend = "多頭強勢 🔥" if price > ma20 else "空方修正 🧊"
-    if price > latest['MA5'] and price > ma20 and price > latest['MA60']: trend = "全面噴發 🚀"
+    bb_up = latest['BB_UP']
+    bb_lo = latest['BB_LO']
     
+    # 1. 結構判斷
+    trend_str = ""
+    if price > ma20 and ma20 > ma60:
+        trend_str = "多頭排列格局，中長線趨勢向上。"
+    elif price < ma20 and ma20 < ma60:
+        trend_str = "空頭排列格局，上方層層賣壓。"
+    elif price > ma20:
+        trend_str = "站上月線，短線嘗試轉強。"
+    else:
+        trend_str = "跌破月線，短線整理修正。"
+        
+    # 2. 動能分析
+    momentum_str = ""
+    if macd_hist > 0 and k > d:
+        momentum_str = "MACD 紅柱與 KD 金叉共振，上漲動能強勁。"
+    elif macd_hist < 0 and k < d:
+        momentum_str = "MACD 綠柱與 KD 死叉共振，下跌動能增強。"
+    elif k > 80:
+        momentum_str = "KD 指標進入高檔鈍化區，需留意短線過熱回檔。"
+    elif k < 20:
+        momentum_str = "KD 指標進入低檔超賣區，隨時有反彈機會。"
+    else:
+        momentum_str = "技術指標呈現中性震盪。"
+
+    # 3. 籌碼分析
     inst_text = "資料更新中..."
+    inst_conclusion = "籌碼動向不明。"
     if inst_data_dict:
         f_val = inst_data_dict['Foreign']
         t_val = inst_data_dict['Trust']
         d_val = inst_data_dict['Dealer']
         total = f_val + t_val + d_val
+        
         inst_text = f"""
         外資: <span style='color:{'#ff4b4b' if f_val>0 else '#00c853'}'>{f_val:,}</span> 張 | 
         投信: <span style='color:{'#ff4b4b' if t_val>0 else '#00c853'}'>{t_val:,}</span> 張 | 
         自營: <span style='color:{'#ff4b4b' if d_val>0 else '#00c853'}'>{d_val:,}</span> 張 
         (合計: {total:,} 張)
         """
+        
+        if total > 2000: inst_conclusion = "法人大舉買進，籌碼面偏多。"
+        elif total < -2000: inst_conclusion = "法人調節賣出，籌碼面偏空。"
+        elif t_val > 500: inst_conclusion = "投信積極佈局，關注作帳行情。"
+        else: inst_conclusion = "法人買賣超幅度不大，觀望氣氛濃。"
     else:
         inst_text = "無法取得今日法人資料 (Yahoo 來源連線中...)"
-    
-    action = "觀望"
-    if price > ma20 and k > d: action = "偏多操作 (拉回找買點)"
-    elif price < ma20 and k < d: action = "偏空操作 (反彈找賣點)"
-    elif k > 80: action = "高檔警戒 (勿追高)"
-    elif k < 20: action = "超跌醞釀反彈"
 
+    # 4. 價量分析
+    vol_str = ""
+    if vol > 1.5 * vol_ma5:
+        vol_str = "今日出量攻擊，顯示買盤積極。" if price > df['Open'].iloc[-1] else "今日爆量下殺，恐有主力出貨嫌疑。"
+    elif vol < 0.6 * vol_ma5:
+        vol_str = "今日量縮整理，市場觀望氣氛濃厚。"
+    else:
+        vol_str = "成交量維持常態水平。"
+
+    # 5. 綜合建議
+    strategy = ""
+    action_color = "#ffffff"
+    
+    if price > ma20 and k > d:
+        strategy = f"多頭強勢。建議沿 5 日線 ({ma5:.1f}) 操作，跌破月線 ({ma20:.1f}) 停利。"
+        action_color = "#ff4b4b" # 紅
+    elif price < ma20 and k < d:
+        strategy = f"空方走勢。壓力看月線 ({ma20:.1f})，支撐看布林下軌 ({bb_lo:.1f})，勿輕易摸底。"
+        action_color = "#00c853" # 綠
+    elif price > bb_up:
+        strategy = "股價觸及布林上軌，短線乖離過大，不宜追高，可分批獲利。"
+        action_color = "#ff9100" # 橘
+    elif price < bb_lo:
+        strategy = "股價觸及布林下軌，短線乖離過大，可留意搶反彈機會。"
+        action_color = "#ffff00" # 黃
+    else:
+        strategy = f"區間震盪。建議在月線 ({ma20:.1f}) 與季線 ({ma60:.1f}) 之間來回操作。"
+
+    # 組合成 HTML 報告
     html = f"""
     <div class="analysis-text">
-        <h3>📊 {name} ({ticker}) 深度診斷</h3>
-        <p><b>【趨勢燈號】</b>：{trend}</p>
-        <p><b>【價量結構】</b>：收盤 {price:.2f}，成交量 {int(latest['Volume']/1000):,} 張。</p>
-        <p><b>【法人籌碼】</b>：{inst_text}</p>
-        <p><b>【關鍵指標】</b>：KD({k:.1f}/{d:.1f}) {'黃金交叉' if k>d else '死亡交叉'} | RSI: {latest['RSI']:.1f}</p>
-        <p><b>【支撐壓力】</b>：月線 {ma20:.2f} 為重要多空分水嶺。</p>
-        <hr>
-        <p style="font-size:1.2rem; color:#ffeb3b !important;"><b>💡 武吉拉建議：{action}</b></p>
+        <h3 style="border-bottom: 2px solid #555; padding-bottom: 10px;">🦖 武吉拉深度完整分析</h3>
+        
+        <p><b>1. 趨勢結構：</b><br>
+        {trend_str}</p>
+        
+        <p><b>2. 資金動能：</b><br>
+        {momentum_str} {vol_str}</p>
+        
+        <p><b>3. 籌碼解讀：</b><br>
+        {inst_conclusion}<br>
+        <span style="font-size:0.9em; color:#ccc;">{inst_text}</span></p>
+        
+        <p><b>4. 關鍵點位：</b><br>
+        壓力：布林上軌 {bb_up:.2f} | 支撐：月線 {ma20:.2f}</p>
+        
+        <hr style="border-top: 1px dashed #666;">
+        <p style="font-size:1.3rem; font-weight:bold; color:{action_color} !important;">
+        💡 操作策略：{strategy}
+        </p>
     </div>
     """
     return html
@@ -357,7 +441,7 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # --- 新增：每日大盤盤勢分析區塊 ---
+    # --- 每日大盤盤勢分析區塊 ---
     st.subheader("🌍 每日大盤盤勢分析")
     
     idx_tab1, idx_tab2 = st.tabs(["🇹🇼 台股盤勢", "🇺🇸 美股盤勢"])
@@ -447,6 +531,9 @@ try:
         fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='orange', width=1), name='MA5'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA20'], line=dict(color='cyan', width=1), name='MA20'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['BB_UP'], line=dict(color='gray', width=1, dash='dot'), name='布林上軌'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['BB_LO'], line=dict(color='gray', width=1, dash='dot'), name='布林下軌'), row=1, col=1)
+        
         colors = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
         fig.add_trace(go.Bar(x=df.index.strftime('%Y-%m-%d'), y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
         

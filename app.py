@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (背景回歸 + 極簡白底風格) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -30,26 +30,26 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
-    page_bg_img = f'''
+    # 使用 format 避免 f-string 與 CSS 大括號衝突
+    page_bg_img = """
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{bin_str}");
+        background-image: url("data:image/png;base64,{0}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
     </style>
-    '''
+    """.format(bin_str)
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 設定背景圖片 (使用您上傳的哥吉拉圖)
+# 設定背景
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
     <style>
-    /* 全局設定 */
-    .stApp { color: #333333; }
+    .stApp { color: #333; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
@@ -90,6 +90,11 @@ st.markdown("""
         border: 2px solid #eee;
         border-radius: 10px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #ffffff;
+        color: #000;
+        border-radius: 10px;
     }
 
     /* 4. KD 指標卡片 */
@@ -175,55 +180,59 @@ st.markdown("""
     
     /* Plotly Tooltip */
     .plotly-notifier { visibility: hidden; }
+
+    /* 側邊欄大盤 */
+    .market-summary-box {
+        padding: 15px;
+        font-size: 0.9rem;
+        border-left: 4px solid #FFD700;
+        margin-bottom: 10px;
+        background-color: rgba(30, 30, 30, 0.95);
+        border-radius: 8px;
+        color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. 資料串接邏輯 ---
 
-# 擴充股票代號對照表
+# 股票代號對照表
 STOCK_NAMES = {
-    # 台股
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電",
-    "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海",
-    "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉",
-    "4903.TWO": "聯光通", # 確保上櫃股票也能被認出
-    # 美股
-    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微",
+    "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
+    "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
+    "4903.TWO": "聯光通",
+    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR"
 }
 
 @st.cache_data(ttl=3600)
 def resolve_ticker(user_input):
-    """
-    智慧解析代號，支援台股上市/上櫃/興櫃與美股
-    """
+    """智慧解析代號"""
     user_input = user_input.strip().upper()
     
-    # 1. 嘗試純數字 (預設台股)
     if user_input.isdigit():
         # 嘗試上市 (.TW)
         ticker_tw = f"{user_input}.TW"
-        stock = yf.Ticker(ticker_tw)
         try:
-            if not stock.history(period="1d").empty:
-                return ticker_tw, stock.info.get('longName', ticker_tw)
+            s = yf.Ticker(ticker_tw)
+            if not s.history(period="1d").empty: return ticker_tw, s.info.get('longName', ticker_tw)
         except: pass
         
         # 嘗試上櫃 (.TWO)
         ticker_two = f"{user_input}.TWO"
-        stock = yf.Ticker(ticker_two)
         try:
-            if not stock.history(period="1d").empty:
-                return ticker_two, stock.info.get('longName', ticker_two)
+            s = yf.Ticker(ticker_two)
+            if not s.history(period="1d").empty: return ticker_two, s.info.get('longName', ticker_two)
         except: pass
         
         return None, None
 
-    # 2. 嘗試美股或已帶後綴的代號
     else:
-        stock = yf.Ticker(user_input)
+        # 美股
         try:
-            if not stock.history(period="1d").empty:
-                return user_input, stock.info.get('longName', user_input)
+            s = yf.Ticker(user_input)
+            if not s.history(period="1d").empty: return user_input, s.info.get('longName', user_input)
         except: pass
         
         return None, None
@@ -244,8 +253,6 @@ def get_market_hot_stocks():
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
     if ".TW" not in ticker and ".TWO" not in ticker: return None
-    
-    # FinMind 代號不需要後綴
     stock_id = ticker.split(".")[0]
     dl = DataLoader(token=FINMIND_API_TOKEN)
     try:
@@ -272,12 +279,10 @@ def get_institutional_data_finmind(ticker):
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
         pivot_df['Date'] = pd.to_datetime(pivot_df['Date']).dt.strftime('%Y/%m/%d')
         return pivot_df
-    except Exception as e:
-        return None
+    except: return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
-    # Yahoo 爬蟲備援
     if ".TW" not in ticker and ".TWO" not in ticker: return None
     try:
         url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
@@ -316,7 +321,7 @@ def get_institutional_data_yahoo(ticker):
 def get_google_news(ticker):
     try:
         query_ticker = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
-        if ".TW" not in ticker and len(ticker) < 5:
+        if ".TW" not in ticker and ".TWO" not in ticker and len(ticker) < 5:
              query_ticker = f"{ticker} stock"
         url = f"https://news.google.com/rss/search?q={query_ticker}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         resp = requests.get(url)
@@ -346,7 +351,6 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    df['J'] = 3 * df['K'] - 2 * df['D']
     
     delta = df['Close'].diff()
     u = delta.clip(lower=0)
@@ -388,6 +392,30 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
     </div>
     """
 
+def analyze_market_index(ticker_symbol):
+    try:
+        stock = yf.Ticker(ticker_symbol)
+        df = stock.history(period="6mo")
+        if df.empty: return None
+        df = calculate_indicators(df)
+        latest = df.iloc[-1]
+        price = latest['Close']
+        ma20 = latest['MA20']
+        k, d = latest['K'], latest['D']
+        change = price - df['Close'].iloc[-2]
+        pct = (change / df['Close'].iloc[-2]) * 100
+        
+        if price > ma20:
+            status = "多頭強勢" if k > d else "多頭回檔"
+            color = "#ff4b4b" if k > d else "#ff9100"
+        else:
+            status = "空方修正" if k < d else "跌深反彈"
+            color = "#00c853" if k < d else "#ffff00"
+            
+        comment = f"KD指標({k:.1f}/{d:.1f})。市場氣氛：{status}。"
+        return {"price": price, "change": change, "pct": pct, "status": status, "color": color, "comment": comment}
+    except: return None
+
 # --- 5. UI 介面 ---
 
 st.markdown("<h1 style='text-align: center; text-shadow: 2px 2px 8px #000; margin-bottom: 20px;'>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
@@ -416,11 +444,22 @@ if target_input:
             st.error(f"❌ 找不到股票代號：{target_input}。請確認代號是否正確，台股(上市/上櫃)輸入數字即可。")
             target = None
 
+# --- 大盤指數展開區 ---
+with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
+    t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
+    with t1:
+        tw = analyze_market_index("^TWII")
+        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
+    with t2:
+        us = analyze_market_index("^IXIC")
+        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
+
+st.markdown("---")
+
 if target:
     try:
         stock = yf.Ticker(target)
         info = stock.info
-        # 如果 resolve_ticker 已經抓到名稱就用，否則從 info 抓
         if 'name' not in locals():
              name = STOCK_NAMES.get(target, info.get('longName', target))
         
@@ -575,7 +614,7 @@ if target:
             if news_list:
                 for news in news_list:
                     st.markdown(f"""
-                    <div class="content-card news-item">
+                    <div class="news-item">
                         <a href="{news['link']}" target="_blank">{news['title']}</a>
                         <div class="news-meta">{news['pubDate']} | {news['source']}</div>
                     </div>

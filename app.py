@@ -50,11 +50,11 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 頂部搜尋框優化 */
+    /* 搜尋框優化 */
     .stTextInput > div > div > input {
         background-color: rgba(255, 255, 255, 0.95);
         color: #000;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         font-weight: bold;
         border: 2px solid #FFD700;
         border-radius: 8px;
@@ -114,7 +114,7 @@ st.markdown("""
     /* 標題 */
     h1, h2 { text-shadow: 2px 2px 5px #000; }
     
-    /* 週期按鈕 */
+    /* 週期按鈕優化 */
     .stRadio > div {
         display: flex;
         flex-direction: row;
@@ -131,31 +131,24 @@ st.markdown("""
 
 # --- 3. 資料串接邏輯 ---
 
-# 擴充股票代號對照表 (僅供顯示中文名稱，搜尋不再受限於此)
+# 內建對照表 (僅供顯示中文名稱)
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
     "1216.TW": "統一", "2002.TW": "中鋼", "2886.TW": "兆豐金", "2884.TW": "玉山金", "2892.TW": "第一金",
     "1101.TW": "台泥", "1102.TW": "亞泥", "1301.TW": "台塑", "1303.TW": "南亞", "1326.TW": "台化",
     "2912.TW": "統一超", "3008.TW": "大立光", "5871.TW": "中租-KY", "5876.TW": "上海商銀", "2880.TW": "華南金",
-    # AI / 電腦
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
     "2357.TW": "華碩", "2324.TW": "仁寶", "3017.TW": "奇鋐", "3037.TW": "欣興", "2379.TW": "瑞昱",
-    # 航運 / 傳產
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
     "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY", "1605.TW": "華新", 
-    # 面板 / 記憶體
     "2409.TW": "友達", "3481.TW": "群創", "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏",
-    # ETF
     "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", "00929.TW": "復華台灣科技優息", 
     "00919.TW": "群益台灣精選高息", "00940.TW": "元大台灣價值高息", "00632R.TW": "元大台灣50反1", "006208.TW": "富邦台50",
     "00713.TW": "元大台灣高息低波", "00939.TW": "統一台灣高息動能",
-    # 美股
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
     "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR",
-    "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾", "SMCI": "美超微", "ARM": "安謀", "MU": "美光",
-    "V": "Visa", "MA": "萬事達卡", "JPM": "摩根大通", "BAC": "美國銀行", "WMT": "沃爾瑪", "KO": "可口可樂",
-    "SPY": "SPDR標普500 ETF", "QQQ": "Invesco納斯達克100 ETF", "SOXX": "iShares半導體ETF"
+    "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾", "SMCI": "美超微", "ARM": "安謀", "MU": "美光"
 }
 
 @st.cache_data(ttl=3600)
@@ -171,7 +164,7 @@ def get_market_hot_stocks():
             start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         ).iloc[-1]['date']
         df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
-        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(10)
+        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(15)
         if not top_df.empty:
             hot_tw = top_df['stock_id'].tolist()
     except: pass
@@ -290,7 +283,7 @@ def calculate_indicators(df):
     
     return df
 
-def analyze_market_index(ticker_symbol, name):
+def analyze_market_index(ticker_symbol):
     try:
         stock = yf.Ticker(ticker_symbol)
         df = stock.history(period="6mo")
@@ -349,8 +342,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
         
         recent_10 = inst_df.tail(10)
         f_sum = recent_10['Foreign'].sum()
-        if f_sum > 10000: inst_html += " 近10日外資累計大買，籌碼安定。"
-        elif f_sum < -10000: inst_html += " 近10日外資累計大賣，壓力沈重。"
+        if f_sum > 10000: inst_html += " 近10日外資累計大買，波段籌碼安定。"
+        elif f_sum < -10000: inst_html += " 近10日外資累計大賣，上方套牢壓力重。"
     else:
         inst_html += "暫無最新數據。"
 
@@ -384,7 +377,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
     </div>
     """
 
-# --- 5. UI 介面 (Top Search - 萬用搜尋) ---
+# --- 5. UI 介面 (Top Search) ---
 
 st.markdown("<h1 style='text-align: center; text-shadow: 2px 2px 8px #000; margin-bottom: 20px;'>🦖 武吉拉 Wujila 投資決策系統</h1>", unsafe_allow_html=True)
 
@@ -413,10 +406,10 @@ if target_input:
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
     with t1:
-        tw = analyze_market_index("^TWII", "加權指數")
+        tw = analyze_market_index("^TWII")
         if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
     with t2:
-        us = analyze_market_index("^IXIC", "那斯達克")
+        us = analyze_market_index("^IXIC")
         if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
@@ -431,9 +424,10 @@ try:
         try: name = stock.info.get('longName', target)
         except: name = target
 
-    # 標題區
+    # 標題區 (標題下方即選單)
     c_header, c_menu = st.columns([1, 2])
     with c_menu:
+        # 週期選單
         interval_map = {"日K": "1d", "週K": "1wk", "月K": "1mo", "60分": "60m", "30分": "30m", "15分": "15m", "5分": "5m"}
         selected_interval_label = st.radio("K 線週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
         interval = interval_map[selected_interval_label]

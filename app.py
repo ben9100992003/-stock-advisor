@@ -9,7 +9,7 @@ import base64
 import os
 import requests
 
-# --- 0. 設定與金鑰 (已填入) ---
+# --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
 # --- 1. 頁面設定 ---
@@ -51,21 +51,39 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* --- 1. 分析報告容器 (上方) --- */
+    /* --- 分析報告容器 --- */
     .glass-container {
-        background-color: rgba(0, 0, 0, 0.8);
+        background-color: rgba(0, 0, 0, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.3);
         border-radius: 16px;
         padding: 30px;
         margin-bottom: 25px;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
     }
-    .glass-container h3 { color: #ffcc00 !important; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 10px; text-shadow: 2px 2px 4px black; }
-    .glass-container p { color: #f0f0f0 !important; font-size: 1.1rem; line-height: 1.6; }
-    .glass-container b { color: #fff; }
+    .glass-container h3 { 
+        color: #ffcc00 !important; 
+        border-bottom: 2px solid rgba(255,255,255,0.2); 
+        padding-bottom: 15px; 
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px black; 
+    }
+    .glass-container p { 
+        color: #f0f0f0 !important; 
+        font-size: 1.1rem; 
+        line-height: 1.8; 
+        margin-bottom: 12px;
+    }
+    .glass-container b { color: #fff; font-weight: 700; }
+    .glass-container .strategy-box {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-left: 5px solid #ff4b4b;
+        padding: 15px;
+        margin-top: 20px;
+        border-radius: 5px;
+    }
 
-    /* --- 2. 側邊欄卡片 --- */
+    /* --- 側邊欄卡片 --- */
     .market-summary-box {
         padding: 15px;
         font-size: 0.9rem;
@@ -75,7 +93,7 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* --- 3. 數據指標卡片 (下方 Metric) --- */
+    /* --- 數據指標卡片 (Metric) --- */
     div[data-testid="stMetric"] {
         background-color: rgba(20, 20, 20, 0.85) !important;
         padding: 15px !important;
@@ -96,19 +114,17 @@ st.markdown("""
         text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
     }
 
-    /* --- 4. Tab 分頁標籤 --- */
+    /* --- Tab 與文字 --- */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #ffffff !important;
         font-size: 1.1rem;
         font-weight: bold;
         text-shadow: 1px 1px 2px black;
     }
-    
-    /* 一般文字與標題 */
     .stMarkdown p, .stCaption { color: #e0e0e0 !important; text-shadow: 1px 1px 2px black; }
     h1, h2, h3 { text-shadow: 2px 2px 8px #000000; color: #fff !important; }
     
-    /* Yahoo 按鈕優化 */
+    /* Yahoo 按鈕 */
     .stLinkButton a {
         background-color: #420066 !important;
         color: white !important;
@@ -137,7 +153,6 @@ def get_top_volume_stocks():
     if not FINMIND_AVAILABLE:
         return ["2330", "2317", "2603", "2609", "3231", "2618", "00940", "00919", "2454", "2303"]
     try:
-        # 使用 Token 初始化
         dl = DataLoader()
         if FINMIND_API_TOKEN:
             dl = DataLoader(token=FINMIND_API_TOKEN)
@@ -214,26 +229,20 @@ def get_institutional_data_yahoo(ticker):
         df_clean['Date'] = df_clean['Date'].apply(clean_date)
         return df_clean.head(30)
 
-    except Exception as e:
+    except Exception:
         return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
-    """優先使用 FinMind 抓取，因為使用者有 Token 且資料較完整"""
     if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
-    
     stock_id = ticker.replace(".TW", "")
-    
-    # 使用 Token 初始化
     dl = DataLoader()
     if FINMIND_API_TOKEN:
         dl = DataLoader(token=FINMIND_API_TOKEN)
-        
     try:
         start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
-        
         df['net'] = df['buy'] - df['sell']
         dates = sorted(df['date'].unique(), reverse=True)
         result_data = []
@@ -252,22 +261,29 @@ def get_institutional_data_finmind(ticker):
 # --- 4. 技術指標與大盤分析函式 ---
 
 def calculate_indicators(df):
+    # 均線系統 (MA)
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
     df['MA60'] = df['Close'].rolling(60).mean()
+    df['MA120'] = df['Close'].rolling(120).mean() # 半年線
     
+    # 布林通道 (20, 2)
     df['STD'] = df['Close'].rolling(20).std()
     df['BB_UP'] = df['MA20'] + 2 * df['STD']
     df['BB_LO'] = df['MA20'] - 2 * df['STD']
+    
+    # 成交量均線
     df['VOL_MA5'] = df['Volume'].rolling(5).mean()
     
+    # KD 指標 (9,3,3)
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
     
+    # RSI (14)
     delta = df['Close'].diff()
     u = delta.clip(lower=0)
     d = -1 * delta.clip(upper=0)
@@ -276,11 +292,11 @@ def calculate_indicators(df):
     rs = ema_u / ema_d
     df['RSI'] = 100 - (100 / (1 + rs))
     
+    # MACD (12, 26, 9)
     exp12 = df['Close'].ewm(span=12, adjust=False).mean()
     exp26 = df['Close'].ewm(span=26, adjust=False).mean()
     df['MACD'] = exp12 - exp26
     df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    df['Hist'] = df['MACD'] - df['Signal']
     
     return df
 
@@ -306,20 +322,20 @@ def analyze_market_index(ticker_symbol):
             if k > d:
                 status = "多頭強勢"
                 color = "#ff4b4b"
-                comment = "指數站穩月線且 KD 黃金交叉，多方控盤，可積極操作。"
+                comment = "站穩月線且 KD 金叉，動能強勁，可積極選股。"
             else:
                 status = "多頭回檔"
                 color = "#ff9100"
-                comment = "指數雖在月線之上但面臨技術性修正，留意月線支撐。"
+                comment = "短線 KD 修正中，留意月線支撐力道。"
         else:
             if k < d:
                 status = "空方修正"
                 color = "#00c853"
-                comment = "指數跌破月線且 KD 死亡交叉，趨勢偏弱，現金為王。"
+                comment = "跌破月線且 KD 死叉，趨勢偏弱，多看少做。"
             else:
                 status = "跌深反彈"
                 color = "#ffff00"
-                comment = "KD 低檔黃金交叉，短線醞釀反彈，但上方壓力仍重。"
+                comment = "KD 低檔背離向上，醞釀反彈，但上方仍有壓。"
                 
         return {
             "price": price, "change": change, "pct": pct,
@@ -328,68 +344,87 @@ def analyze_market_index(ticker_symbol):
     except:
         return None
 
-# --- 5. 深度分析報告 (HTML 生成版) ---
+# --- 5. 深度分析報告 (加強描述版) ---
 def generate_narrative_report(name, ticker, latest, inst_data_dict, df):
     price = latest['Close']
     vol = latest['Volume']
-    ma5, ma20, ma60 = latest['MA5'], latest['MA20'], latest['MA60']
+    vol_ma5 = latest['VOL_MA5']
+    ma5, ma10, ma20, ma60, ma120 = latest['MA5'], latest['MA10'], latest['MA20'], latest['MA60'], latest['MA120']
     k, d = latest['K'], latest['D']
+    rsi = latest['RSI']
     
-    # 趨勢敘述
-    trend_html = ""
-    if price > ma20:
-        trend_html = f"<b>{name} ({ticker})</b> 目前股價站穩月線之上，顯示中期趨勢具備支撐。"
-        if price > ma5 and ma5 > ma20:
-            trend_html += " 短線沿著 5 日均線強勢上攻，多頭架構完整。"
+    # 1. 趨勢架構分析
+    trend_html = f"<b>{name} ({ticker})</b> 今日收盤價為 {price:.2f} 元。"
+    
+    if price > ma5 and ma5 > ma20 and ma20 > ma60:
+        trend_html += " 目前均線呈現<b>「多頭排列」</b>，股價沿著 5 日線強勢上攻，屬於強者恆強的格局。下方季線 (MA60) 趨勢向上，長線保護短線效果顯著。"
+    elif price < ma5 and ma5 < ma20 and ma20 < ma60:
+        trend_html += " 目前均線呈現<b>「空頭排列」</b>，股價受制於層層均線反壓，上方壓力沈重。任何反彈至月線附近皆可能面臨解套賣壓。"
+    elif price > ma20:
+        trend_html += " 股價目前站穩<b>「月線 (MA20)」</b>之上，中期趨勢維持多方控盤。"
+        if price < ma5:
+            trend_html += " 唯短線跌破 5 日線，動能稍有轉弱，需觀察是否能守穩 10 日線或月線支撐。"
     else:
-        trend_html = f"<b>{name} ({ticker})</b> 股價跌破月線，短線進入整理修正階段。"
-        if price < ma60:
-            trend_html += " 且目前位於季線之下，上方套牢賣壓沈重，需等待落底訊號。"
+        trend_html += " 股價目前位於<b>「月線 (MA20)」</b>之下，短線趨勢偏弱，屬於整理修正階段。"
+        if price > ma60:
+            trend_html += " 但仍守在季線 (MA60) 之上，長線多頭架構尚未完全破壞，可視為漲多拉回。"
 
-    # 籌碼敘述
-    inst_html = "籌碼方面，"
+    # 2. 籌碼面解讀
+    inst_html = ""
     if inst_data_dict:
         f_val = inst_data_dict['Foreign']
         t_val = inst_data_dict['Trust']
         total = f_val + t_val + inst_data_dict['Dealer']
         date_str = inst_data_dict['Date']
         
-        buy_sell_color = "#ff4b4b" if total > 0 else "#00c853"
         buy_sell_text = "買超" if total > 0 else "賣超"
+        color_style = "#ff4b4b" if total > 0 else "#00c853"
         
-        inst_html += f"截至 {date_str}，三大法人合計 <span style='color:{buy_sell_color}'>{buy_sell_text} {abs(total):,} 張</span>。"
-        if f_val > 1000: inst_html += " 其中外資展現買盤誠意，為推升股價主力。"
-        elif f_val < -1000: inst_html += " 唯外資近期調節動作頻頻，需留意提款壓力。"
+        inst_html += f"籌碼方面，截至 {date_str}，三大法人合計<span style='color:{color_style}'><b>{buy_sell_text} {abs(total):,} 張</b></span>。"
         
-        if t_val > 500: inst_html += " 值得注意的是，投信正積極佈局，可能與季底作帳行情有關。"
+        if f_val > 2000:
+            inst_html += " 其中<b>外資</b>買盤積極，為推升股價的主要推手，顯示國際資金對後市看法樂觀。"
+        elif f_val < -2000:
+            inst_html += " 值得留意的是，<b>外資</b>近期調節動作頻頻，需提防提款賣壓湧現。"
+            
+        if t_val > 500:
+            inst_html += " 另外，<b>投信</b>連續買超佈局，籌碼趨於集中，有利於股價籌碼沈澱。"
     else:
-        inst_html += "暫無最新法人買賣超數據 (通常於下午 3 點後更新)，建議稍後再確認。"
+        inst_html = "目前暫無最新的法人買賣超數據，建議稍後再確認。"
 
-    # 技術指標敘述
-    kd_status = "黃金交叉" if k > d else "死亡交叉"
-    kd_color = "#ff4b4b" if k > d else "#00c853"
-    tech_html = f"技術指標部分，KD 目前數值為 ({k:.1f}, {d:.1f})，呈現 <span style='color:{kd_color}'><b>{kd_status}</b></span>。"
-    
-    if k > d: tech_html += " 短線動能轉強，有利多方表態。"
-    else: tech_html += " 短線動能轉弱，可能面臨回檔整理。"
-        
-    if latest['RSI'] > 70: tech_html += " <br>⚠️ RSI 指標進入高檔區，慎防追高風險。"
-    elif latest['RSI'] < 30: tech_html += " <br>✅ RSI 指標進入超賣區，隨時有機會出現技術性反彈。"
+    # 3. 技術指標訊號
+    tech_html = f"技術指標部分，KD 值目前為 ({k:.1f}, {d:.1f})，"
+    if k > d:
+        tech_html += "呈現<b>「黃金交叉」</b>向上，短線買盤進駐，動能轉強。"
+        if k < 20:
+            tech_html += " 且 KD 位於低檔超賣區交叉，這通常是強力的<b>底部反轉訊號</b>，反彈機率高。"
+    else:
+        tech_html += "呈現<b>「死亡交叉」</b>向下，短線面臨獲利了結賣壓，動能轉弱。"
+        if k > 80:
+            tech_html += " 且 KD 位於高檔區交叉向下，需留意<b>假突破真拉回</b>的風險。"
+            
+    if rsi > 75:
+        tech_html += f" RSI 指標來到 {rsi:.1f}，已進入<b>超買區</b>，短線隨時可能出現技術性修正，不宜過度追高。"
+    elif rsi < 25:
+        tech_html += f" RSI 指標來到 {rsi:.1f}，已進入<b>超賣區</b>，乖離過大，隨時有機會出現跌深反彈。"
 
-    # 總結建議
+    # 4. 總結建議
     advice = ""
     adv_color = "#ffffff"
+    
+    support = ma20 if price > ma20 else ma60
+    resistance = ma5 if price < ma5 else (ma20 if price < ma20 else price * 1.1)
+
     if price > ma20 and k > d:
-        advice = "綜合研判：趨勢偏多。建議沿 5 日線操作，若拉回不破月線可視為買點。"
+        advice = f"綜合研判：趨勢偏多。目前技術面與籌碼面皆有利多方，建議順勢操作。防守點可設在月線 {support:.1f}。"
         adv_color = "#ff4b4b" # 紅
     elif price < ma20 and k < d:
-        advice = "綜合研判：趨勢偏空。建議保守觀望，等待股價重新站回月線再行佈局。"
+        advice = f"綜合研判：趨勢偏空。短線型態轉弱，建議保守觀望或減碼操作，等待股價重新站回月線 {ma20:.1f} 再行佈局。"
         adv_color = "#00c853" # 綠
     else:
-        advice = "綜合研判：區間震盪。目前多空拉鋸，建議在月線與季線之間區間操作。"
+        advice = f"綜合研判：區間震盪。目前多空勢力拉鋸，建議在季線 {ma60:.1f} 與月線 {ma20:.1f} 之間進行區間操作，高出低進。"
         adv_color = "#ffff00" # 黃
 
-    # 組合 HTML
     html_report = f"""
     <div class="glass-container">
         <h3>📊 武吉拉深度完整分析</h3>
@@ -397,9 +432,11 @@ def generate_narrative_report(name, ticker, latest, inst_data_dict, df):
         <p><b>2. 籌碼解讀：</b><br>{inst_html}</p>
         <p><b>3. 關鍵指標：</b><br>{tech_html}</p>
         <hr style="border-top: 1px dashed #aaa;">
-        <p style="font-size: 1.2rem; font-weight: bold; color: {adv_color} !important;">
-            💡 {advice}
-        </p>
+        <div class="strategy-box">
+            <p style="font-size: 1.2rem; font-weight: bold; color: {adv_color} !important; margin:0;">
+                💡 {advice}
+            </p>
+        </div>
     </div>
     """
     return html_report
@@ -461,8 +498,9 @@ with st.sidebar:
 
 # 右側主畫面
 try:
+    # 抓取 2 年資料以計算年線
     stock = yf.Ticker(target)
-    df = stock.history(period="6mo")
+    df = stock.history(period="2y")
     
     if df.empty:
         st.error(f"找不到 {target} 的資料，請確認代號。")
@@ -471,7 +509,7 @@ try:
         latest = df.iloc[-1]
         name = STOCK_NAMES.get(target, stock.info.get('longName', target))
         
-        # 優先使用 FinMind 抓取法人資料，失敗則使用 Yahoo
+        # 抓取法人
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None:
              inst_df = get_institutional_data_yahoo(target)
@@ -490,35 +528,74 @@ try:
         report_html = generate_narrative_report(name, target, latest, latest_inst_dict, df)
         st.markdown(report_html, unsafe_allow_html=True)
         
-        # K 線圖 (改為白色背景，黑色文字)
-        fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.2, 0.3], vertical_spacing=0.03)
+        # --- 專業 K 線圖 (Yahoo 風格) ---
+        fig = make_subplots(
+            rows=3, cols=1, 
+            shared_xaxes=True, 
+            vertical_spacing=0.02, 
+            row_heights=[0.6, 0.2, 0.2],
+            subplot_titles=("", "", "")
+        )
         
-        # K線
-        fig.add_trace(go.Candlestick(x=df.index.strftime('%Y-%m-%d'), open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name='K線', increasing_line_color='#ff4b4b', decreasing_line_color='#00c853'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA5'], line=dict(color='#2962ff', width=1), name='MA5'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA20'], line=dict(color='#ff6d00', width=1), name='MA20'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['MA60'], line=dict(color='#ffd600', width=1), name='MA60'), row=1, col=1)
+        # 1. 主圖：K線 + 均線
+        # K 線
+        fig.add_trace(go.Candlestick(
+            x=df.index.strftime('%Y-%m-%d'), 
+            open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], 
+            name='K線', 
+            increasing_line_color='#ff4b4b', increasing_fillcolor='#ff4b4b',
+            decreasing_line_color='#00c853', decreasing_fillcolor='#00c853'
+        ), row=1, col=1)
         
-        # 成交量
-        colors = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
-        fig.add_trace(go.Bar(x=df.index.strftime('%Y-%m-%d'), y=df['Volume'], marker_color=colors, name='成交量'), row=2, col=1)
+        # 均線 (仿 Yahoo 色系)
+        ma_configs = [
+            ('MA5', 'blue', 1), 
+            ('MA10', 'purple', 1), 
+            ('MA20', 'orange', 1.5), # 月線加粗
+            ('MA60', 'green', 1.5),  # 季線加粗
+            ('MA120', 'brown', 1)    # 半年線
+        ]
+        for ma_name, ma_color, ma_width in ma_configs:
+            fig.add_trace(go.Scatter(
+                x=df.index.strftime('%Y-%m-%d'), y=df[ma_name], 
+                line=dict(color=ma_color, width=ma_width), 
+                name=f'{ma_name} ({latest[ma_name]:.2f})'
+            ), row=1, col=1)
+
+        # 2. 副圖一：成交量
+        colors_vol = ['#ff4b4b' if r['Open'] < r['Close'] else '#00c853' for i, r in df.iterrows()]
+        fig.add_trace(go.Bar(
+            x=df.index.strftime('%Y-%m-%d'), 
+            y=df['Volume'], 
+            marker_color=colors_vol, 
+            name='成交量'
+        ), row=2, col=1)
+
+        # 3. 副圖二：KD 指標
+        fig.add_trace(go.Scatter(
+            x=df.index.strftime('%Y-%m-%d'), y=df['K'], 
+            line=dict(color='#2962ff', width=1.2), name=f'K9 ({latest["K"]:.1f})'
+        ), row=3, col=1)
+        fig.add_trace(go.Scatter(
+            x=df.index.strftime('%Y-%m-%d'), y=df['D'], 
+            line=dict(color='#ff6d00', width=1.2), name=f'D9 ({latest["D"]:.1f})'
+        ), row=3, col=1)
         
-        # KD
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['K'], line=dict(color='#2962ff', width=1), name='K9'), row=3, col=1)
-        fig.add_trace(go.Scatter(x=df.index.strftime('%Y-%m-%d'), y=df['D'], line=dict(color='#ff6d00', width=1), name='D9'), row=3, col=1)
-        
-        # 設定圖表樣式 (白色背景 + 黑色文字)
+        # 設定圖表樣式 (白色背景 + 格線)
         fig.update_layout(
             template="plotly_white",
-            height=800,
+            height=900, # 加高圖表
             xaxis_rangeslider_visible=False,
             xaxis3_rangeslider_visible=False,
-            paper_bgcolor='rgba(255, 255, 255, 0.95)',
+            paper_bgcolor='rgba(255, 255, 255, 0.95)', # 純白背景
             plot_bgcolor='rgba(255, 255, 255, 0.95)',
+            hovermode='x unified',
             showlegend=True,
-            font=dict(color='black'), # 圖表內文字設為黑色
-            margin=dict(l=50, r=20, t=30, b=50) # 調整邊距
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+            margin=dict(l=50, r=20, t=30, b=50)
         )
+        
+        # 顯示圖表
         st.plotly_chart(fig, use_container_width=True)
         
         # 底部 Tab 區塊

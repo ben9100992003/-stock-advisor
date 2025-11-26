@@ -28,17 +28,18 @@ def set_png_as_page_bg(png_file):
     if not os.path.exists(png_file): return
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
-    page_bg_img = '''
+    
+    page_bg_img = f'''
     <style>
-    .stApp {
-        background-image: url("data:image/png;base64,%s");
+    .stApp {{
+        background-image: url("data:image/png;base64,{bin_str}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
-    }
+    }}
     </style>
-    ''' % bin_str
+    '''
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
 set_png_as_page_bg('bg.png')
@@ -101,9 +102,9 @@ st.markdown("""
         margin-top: 10px;
         margin-bottom: 20px;
     }
-    .kd-title { font-size: 1.3rem; font-weight: bold; color: #444; }
-    .kd-val { font-size: 2rem; font-weight: 900; color: #000; }
-    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white; font-weight: bold; font-size: 1rem; }
+    .kd-title { font-size: 1.1rem; font-weight: bold; color: #555; }
+    .kd-val { font-size: 1.5rem; font-weight: 800; color: #000; }
+    .kd-tag { padding: 4px 12px; border-radius: 20px; color: white; font-weight: bold; font-size: 0.9rem; }
 
     /* 5. Tab 與週期按鈕 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
@@ -122,8 +123,8 @@ st.markdown("""
         flex: 1;
         text-align: center;
         background-color: transparent;
-        padding: 8px 0;
-        border-radius: 20px;
+        padding: 6px 0;
+        border-radius: 6px;
         margin: 0;
         color: #666 !important;
         font-weight: bold;
@@ -134,17 +135,25 @@ st.markdown("""
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #26a69a !important;
         color: #fff !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
     /* 連結按鈕 */
-    .stLinkButton a { background-color: #fff !important; color: #333 !important; border: 1px solid #ccc !important; font-weight: bold; }
+    .stLinkButton a { 
+        background-color: #fff !important; 
+        color: #333 !important; 
+        border: 1px solid #ccc !important; 
+        font-weight: bold !important; 
+    }
     
     /* 標題 */
     h1, h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
+    
+    /* Plotly Tooltip */
+    .plotly-notifier { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -238,12 +247,14 @@ def calculate_indicators(df):
     df['MA60'] = df['Close'].rolling(60).mean()
     df['MA120'] = df['Close'].rolling(120).mean()
     df['MA240'] = df['Close'].rolling(240).mean()
+    df['VOL_MA5'] = df['Volume'].rolling(5).mean()
     
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
+    df['J'] = 3 * df['K'] - 2 * df['D']
     
     return df
 
@@ -348,12 +359,12 @@ try:
         df = calculate_indicators(df)
         latest = df.iloc[-1]
         
-        # K 線圖
+        # K 線圖 (極簡 + 同步十字線)
         fig = make_subplots(
             rows=3, cols=1, 
             shared_xaxes=True, 
             row_heights=[0.6, 0.2, 0.2], 
-            vertical_spacing=0.01
+            vertical_spacing=0.02
         )
         
         # 1. 主圖
@@ -366,15 +377,27 @@ try:
         fig.add_trace(go.Bar(x=df.index, y=df['Volume'], marker_color=colors_vol, name='成交量'), row=2, col=1)
         if 'VOL_MA5' in df.columns: fig.add_trace(go.Scatter(x=df.index, y=df['VOL_MA5'], line=dict(color='#1f77b4', width=1), name='MV5'), row=2, col=1)
 
-        # 3. KD (只保留 KD，移除 RSI, MACD)
+        # 3. KD
         fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#1f77b4', width=1.2), name='K9'), row=3, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#ff7f0e', width=1.2), name='D9'), row=3, col=1)
 
-        # 設定預設顯示範圍 (最近 45 根)
-        if len(df) > 45:
-            fig.update_xaxes(range=[df.index[-45], df.index[-1]], row=1, col=1)
+        # 設定預設顯示範圍 (智慧判斷)
+        if len(df) > 0:
+            end_idx = df.index[-1]
+            # 分時線: 顯示最近一日 (約 60~100 根)
+            if interval in ["1m", "5m", "10m", "30m", "60m"]:
+                 # 回推一天前
+                 start_idx = end_idx - timedelta(days=1)
+                 # 確保不超過資料起始點
+                 if start_idx < df.index[0]: start_idx = df.index[0]
+            else:
+                 # 日線以上: 顯示最近 45 根
+                 if len(df) > 45: start_idx = df.index[-45]
+                 else: start_idx = df.index[0]
+            
+            fig.update_xaxes(range=[start_idx, end_idx], row=1, col=1)
 
-        # Layout 配置 (加上十字線與拖曳)
+        # Layout: 極簡 + 十字線連動
         fig.update_layout(
             template="plotly_white", height=700,
             margin=dict(l=10, r=10, t=10, b=10),

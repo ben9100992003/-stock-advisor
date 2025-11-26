@@ -14,7 +14,7 @@ from FinMind.data import DataLoader
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
 # --- 1. 頁面設定 ---
-st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide")
+st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
 # --- 2. 背景圖片與 CSS 設定 ---
 def get_base64_of_bin_file(bin_file):
@@ -47,11 +47,17 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* 頂部搜尋區塊優化 */
+    /* 搜尋框優化 */
+    .stSelectbox label {
+        color: #FFD700 !important;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: rgba(255, 255, 255, 0.95);
         color: #000;
         border-radius: 8px;
+        border: 2px solid #FFD700;
     }
     
     /* 分析報告容器 */
@@ -67,7 +73,7 @@ st.markdown("""
     .glass-container h3 { color: #FFD700 !important; border-bottom: 1px solid #555; padding-bottom: 10px; }
     .glass-container p, .glass-container li { color: #f0f0f0 !important; font-size: 1.15rem; line-height: 1.8; }
     
-    /* 側邊欄卡片 (大盤) */
+    /* 大盤卡片 */
     .market-summary-box {
         padding: 15px;
         font-size: 0.9rem;
@@ -112,19 +118,33 @@ st.markdown("""
 
 # --- 3. 資料串接邏輯 ---
 
+# 擴充股票代號對照表 (中文搜尋核心)
 STOCK_NAMES = {
+    # 權值股
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電", "2382.TW": "廣達",
     "2412.TW": "中華電", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金", "2303.TW": "聯電",
+    "2886.TW": "兆豐金", "2884.TW": "玉山金", "1216.TW": "統一", "2002.TW": "中鋼", "2892.TW": "第一金",
+    # AI 伺服器 & 電子
     "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
+    "2357.TW": "華碩", "2324.TW": "仁寶", "3017.TW": "奇鋐", "3037.TW": "欣興", "2379.TW": "瑞昱",
+    # 航運
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
+    "2605.TW": "新興", "2606.TW": "裕民", "2637.TW": "慧洋-KY",
+    # 記憶體/面板/被動元件
     "2344.TW": "華邦電", "2408.TW": "南亞科", "2337.TW": "旺宏", "2409.TW": "友達", "3481.TW": "群創",
-    "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", "00929.TW": "復華台灣科技優息", "00919.TW": "群益台灣精選高息",
+    "2327.TW": "國巨", "2492.TW": "華新科",
+    # ETF
+    "0050.TW": "元大台灣50", "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", "00929.TW": "復華台灣科技優息", 
+    "00919.TW": "群益台灣精選高息", "00940.TW": "元大台灣價值高息", "00632R.TW": "元大台灣50反1",
+    # 美股
     "NVDA": "輝達 (NVIDIA)", "TSLA": "特斯拉 (Tesla)", "AAPL": "蘋果 (Apple)", "AMD": "超微 (AMD)", "PLTR": "Palantir",
-    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR"
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "NFLX": "網飛", "TSM": "台積電 ADR",
+    "AVGO": "博通", "QCOM": "高通", "INTC": "英特爾"
 }
 
 @st.cache_data(ttl=3600)
 def get_top_volume_stocks():
+    """取得熱門股代號列表"""
     try:
         dl = DataLoader(token=FINMIND_API_TOKEN)
         latest_trade_date = dl.taiwan_stock_daily_adj(
@@ -132,7 +152,7 @@ def get_top_volume_stocks():
             start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
         ).iloc[-1]['date']
         df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
-        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(20)
+        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(30)
         return top_df['stock_id'].tolist()
     except:
         return ["2330", "2317", "2603", "2609", "3231", "2454"] 
@@ -294,62 +314,80 @@ def generate_narrative_report(name, ticker, latest, inst_df, df):
     </div>
     """
 
-# --- 6. UI 介面 ---
+# --- 5. UI 介面 (頂部搜尋版) ---
 
-# 1. 頂部搜尋與大盤狀態
-c_title, c_search = st.columns([1, 2])
-with c_title:
-    st.markdown("<h2 style='margin-top:0;'>🦖 武吉拉 Wujila</h2>", unsafe_allow_html=True)
+# 標題
+st.markdown("<h1 style='text-align: center; text-shadow: 2px 2px 8px #000; margin-bottom: 20px;'>🦖 武吉拉 Wujila 投資決策系統</h1>", unsafe_allow_html=True)
 
-with c_search:
-    with st.spinner("載入市場數據..."):
-        hot_tickers = get_top_volume_stocks()
-    
-    search_options = []
-    for t in hot_tickers:
-        t_key = f"{t}.TW" if t.isdigit() else t
-        name = STOCK_NAMES.get(t_key, t)
+# 1. 搜尋與過濾邏輯
+with st.spinner("正在掃描市場熱門股..."):
+    hot_tickers = get_top_volume_stocks()
+
+# 建立完整的搜尋選項清單 (中文名稱 + 代號)
+search_options = []
+
+# A. 加入熱門股 (加上 🔥 標記)
+for t in hot_tickers:
+    t_key = f"{t}.TW" if t.isdigit() else t
+    name = STOCK_NAMES.get(t_key, t)
+    search_options.append(f"🔥 {name} ({t_key})")
+
+# B. 加入其他權值股 (避免重複)
+seen_tickers = set(hot_tickers)
+for t_key, name in STOCK_NAMES.items():
+    raw_ticker = t_key.replace(".TW", "")
+    if raw_ticker not in seen_tickers:
         search_options.append(f"{name} ({t_key})")
-        
-    seen_tickers = set(hot_tickers)
-    for t_key, name in STOCK_NAMES.items():
-        raw_ticker = t_key.replace(".TW", "")
-        if raw_ticker not in seen_tickers:
-            search_options.append(f"{name} ({t_key})")
-            
-    selected_search = st.selectbox("🔍 搜尋股票 (輸入代號或中文名稱)", options=search_options, index=0)
-    target = selected_search.split("(")[-1].replace(")", "")
 
-# 2. 側邊欄：週期設定
-with st.sidebar:
-    st.subheader("⚙️ 設定與大盤")
-    
+# C. 預設選項 (台積電)
+default_index = 0
+for i, opt in enumerate(search_options):
+    if "2330" in opt:
+        default_index = i
+        break
+
+# 頂部搜尋框
+selected_search = st.selectbox(
+    "🔍 請輸入股票代號或中文名稱搜尋 (例如：2330, 台積電, NVDA)",
+    options=search_options,
+    index=default_index
+)
+
+# 解析選擇的代號
+# 格式可能是 "🔥 台積電 (2330.TW)" 或 "鴻海 (2317.TW)"
+# 我們取最後括號內的字串
+target = selected_search.split("(")[-1].replace(")", "")
+
+# --- 大盤指數展開區 (Expander) ---
+with st.expander("🌍 查看今日大盤盤勢 (台股 / 美股)", expanded=False):
+    t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
+    with t1:
+        tw = analyze_market_index("^TWII")
+        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
+    with t2:
+        us = analyze_market_index("^IXIC")
+        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# --- K 線週期與連結區 ---
+col_k, col_link = st.columns([3, 1])
+with col_k:
     interval_map = {"日K": "1d", "週K": "1wk", "月K": "1mo", "60分": "60m", "30分": "30m", "15分": "15m", "5分": "5m"}
     selected_interval_label = st.radio("K 線週期", list(interval_map.keys()), horizontal=True)
     interval = interval_map[selected_interval_label]
     data_period = "2y" if interval in ["1d", "1wk", "1mo"] else "60d"
+with col_link:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.link_button(f"前往 Yahoo 股市", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
 
-    st.markdown("---")
-    
-    t1, t2 = st.tabs(["🇹🇼 台股", "🇺🇸 美股"])
-    with t1:
-        tw = analyze_market_index("^TWII")
-        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']}</div></div>", unsafe_allow_html=True)
-    with t2:
-        us = analyze_market_index("^IXIC")
-        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']}</div></div>", unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.caption("資料來源: Yahoo Finance, FinMind")
-    st.link_button(f"前往 Yahoo ({target})", f"https://tw.stock.yahoo.com/quote/{target}", use_container_width=True)
-
-# 3. 主畫面數據
+# --- 3. 主畫面數據分析 ---
 try:
     stock = yf.Ticker(target)
     df = stock.history(period=data_period, interval=interval)
     
     if df.empty:
-        st.error(f"找不到 {target} 的資料。")
+        st.error(f"找不到 {target} 的資料，請確認代號是否正確。")
     else:
         df = calculate_indicators(df)
         latest = df.iloc[-1]
@@ -359,14 +397,15 @@ try:
         pct = (chg / df['Close'].iloc[-2]) * 100
         color = "#ff4b4b" if chg >= 0 else "#00c853"
         
+        # 股票標題
         st.markdown(f"<h1 style='text-shadow:2px 2px 4px black; margin:0;'>{name} ({target})</h1>", unsafe_allow_html=True)
         st.markdown(f"<h2 style='color:{color};text-shadow:1px 1px 2px black; margin:0;'>{latest['Close']:.2f} <small>({chg:+.2f} / {pct:+.2f}%)</small></h2>", unsafe_allow_html=True)
         
-        # 抓取法人
+        # 抓取法人 (優先 FinMind)
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
         
-        # 報告
+        # 分析報告
         st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
         
         # --- K 線圖 (啟用 Range Slider) ---

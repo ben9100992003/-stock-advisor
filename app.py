@@ -9,7 +9,7 @@ import base64
 import os
 import requests
 from FinMind.data import DataLoader
-import xml.etree.ElementTree as ET # 用於解析 RSS 新聞
+import xml.etree.ElementTree as ET
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (極簡白底風格) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -138,7 +138,7 @@ st.markdown("""
         color: #fff !important;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-
+    
     /* 新聞樣式 */
     .news-item {
         padding: 10px 0;
@@ -209,21 +209,37 @@ def get_institutional_data_finmind(ticker):
         start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
+        
+        # 關鍵修正：處理欄位名稱中文化與合併
+        # FinMind 可能回傳 'Foreign_Investor', 'Investment_Trust' 或 '外資', '投信'
+        # 我們先定義一個正規化函式
+        def normalize_name(n):
+            if '外資' in n or 'Foreign' in n: return 'Foreign'
+            if '投信' in n or 'Trust' in n: return 'Trust'
+            if '自營' in n or 'Dealer' in n: return 'Dealer'
+            return 'Other'
+            
+        df['norm_name'] = df['name'].apply(normalize_name)
         df['net'] = df['buy'] - df['sell']
-        pivot_df = df.pivot_table(index='date', columns='name', values='net', aggfunc='sum').fillna(0)
-        rename_map = {}
-        for col in pivot_df.columns:
-            if '外資' in col: rename_map[col] = 'Foreign'
-            elif '投信' in col: rename_map[col] = 'Trust'
-            elif '自營' in col: rename_map[col] = 'Dealer'
-        pivot_df = pivot_df.rename(columns=rename_map)
+        
+        # 進行 Pivot，將同一天的同一類別（如自營商避險+自營商自行買賣）加總
+        pivot_df = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
+        
+        # 確保只有需要的欄位
         for col in ['Foreign', 'Trust', 'Dealer']:
             if col not in pivot_df.columns: pivot_df[col] = 0
+            
+        # 單位換算 (股 -> 張)
         pivot_df = (pivot_df / 1000).astype(int)
+        
+        # 整理 Index 與 Columns
         pivot_df = pivot_df.reset_index()
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
+        
         return pivot_df
-    except: return None
+    except Exception as e:
+        # print(f"FinMind Error: {e}") # Debug 用
+        return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
@@ -261,19 +277,15 @@ def get_institutional_data_yahoo(ticker):
 
 @st.cache_data(ttl=300)
 def get_google_news(ticker):
-    """使用 Google News RSS 抓取個股新聞 (穩定版)"""
     try:
-        # 處理代號，例如 2330.TW -> 2330+TW (Google search query format)
         query_ticker = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
-        if ".TW" not in ticker and len(ticker) < 5: # 美股
+        if ".TW" not in ticker and len(ticker) < 5:
              query_ticker = f"{ticker} stock"
-             
         url = f"https://news.google.com/rss/search?q={query_ticker}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         resp = requests.get(url)
         root = ET.fromstring(resp.content)
-        
         news_list = []
-        for item in root.findall('.//item')[:10]: # 取前 10 則
+        for item in root.findall('.//item')[:10]:
             news_list.append({
                 'title': item.find('title').text,
                 'link': item.find('link').text,
@@ -281,8 +293,7 @@ def get_google_news(ticker):
                 'source': item.find('source').text if item.find('source') is not None else 'Google News'
             })
         return news_list
-    except Exception as e:
-        return []
+    except: return []
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
@@ -298,7 +309,12 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    df['J'] = 3 * df['K'] - 2 * df['D']
+    
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
@@ -475,12 +491,13 @@ try:
         """, unsafe_allow_html=True)
 
     with tab2:
+        # 法人資料備援邏輯：FinMind -> Yahoo
         inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
         st.markdown(generate_narrative_report(name, target, latest, inst_df, df), unsafe_allow_html=True)
 
     with tab3:
-        inst_df = get_institutional_data_finmind(target) # 再抓一次確保
+        inst_df = get_institutional_data_finmind(target)
         if inst_df is None and ".TW" in target: inst_df = get_institutional_data_yahoo(target)
         
         if inst_df is not None and not inst_df.empty:

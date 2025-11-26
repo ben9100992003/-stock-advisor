@@ -9,6 +9,9 @@ import base64
 import os
 import requests
 
+# --- 0. 設定與金鑰 (已填入) ---
+FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
+
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide")
 
@@ -72,29 +75,25 @@ st.markdown("""
         border-radius: 8px;
     }
 
-    /* --- 3. 數據指標卡片 (下方 Metric) - 關鍵修復 --- */
+    /* --- 3. 數據指標卡片 (下方 Metric) --- */
     div[data-testid="stMetric"] {
-        background-color: rgba(20, 20, 20, 0.85) !important; /* 半透明黑底 */
+        background-color: rgba(20, 20, 20, 0.85) !important;
         padding: 15px !important;
         border-radius: 12px !important;
         border: 1px solid rgba(255, 255, 255, 0.15) !important;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
         backdrop-filter: blur(5px);
     }
-    
-    /* 標籤文字 (如 RSI, K, D) */
     div[data-testid="stMetricLabel"] p {
-        color: #bbbbbb !important; /* 亮灰色 */
+        color: #bbbbbb !important;
         font-size: 1rem !important;
         font-weight: bold !important;
     }
-    
-    /* 數值文字 (如 47.9) */
     div[data-testid="stMetricValue"] div {
-        color: #ffffff !important; /* 純白 */
+        color: #ffffff !important;
         font-size: 2rem !important;
         font-weight: 700 !important;
-        text-shadow: 0 0 8px rgba(255, 255, 255, 0.6); /* 發光特效 */
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
     }
 
     /* --- 4. Tab 分頁標籤 --- */
@@ -138,7 +137,11 @@ def get_top_volume_stocks():
     if not FINMIND_AVAILABLE:
         return ["2330", "2317", "2603", "2609", "3231", "2618", "00940", "00919", "2454", "2303"]
     try:
+        # 使用 Token 初始化
         dl = DataLoader()
+        if FINMIND_API_TOKEN:
+            dl = DataLoader(token=FINMIND_API_TOKEN)
+            
         latest_trade_date = dl.taiwan_stock_daily_adj(
             stock_id="2330", 
             start_date=(datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
@@ -212,6 +215,38 @@ def get_institutional_data_yahoo(ticker):
         return df_clean.head(30)
 
     except Exception as e:
+        return None
+
+@st.cache_data(ttl=300)
+def get_institutional_data_finmind(ticker):
+    """優先使用 FinMind 抓取，因為使用者有 Token 且資料較完整"""
+    if not FINMIND_AVAILABLE or ".TW" not in ticker: return None
+    
+    stock_id = ticker.replace(".TW", "")
+    
+    # 使用 Token 初始化
+    dl = DataLoader()
+    if FINMIND_API_TOKEN:
+        dl = DataLoader(token=FINMIND_API_TOKEN)
+        
+    try:
+        start_date = (datetime.now() - timedelta(days=45)).strftime('%Y-%m-%d')
+        df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
+        if df.empty: return None
+        
+        df['net'] = df['buy'] - df['sell']
+        dates = sorted(df['date'].unique(), reverse=True)
+        result_data = []
+        for d in dates:
+            day_df = df[df['date'] == d]
+            def get_net(key):
+                v = day_df[day_df['name'].str.contains(key)]['net'].sum()
+                return int(v / 1000) 
+            result_data.append({
+                'Date': d, 'Foreign': get_net('外資'), 'Trust': get_net('投信'), 'Dealer': get_net('自營')
+            })
+        return pd.DataFrame(result_data).head(30)
+    except:
         return None
 
 # --- 4. 技術指標與大盤分析函式 ---
@@ -436,8 +471,11 @@ try:
         latest = df.iloc[-1]
         name = STOCK_NAMES.get(target, stock.info.get('longName', target))
         
-        # 抓取法人 (強化版)
-        inst_df = get_institutional_data_yahoo(target)
+        # 優先使用 FinMind 抓取法人資料，失敗則使用 Yahoo
+        inst_df = get_institutional_data_finmind(target)
+        if inst_df is None:
+             inst_df = get_institutional_data_yahoo(target)
+        
         latest_inst_dict = inst_df.iloc[0].to_dict() if inst_df is not None and not inst_df.empty else None
 
         # 標題

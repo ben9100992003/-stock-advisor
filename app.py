@@ -11,9 +11,9 @@ import requests
 from FinMind.data import DataLoader
 
 # --- 0. 設定與金鑰 ---
-st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="武吉拉 Wujila Pro+", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# FinMind API Token (用於抓取精準的台股籌碼)
+# 您的 FinMind Token
 FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
 # --- 1. Session State ---
@@ -142,130 +142,156 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心邏輯：爬蟲與資料獲取 ---
+# --- 3. 資料引擎 (FinMind + Yahoo 混合) ---
 
-@st.cache_data(ttl=86400) # 名稱快取一天
+@st.cache_data(ttl=86400) 
 def get_chinese_name_from_yahoo(stock_id):
-    """
-    [爬蟲] 直接爬取 Yahoo 股市的標題來取得最準確的中文名稱
-    """
-    # 僅針對台股數字代號
+    """[爬蟲] 抓取中文名稱"""
     if not stock_id[0].isdigit(): return None
-    
     try:
-        # 去掉 .TW/.TWO
         clean_id = stock_id.split('.')[0]
         url = f"https://tw.stock.yahoo.com/quote/{clean_id}"
         headers = {'User-Agent': 'Mozilla/5.0'}
         r = requests.get(url, headers=headers, timeout=3)
-        
-        # 簡單解析 HTML title
-        # 格式通常是: <title>台積電(2330) - 個股走勢...</title>
         if r.status_code == 200:
             start = r.text.find('<title>')
             end = r.text.find('</title>')
             if start != -1 and end != -1:
                 title = r.text[start+7:end]
-                # 提取中文部分： "台積電(2330)" -> "台積電"
-                if "(" in title:
-                    name = title.split('(')[0].strip()
-                    return name
+                if "(" in title: return title.split('(')[0].strip()
     except: pass
     return None
 
 @st.cache_data(ttl=300)
 def smart_search_stock(query):
-    """
-    [智能搜股] 解決找不到股票的問題
-    1. 判斷是否為數字 -> 嘗試上市/上櫃
-    2. 檢查 yfinance 資料是否存在
-    3. 抓取中文名稱
-    """
+    """[智能搜股] 支援代號/英文/中文"""
     query = query.strip().upper()
-    
     def try_fetch(ticker):
         try:
             s = yf.Ticker(ticker)
-            # 必須有歷史資料才算有效
             h = s.history(period="5d")
-            if not h.empty:
-                return ticker, s.info
+            if not h.empty: return ticker, s.info
         except: pass
         return None, None
 
-    found_ticker = None
-    found_info = None
+    found_ticker, found_info = None, None
 
-    # A. 數字代號 (台股)
     if query.isdigit():
-        # 1. 嘗試上市
         t, i = try_fetch(f"{query}.TW")
-        if t: 
-            found_ticker, found_info = t, i
+        if t: found_ticker, found_info = t, i
         else:
-            # 2. 嘗試上櫃 (解決 4903 找不到的問題)
             t, i = try_fetch(f"{query}.TWO")
             if t: found_ticker, found_info = t, i
-    
-    # B. 已有後綴 (如 2330.TW)
-    elif ".TW" in query:
-        found_ticker, found_info = try_fetch(query)
-        
-    # C. 美股/英文 (如 AI, NVDA)
-    else:
-        found_ticker, found_info = try_fetch(query)
+    elif ".TW" in query: found_ticker, found_info = try_fetch(query)
+    else: found_ticker, found_info = try_fetch(query)
 
-    # 如果找到了，嘗試優化名稱 (爬蟲)
     stock_name = found_ticker
     if found_ticker:
-        # 如果是台股，優先用爬蟲抓中文名
         if ".TW" in found_ticker:
             cn_name = get_chinese_name_from_yahoo(found_ticker)
             if cn_name: stock_name = cn_name
             elif found_info and 'longName' in found_info: stock_name = found_info['longName']
         else:
-            # 美股用 info
             if found_info and 'longName' in found_info: stock_name = found_info['longName']
             
     return found_ticker, stock_name, found_info
 
 @st.cache_data(ttl=300)
+def get_stock_data_hybrid(ticker, interval, period_days=365):
+    """
+    [混合資料引擎]
+    1. 如果是台股日線/週線 -> 優先用 FinMind (使用您的 Token)
+    2. 如果是台股分時(1m/5m) -> 用 Yahoo (FinMind 日線無分時)
+    3. 如果是美股 -> 用 Yahoo
+    """
+    is_tw = ".TW" in ticker or ".TWO" in ticker
+    is_intraday = interval in ["1m", "5m", "30m", "60m"]
+    
+    # --- 情境 A: 台股日線/長線 (使用 FinMind) ---
+    if is_tw and not is_intraday:
+        try:
+            stock_id = ticker.split('.')[0]
+            dl = DataLoader(token=FINMIND_TOKEN)
+            start_date = (datetime.now() - timedelta(days=period_days)).strftime('%Y-%m-%d')
+            
+            # 抓取股價
+            df = dl.taiwan_stock_daily(stock_id=stock_id, start_date=start_date)
+            
+            if not df.empty:
+                # 格式轉換為 Yahoo 格式以相容後續計算
+                df = df.rename(columns={
+                    'date': 'Date', 'open': 'Open', 'max': 'High', 'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'
+                })
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.set_index('Date')
+                
+                # FinMind 沒有調整後股價，若需要可改用 taiwan_stock_daily_adj
+                # 這裡為了 K 線圖真實性，使用原始股價
+                
+                # Resample 如果需要週/月線
+                if interval == "1wk":
+                    df = df.resample('W').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}).dropna()
+                elif interval == "1mo":
+                    df = df.resample('M').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}).dropna()
+                
+                return df
+        except Exception as e:
+            pass # 失敗則自動降級回 Yahoo
+            
+    # --- 情境 B: 台股分時 或 美股 (使用 Yahoo) ---
+    try:
+        yf_period = "1d" if is_intraday else ("1y" if period_days < 500 else "2y")
+        stock = yf.Ticker(ticker)
+        df = stock.history(period=yf_period, interval=interval)
+        if df.empty: return None
+        return df
+    except: return None
+
+@st.cache_data(ttl=300)
 def get_institutional_chips(ticker):
-    """
-    [籌碼] 使用 FinMind 抓取外資/投信/自營商
-    """
+    """[籌碼] 使用 FinMind Token 抓取"""
     if ".TW" not in ticker and ".TWO" not in ticker: return None
     stock_id = ticker.split('.')[0]
-    
     try:
         dl = DataLoader(token=FINMIND_TOKEN)
-        # 抓最近 30 天
-        start_date = (datetime.now() - timedelta(days=35)).strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=40)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
         
-        # 整理數據
         def map_name(n):
-            if '外資' in n or 'Foreign' in n: return '外資'
+            if '外資' in n: return '外資'
             if '投信' in n: return '投信'
             if '自營' in n: return '自營商'
             return '其他'
-            
         df['type'] = df['name'].apply(map_name)
-        df['net'] = (df['buy'] - df['sell']) / 1000 # 換算張數
-        
-        # 轉成寬表格
+        df['net'] = (df['buy'] - df['sell']) / 1000
         pivot = df.pivot_table(index='date', columns='type', values='net', aggfunc='sum').fillna(0)
         pivot = pivot.sort_index(ascending=False)
         return pivot
     except: return None
 
+@st.cache_data(ttl=3600)
+def get_financial_per(ticker):
+    """[基本面] 使用 FinMind 抓取本益比/殖利率"""
+    if ".TW" not in ticker and ".TWO" not in ticker: return None
+    stock_id = ticker.split('.')[0]
+    try:
+        dl = DataLoader(token=FINMIND_TOKEN)
+        start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+        df = dl.taiwan_stock_per_pbr(stock_id=stock_id, start_date=start_date)
+        if not df.empty:
+            return df.iloc[-1] # 回傳最新一筆
+    except: pass
+    return None
+
 def calculate_indicators(df):
-    if df is None or len(df) < 20: return df
+    if df is None or len(df) < 5: return df
+    # 確保有 Volume 欄位
+    if 'Volume' not in df.columns: df['Volume'] = 0
+    
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
-    
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
@@ -273,10 +299,8 @@ def calculate_indicators(df):
     df['D'] = df['K'].ewm(com=2).mean()
     return df
 
-def get_detailed_analysis(ticker, name, df, chips_df, info):
-    """
-    [詳細分析報告生成]
-    """
+def get_detailed_analysis(ticker, name, df, chips_df, fin_data, info):
+    """詳細分析報告 (整合 FinMind 數據)"""
     latest = df.iloc[-1]
     close = latest['Close']
     ma5 = latest.get('MA5', 0)
@@ -285,128 +309,114 @@ def get_detailed_analysis(ticker, name, df, chips_df, info):
     k = latest.get('K', 50)
     d = latest.get('D', 50)
     
-    # 1. 趨勢判斷
+    # 趨勢
     trend = "震盪"
     trend_color = "#FFFF00"
-    if close > ma20 and ma5 > ma10: 
-        trend = "多頭強勢"
-        trend_color = "#ff5252"
-    elif close < ma20 and ma5 < ma10: 
-        trend = "空方控盤"
-        trend_color = "#00e676"
+    if close > ma20 and ma5 > ma10: trend = "多頭強勢"; trend_color = "#ff5252"
+    elif close < ma20 and ma5 < ma10: trend = "空方控盤"; trend_color = "#00e676"
     
-    # 2. KD 訊號
+    # KD
     kd_sig = "中性"
     if k > d and k < 80: kd_sig = "黃金交叉 (偏多)"
     elif k < d and k > 20: kd_sig = "死亡交叉 (偏空)"
     
-    # 3. 籌碼解讀 (最近一日)
+    # 籌碼
     chip_msg = "無籌碼資料 (美股)"
     if chips_df is not None and not chips_df.empty:
-        last_chip = chips_df.iloc[0] # 最近一天
-        f_buy = last_chip.get('外資', 0)
-        t_buy = last_chip.get('投信', 0)
-        
-        if f_buy > 0 and t_buy > 0: chip_msg = "土洋同步買超，籌碼安定。"
-        elif f_buy < 0 and t_buy < 0: chip_msg = "土洋同步賣超，壓力大。"
-        elif t_buy > 0: chip_msg = "投信進場護盤/佈局。"
-        elif f_buy > 0: chip_msg = "外資買盤回補。"
+        last = chips_df.iloc[0]
+        f = last.get('外資', 0)
+        t = last.get('投信', 0)
+        if f > 0 and t > 0: chip_msg = "土洋同步買超，籌碼安定。"
+        elif f < 0 and t < 0: chip_msg = "土洋同步賣超，壓力大。"
+        elif t > 0: chip_msg = "投信佈局中。"
+        elif f > 0: chip_msg = "外資回補中。"
         else: chip_msg = "法人動向不明顯。"
         
-    # 4. 產業題材
-    summary = info.get('longBusinessSummary', '')
-    sector = info.get('sector', '未知產業')
-    if len(summary) > 100: summary = summary[:100] + "..."
-    elif not summary: summary = "暫無詳細資料。"
+    # 基本面 (FinMind)
+    per_info = "N/A"
+    yield_info = "N/A"
+    if fin_data is not None:
+        if 'PER' in fin_data and fin_data['PER'] > 0: per_info = f"{fin_data['PER']:.1f} 倍"
+        if 'dividend_yield' in fin_data: yield_info = f"{fin_data['dividend_yield']:.1f} %"
+        
+    summary = info.get('longBusinessSummary', '')[:100] + "..." if info.get('longBusinessSummary') else "暫無詳細資料"
 
     return f"""
     <div class="glass-card">
-        <h3>📝 {name} 戰情分析</h3>
-        <p><b>🏢 產業地位：</b>{sector}</p>
+        <h3>📝 {name} 戰情室</h3>
+        <p><b>🏢 產業：</b>{info.get('sector', '未知')}</p>
+        <div style="display:flex; gap:15px; margin-bottom:10px;">
+            <div style="background:rgba(255,255,255,0.1); padding:8px; border-radius:8px;">本益比: <b>{per_info}</b></div>
+            <div style="background:rgba(255,255,255,0.1); padding:8px; border-radius:8px;">殖利率: <b>{yield_info}</b></div>
+        </div>
         <p style="font-size:0.9rem; opacity:0.8">{summary}</p>
         <hr style="border-color:rgba(255,255,255,0.2)">
         
-        <h4>📊 技術面診斷</h4>
+        <h4>📊 技術面</h4>
         <table class="analysis-table" style="width:100%">
-            <tr>
-                <td>趨勢</td>
-                <td><span style="color:{trend_color}; font-weight:bold">{trend}</span> (股價 vs 月線)</td>
-            </tr>
-            <tr>
-                <td>KD 指標</td>
-                <td>K={k:.1f}, D={d:.1f} <br> <b>{kd_sig}</b></td>
-            </tr>
-            <tr>
-                <td>關鍵均線</td>
-                <td>MA5: {ma5:.1f} / MA20: {ma20:.1f}</td>
-            </tr>
+            <tr><td>趨勢</td><td><span style="color:{trend_color}; font-weight:bold">{trend}</span></td></tr>
+            <tr><td>KD</td><td>K={k:.1f}, D={d:.1f} ({kd_sig})</td></tr>
+            <tr><td>均線</td><td>MA5: {ma5:.1f} / MA20: {ma20:.1f}</td></tr>
         </table>
         
-        <h4 style="margin-top:15px">🏛️ 籌碼面解讀</h4>
+        <h4 style="margin-top:15px">🏛️ 籌碼面 (FinMind)</h4>
         <p>{chip_msg}</p>
     </div>
     """
 
 # --- 4. UI 主程式 ---
 
-st.markdown("<h2 style='text-align:center; margin-bottom:10px;'>🦖 武吉拉 Wujila Pro</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center; margin-bottom:10px;'>🦖 武吉拉 Wujila Pro+</h2>", unsafe_allow_html=True)
 
-# 搜尋區
 c1, c2 = st.columns([2.5, 1.5])
 with c1:
-    # 支援代號直接搜尋
-    query = st.text_input("搜股 (輸入 4903, 2330, AI...)", placeholder="代號自動辨識...")
+    query = st.text_input("搜股 (輸入代號如 4903, 2330...)", placeholder="代號自動辨識...")
     if query:
-        with st.spinner("🕷️ 智能搜股中..."):
+        with st.spinner("🕷️ 智能搜尋..."):
             t, n, i = smart_search_stock(query)
             if t:
                 st.session_state.current_ticker = t
-                st.session_state.current_name = n # 存起來避免重複爬
+                st.session_state.current_name = n
                 st.session_state.current_info = i
                 st.rerun()
             else:
-                st.error(f"❌ 遍歷 Yahoo 資料庫仍找不到：{query}")
+                st.error(f"❌ 找不到：{query}")
 
 with c2:
     watch_select = st.selectbox("⭐ 我的自選", ["(切換股票)"] + st.session_state.watchlist)
     if watch_select != "(切換股票)":
         st.session_state.current_ticker = watch_select
-        # 切換自選時也要更新名稱
         t, n, i = smart_search_stock(watch_select)
         st.session_state.current_name = n
         st.session_state.current_info = i
 
-# 取得當前股票資訊
 target = st.session_state.current_ticker
-# 優先使用存的中文名，沒有則用代號
 display_name = st.session_state.get('current_name', target)
 display_info = st.session_state.get('current_info', {})
 
 if target:
-    # 預載資料
-    df_daily = yf.Ticker(target).history(period="3mo", interval="1d")
-    df_daily = calculate_indicators(df_daily)
+    # 預設日線 (使用混合引擎)
+    df_daily = get_stock_data_hybrid(target, "1d", 365)
     
-    if not df_daily.empty:
+    if df_daily is not None and not df_daily.empty:
+        df_daily = calculate_indicators(df_daily)
         latest = df_daily.iloc[-1]
         prev = df_daily.iloc[-2]
         change = latest['Close'] - prev['Close']
         pct = (change / prev['Close']) * 100
-        
         color_cls = "price-up" if change >= 0 else "price-down"
         arrow = "▲" if change >= 0 else "▼"
         
-        # Yahoo 連結
         yahoo_url = f"https://finance.yahoo.com/quote/{target}"
         if ".TW" in target: yahoo_url = f"https://tw.stock.yahoo.com/quote/{target.replace('.TW','')}"
         elif ".TWO" in target: yahoo_url = f"https://tw.stock.yahoo.com/quote/{target.replace('.TWO','')}"
 
-        # --- A. 報價卡片 (顯示中文名) ---
+        # --- A. 報價卡片 ---
         st.markdown(f"""
         <div class="glass-card">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
-                    <div style="font-size:1.4rem; opacity:1; font-weight:bold;">{display_name}</div>
+                    <div style="font-size:1.4rem; font-weight:bold;">{display_name}</div>
                     <div style="font-size:0.9rem; opacity:0.7;">{target}</div>
                 </div>
                 <div style="text-align:right;">
@@ -416,18 +426,15 @@ if target:
                 </div>
             </div>
             <div class="{color_cls} price-big">{latest['Close']:.2f}</div>
-            <div style="font-size:0.8rem; opacity:0.8; display:flex; gap:15px;">
-                <span>量: {int(latest['Volume']/1000):,} K</span>
-                <span>MA5: {latest['MA5']:.2f}</span>
-                <span>MA20: {latest['MA20']:.2f}</span>
+            <div style="font-size:0.8rem; opacity:0.8;">
+                量: {int(latest['Volume']/1000):,} K | 高: {latest['High']:.2f} | 低: {latest['Low']:.2f}
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # --- B. 操作按鈕 (左右並排) ---
+        # --- B. 操作按鈕 ---
         b1, b2 = st.columns(2)
-        with b1:
-            st.link_button("🔗 Yahoo 股市", yahoo_url)
+        with b1: st.link_button("🔗 Yahoo 股市", yahoo_url)
         with b2:
             if target in st.session_state.watchlist:
                 if st.button("🗑️ 移除自選"): toggle_watchlist(); st.rerun()
@@ -442,11 +449,13 @@ if target:
             sel_p = st.radio("週期", list(t_map.keys()), horizontal=True, label_visibility="collapsed")
             interval = t_map[sel_p]
             
-            # 資料抓取
-            period = "1d" if interval in ["1m", "5m", "30m", "60m"] else "1y"
-            df_chart = yf.Ticker(target).history(period=period, interval=interval)
+            # 使用混合引擎抓資料
+            # 1分/5分: 抓 1-5 天; 日線: 抓 1 年
+            p_days = 5 if interval in ["1m", "5m"] else 365
+            with st.spinner("抓取 FinMind / Yahoo 資料..."):
+                df_chart = get_stock_data_hybrid(target, interval, p_days)
             
-            if not df_chart.empty:
+            if df_chart is not None and not df_chart.empty:
                 df_chart = calculate_indicators(df_chart)
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
                 
@@ -472,7 +481,6 @@ if target:
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20, 20, 20, 0.7)',
                     font=dict(color='#eee'), xaxis_rangeslider_visible=False, showlegend=False, dragmode='pan'
                 )
-                # 網格
                 grid_c = 'rgba(255,255,255,0.1)'
                 fig.update_xaxes(showgrid=True, gridcolor=grid_c, row=1, col=1)
                 fig.update_yaxes(showgrid=True, gridcolor=grid_c, row=1, col=1)
@@ -483,19 +491,19 @@ if target:
                 st.info("此週期暫無資料")
 
         with tabs[1]:
-            # 生成詳細分析報告
+            # 基本面資料 (FinMind)
+            fin_data = get_financial_per(target)
             chips_df = get_institutional_chips(target)
-            html_report = get_detailed_analysis(target, display_name, df_daily, chips_df, display_info)
+            
+            html_report = get_detailed_analysis(target, display_name, df_daily, chips_df, fin_data, display_info)
             st.markdown(html_report, unsafe_allow_html=True)
             
         with tabs[2]:
-            # 籌碼表格
             chips_df = get_institutional_chips(target)
             if chips_df is not None:
                 st.markdown("<div class='glass-card'><h4>🏛️ 三大法人買賣超 (張)</h4></div>", unsafe_allow_html=True)
-                # 格式化表格
                 st.dataframe(chips_df.head(20).style.format("{:.0f}"), use_container_width=True)
-                st.caption("* 數據來源: FinMind (延遲更新)")
+                st.caption("* 數據來源: FinMind")
             else:
-                st.info("⚠️ 無籌碼資料 (僅支援台股)")
+                st.info("⚠️ 美股無法人籌碼資料")
 

@@ -99,6 +99,16 @@ st.markdown("""
     }
     .content-card b { color: #000 !important; font-weight: 900; }
     
+    /* 表格樣式 */
+    .analysis-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 0.95rem;
+    }
+    .analysis-table th { background-color: #f0f0f0; padding: 8px; text-align: left; color: #333; }
+    .analysis-table td { border-bottom: 1px solid #eee; padding: 8px; color: #333; }
+
     /* 3. 搜尋框 */
     .stTextInput > div > div > input {
         background-color: #ffffff;
@@ -243,7 +253,7 @@ def get_market_hot_stocks():
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
     if ".TW" not in ticker and ".TWO" not in ticker: return None
-    stock_id = ticker.split(".")[0]
+    stock_id = ticker.replace(".TW", "").replace(".TWO", "")
     dl = DataLoader(token=FINMIND_API_TOKEN)
     try:
         start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
@@ -340,103 +350,118 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    df['J'] = 3 * df['K'] - 2 * df['D']
-    
-    delta = df['Close'].diff()
-    u = delta.clip(lower=0)
-    d = -1 * delta.clip(upper=0)
-    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
-    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
 def generate_narrative_report(name, ticker, latest, inst_df, df, info):
-    # 1. 基本面 (題材與展望)
-    sector = info.get('sector', '科技')
-    summary = info.get('longBusinessSummary', '')
-    
-    theme_text = f"<b>{name} ({ticker})</b> 屬於 {sector} 產業。"
-    if "Semiconductor" in summary or "晶圓" in summary:
-        theme_text += " 受惠於 AI 伺服器需求爆發，先進製程產能滿載，營運展望樂觀。"
-    elif "Shipping" in summary or "海運" in summary:
-        theme_text += " 運價指數波動與全球地緣政治風險為主要觀察重點。"
-    else:
-        theme_text += " 公司基本面穩健，需留意產業景氣循環變化。"
-
-    # 2. 技術面 (趨勢與技術判讀)
+    # 基本數據
     price = latest['Close']
     ma5, ma10, ma20 = latest['MA5'], latest['MA10'], latest['MA20']
+    ma60 = latest['MA60']
     k, d = latest['K'], latest['D']
     
-    tech_trend = ""
+    date_str = datetime.now().strftime('%Y/%m/%d')
+    
+    # 1. 技術面分析
+    tech_status = "盤整"
     if price > ma5 and ma5 > ma10 and ma10 > ma20:
-        tech_trend = "均線呈現<b>多頭排列</b> (MA5>MA10>MA20)，股價沿 5 日線強勢上攻，短線動能強勁。"
+        tech_status = "多頭排列 (MA5>MA10>MA20)"
+        tech_desc = "均線結構良好，顯示股價處於健康的上漲趨勢中。"
     elif price < ma5 and ma5 < ma10 and ma10 < ma20:
-        tech_trend = "均線呈現<b>空頭排列</b>，上方層層反壓，反彈宜減碼。"
+        tech_status = "空頭排列 (MA5<MA10<MA20)"
+        tech_desc = "短線趨勢偏弱，上方壓力重重。"
     elif price > ma20:
-        tech_trend = "股價站穩<b>月線</b>之上，中期趨勢偏多。"
-        if price < ma5: tech_trend += " 唯短線跌破 5 日線，進入漲多回檔整理，測試 10 日線支撐。"
+        tech_status = "站上月線"
+        tech_desc = "中期趨勢偏多，唯短線可能震盪。"
     else:
-        tech_trend = "股價跌破<b>月線</b>，短線轉弱。"
-        
-    kd_status = "黃金交叉" if k > d else "死亡交叉"
-    kd_desc = f"日 KD 指標 ({k:.1f}/{d:.1f}) 呈現<b>{kd_status}</b>。"
-    if k > 80: kd_desc += " 位於高檔鈍化區，留意隨時可能回檔。"
-    elif k < 20: kd_desc += " 位於低檔超賣區，隨時醞釀反彈。"
+        tech_status = "跌破月線"
+        tech_desc = "短線轉弱，需觀察季線支撐。"
 
-    # 3. 籌碼面 (三大法人)
-    inst_text = "籌碼中性"
+    kd_status = "黃金交叉" if k > d else "死亡交叉"
+    kd_desc = f"KD ({k:.1f}/{d:.1f}) 呈現<b>{kd_status}</b>。"
+    
+    # 2. 籌碼面分析
+    inst_table_html = "<tr><td colspan='4'>暫無資料</td></tr>"
+    inst_desc = "暫無法人數據。"
     if inst_df is not None and not inst_df.empty:
         last = inst_df.iloc[-1]
         f_val, t_val, d_val = last['Foreign'], last['Trust'], last['Dealer']
         total = f_val + t_val + d_val
         
-        recent_5 = inst_df.tail(5)['Foreign'].sum()
-        f_trend = "外資近期偏多操作" if recent_5 > 0 else "外資近期偏空調節"
+        inst_desc = f"法人單日合計 <b>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
+        if f_val > 0 and t_val > 0: inst_desc += " 土洋同步看多，有利股價推升。"
+        elif f_val < 0 and t_val < 0: inst_desc += " 土洋同步調節，籌碼面承壓。"
         
-        inst_text = f"三大法人合計 {'買超' if total>0 else '賣超'} {abs(total):,} 張。{f_trend}。"
-    else:
-        inst_text = "暫無最新法人數據。"
+        # 產生 HTML 表格
+        inst_table_html = f"""
+        <tr>
+            <td>{last['Date']}</td>
+            <td style="color:{'#e53935' if f_val>0 else '#43a047'}">{f_val:,}</td>
+            <td style="color:{'#e53935' if t_val>0 else '#43a047'}">{t_val:,}</td>
+            <td style="color:{'#e53935' if d_val>0 else '#43a047'}">{d_val:,}</td>
+            <td style="color:{'#e53935' if total>0 else '#43a047'}"><b>{total:,}</b></td>
+        </tr>
+        """
 
-    # 4. 進出場建議 (核心邏輯)
+    # 3. 基本面 (題材)
+    sector = info.get('sector', '科技')
+    industry = info.get('industry', '')
+    summary = info.get('longBusinessSummary', '暫無詳細說明。')
+    
+    theme_text = f"<b>{name}</b> 屬於 {sector} - {industry} 產業。"
+    if "Semiconductor" in summary: theme_text += " 關注半導體庫存去化與 AI 需求。"
+    elif "Shipping" in summary: theme_text += " 關注運價指數與地緣政治影響。"
+    
+    # 4. 進出場建議
     # 支撐：MA10 或 MA20
     support = ma10 if price > ma10 else ma20
-    # 壓力：MA5 (若在之下) 或 前波高點
-    resistance = ma5 if price < ma5 else (price * 1.05)
-    
-    entry_signal = ""
-    exit_signal = ""
+    # 壓力：MA5 或 前高 (模擬)
+    resistance = ma5 if price < ma5 else price * 1.05
     
     if price > ma20 and k > d:
         action = "偏多操作"
-        entry_signal = f"拉回至 5 日線 {ma5:.2f} 附近不破可分批佈局。"
-        exit_signal = f"跌破月線 {ma20:.2f} 則建議停利或停損。"
+        entry = f"拉回至 5 日線 {ma5:.2f} 附近不破可佈局。"
+        exit_pt = f"跌破月線 {ma20:.2f} 嚴設停損。"
     elif price < ma20 and k < d:
         action = "保守觀望"
-        entry_signal = f"需等待股價重新站回月線 {ma20:.2f} 再行佈局。"
-        exit_signal = f"反彈至月線 {ma20:.2f} 附近遇壓可考慮減碼。"
+        entry = f"等待站回月線 {ma20:.2f} 再考慮進場。"
+        exit_pt = f"反彈至月線 {ma20:.2f} 遇壓可減碼。"
     else:
         action = "區間震盪"
-        entry_signal = f"箱型區間下緣 {support:.2f} 附近嘗試低接。"
-        exit_signal = f"箱型區間上緣 {resistance:.2f} 附近獲利了結。"
+        entry = f"箱型下緣 {support:.2f} 附近嘗試低接。"
+        exit_pt = f"箱型上緣 {resistance:.2f} 附近獲利了結。"
 
     return f"""
     <div class="content-card">
         <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
         
         <h4>1. 技術指標分析</h4>
-        <p><b>趨勢與技術判讀：</b>{tech_trend}</p>
-        <p><b>指標數據：</b>{kd_desc}</p>
+        <table class="analysis-table">
+            <tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
+            <tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
+            <tr><td colspan="4"><b>趨勢判讀：</b>{tech_status}。{tech_desc} {kd_desc}</td></tr>
+        </table>
         
-        <h4>2. 主要機構投資人分析</h4>
-        <p><b>最新籌碼分析：</b>{inst_text}</p>
+        <h4>2. 三大法人籌碼分析</h4>
+        <table class="analysis-table">
+            <thead>
+                <tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr>
+            </thead>
+            <tbody>
+                {inst_table_html}
+            </tbody>
+        </table>
+        <p><b>籌碼解讀：</b>{inst_desc}</p>
         
         <h4>3. 公司題材與願景</h4>
-        <p><b>核心題材：</b>{theme_text}</p>
+        <p>{theme_text}</p>
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
-        <p><b>🟢 進場數據點 (買入訊號)：</b>{entry_signal}</p>
-        <p><b>🔴 出場數據點 (賣出訊號)：</b>{exit_signal}</p>
+        <ul>
+            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
+            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
+        </ul>
+        <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>
     """
 
@@ -672,3 +697,5 @@ if target:
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
+
+

@@ -382,4 +382,3 @@ with c_us:
         d = v - ixi.iloc[-2]['Close']
         c = "#ff5252" if d>0 else "#00e676"
         st.markdown(f"<div style='text-align:center; font-size:0.8rem'>🇺🇸 那指<br><span style='color:{c};font-weight:bold;font-size:1rem'>{v:.0f} ({d:+.0f})</span></div>", unsafe_allow_html=True)
-

@@ -12,18 +12,51 @@ import xml.etree.ElementTree as ET
 from FinMind.data import DataLoader
 
 # --- 0. 設定與金鑰 ---
-st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="武吉拉 Wujila Ultimate", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
 FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
-# --- 1. Session State ---
+# --- 1. 內建股票大數據 (解決找不到股票的核心) ---
+# 這裡內建常見熱門股，確保搜尋絕對命中，不用看 Yahoo 臉色
+STATIC_TW_STOCKS = {
+    # 熱門上櫃 (容易找不到的)
+    "4903": {"name": "聯光通", "suffix": ".TWO"},
+    "8069": {"name": "元太", "suffix": ".TWO"},
+    "3131": {"name": "弘塑", "suffix": ".TWO"},
+    "3293": {"name": "鈊象", "suffix": ".TWO"},
+    "6187": {"name": "萬潤", "suffix": ".TWO"},
+    "3529": {"name": "力旺", "suffix": ".TWO"},
+    "5347": {"name": "世界", "suffix": ".TWO"},
+    "5483": {"name": "中美晶", "suffix": ".TWO"},
+    # 熱門上市
+    "2330": {"name": "台積電", "suffix": ".TW"},
+    "2317": {"name": "鴻海", "suffix": ".TW"},
+    "2454": {"name": "聯發科", "suffix": ".TW"},
+    "2603": {"name": "長榮", "suffix": ".TW"},
+    "2609": {"name": "陽明", "suffix": ".TW"},
+    "2615": {"name": "萬海", "suffix": ".TW"},
+    "3231": {"name": "緯創", "suffix": ".TW"},
+    "2382": {"name": "廣達", "suffix": ".TW"},
+    "2356": {"name": "英業達", "suffix": ".TW"},
+    "3008": {"name": "大立光", "suffix": ".TW"},
+    "2303": {"name": "聯電", "suffix": ".TW"},
+    "2881": {"name": "富邦金", "suffix": ".TW"},
+    "2882": {"name": "國泰金", "suffix": ".TW"},
+    "1519": {"name": "華城", "suffix": ".TW"},
+    "1513": {"name": "中興電", "suffix": ".TW"},
+    "1503": {"name": "士電", "suffix": ".TW"},
+    "2376": {"name": "技嘉", "suffix": ".TW"},
+    "6669": {"name": "緯穎", "suffix": ".TW"},
+    "3035": {"name": "智原", "suffix": ".TW"},
+    "3443": {"name": "創意", "suffix": ".TW"},
+    "3661": {"name": "世芯-KY", "suffix": ".TW"},
+}
+
+# --- 2. Session State ---
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = ["2330.TW", "NVDA"]
 if 'current_ticker' not in st.session_state:
     st.session_state.current_ticker = "2330.TW"
-# 緩存全台股票清單
-if 'tw_stock_map' not in st.session_state:
-    st.session_state.tw_stock_map = {}
 
 def toggle_watchlist():
     t = st.session_state.current_ticker
@@ -34,12 +67,10 @@ def toggle_watchlist():
         st.session_state.watchlist.append(t)
         st.toast(f"✅ 已加入 {t}")
 
-# --- 2. 視覺樣式 (強制並排修復) ---
+# --- 3. CSS 樣式 (字體縮小 + 不換行修復) ---
 def get_base64_of_bin_file(bin_file):
     try:
-        with open(bin_file, 'rb') as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
+        with open(bin_file, 'rb') as f: return base64.b64encode(f.read()).decode()
     except: return ""
 
 def set_bg_hack(png_file):
@@ -50,10 +81,8 @@ def set_bg_hack(png_file):
         <style>
         .stApp {{
             background-image: url("data:image/png;base64,{bin_str}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
+            background-size: cover; background-position: center;
+            background-repeat: no-repeat; background-attachment: fixed;
         }}
         .stApp::before {{
             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -79,117 +108,102 @@ st.markdown("""
         background-color: rgba(0, 0, 0, 0.8) !important; color: #fff !important;
         border: 1px solid #FFD700 !important; border-radius: 12px;
     }
-    
-    /* 週期按鈕 */
-    div[data-testid="stRadio"] > div { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; }
+
+    /* --- 關鍵修復：週期按鈕 (字體變小 / 不換行) --- */
+    div[data-testid="stRadio"] > div {
+        display: flex; flex-wrap: nowrap !important; /* 強制不換行 */
+        overflow-x: auto; gap: 4px; padding-bottom: 2px;
+    }
     div[data-testid="stRadio"] label {
-        background: rgba(255,255,255,0.1) !important; border-radius: 15px;
-        padding: 4px 12px !important; min-width: 45px; text-align: center;
+        background: rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 12px;
+        padding: 4px 10px !important; /* 縮小內距 */
+        min-width: 40px; /* 縮小按鈕 */
+        text-align: center;
+        flex-shrink: 0; /* 防止被擠壓 */
+        margin-right: 0px !important;
+    }
+    div[data-testid="stRadio"] label p {
+        font-size: 12px !important; /* 字體縮小 */
+        font-weight: normal !important;
+        white-space: nowrap !important; /* 文字不換行 */
+        margin-bottom: 0px !important;
     }
     div[data-testid="stRadio"] label[data-checked="true"] {
         background: #FFD700 !important; border-color: #FFD700 !important;
     }
-    div[data-testid="stRadio"] label[data-checked="true"] p { color: #000 !important; font-weight: bold !important; }
-
-    /* --- 關鍵修復：強制按鈕並排 (Mobile Flex Fix) --- */
-    /* 針對按鈕區的 Columns 強制不換行 */
-    div[data-testid="column"] {
-        flex: 1 !important;
-        min-width: 0 !important; /* 允許縮小 */
+    div[data-testid="stRadio"] label[data-checked="true"] p {
+        color: #000 !important; font-weight: bold !important;
     }
+
+    /* --- 關鍵修復：強制按鈕並排 --- */
+    div[data-testid="column"] { flex: 1 !important; min-width: 0 !important; }
     
-    /* 按鈕樣式 */
     .stButton button, .stLinkButton a {
-        width: 100%; height: 45px;
-        display: flex; justify-content: center; align-items: center;
-        border-radius: 12px; font-weight: bold; margin: 0;
+        width: 100%; height: 42px; display: flex; justify-content: center; align-items: center;
+        border-radius: 10px; font-weight: bold; margin: 0; font-size: 14px;
     }
     .stLinkButton a { background: #6e00ff !important; color: white !important; text-decoration: none; }
     .stButton button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; }
     .stButton button:hover { border-color: #FFD700; color: #FFD700; }
-    
+
     /* 報價顏色 */
     .price-up { color: #ff5252 !important; }
     .price-down { color: #00e676 !important; }
     .price-big { font-size: 2.8rem; font-weight: 800; line-height: 1.1; }
 
-    /* 圖表 */
+    /* 圖表背景透明 */
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 大數據引擎 (FinMind Database) ---
-
-@st.cache_data(ttl=86400)
-def load_all_tw_stocks():
-    """
-    [大數據] 下載全台所有股票代號對照表
-    這就是為什麼之前會找不到：原本是用猜的，現在我們直接拿名單！
-    """
-    try:
-        dl = DataLoader(token=FINMIND_TOKEN)
-        # 抓上市
-        df_tse = dl.taiwan_stock_info()
-        # 建立對照表: "2330" -> "2330.TW"
-        stock_map = {}
-        if not df_tse.empty:
-            for _, row in df_tse.iterrows():
-                sid = row['stock_id']
-                # 簡單區分：一般用 .TW (上市) 或 .TWO (上櫃，FinMind 統一回傳 ID，我們需自行判斷)
-                # 這裡我們先存基本 ID，搜尋時驗證
-                stock_map[sid] = row['stock_name']
-        return stock_map
-    except:
-        return {}
-
-# 啟動時載入清單 (解決找不到股票的問題)
-tw_stocks = load_all_tw_stocks()
+# --- 4. 智能搜尋 (優先查內建庫) ---
 
 @st.cache_data(ttl=300)
 def smart_search_stock(query):
     query = query.strip().upper()
     
-    # 1. 優先查「大數據清單」 (秒殺台股)
-    if query in tw_stocks:
-        name = tw_stocks[query]
-        # 嘗試判斷是上市還上櫃
-        # 策略：先試 .TW，若 yfinance 沒資料再試 .TWO
-        # 這樣比盲猜準確很多，因為我們已經知道這個代號 "一定存在"
-        try:
-            test_tw = yf.Ticker(f"{query}.TW")
-            if not test_tw.history(period="1d").empty:
-                return f"{query}.TW", name, test_tw.info
-            
-            test_two = yf.Ticker(f"{query}.TWO")
-            if not test_two.history(period="1d").empty:
-                return f"{query}.TWO", name, test_two.info
-        except: pass
-        # 如果都連不上，預設回傳上市，讓介面顯示
-        return f"{query}.TW", name, {}
+    # 1. 第一關：查內建大數據 (Static DB)
+    if query in STATIC_TW_STOCKS:
+        data = STATIC_TW_STOCKS[query]
+        full_ticker = f"{query}{data['suffix']}"
+        return full_ticker, data['name'], {}
 
-    # 2. 查不到清單，可能是美股或 ETF
+    # 2. 第二關：Yahoo 查詢
     def try_fetch(ticker):
         try:
             s = yf.Ticker(ticker)
-            if not s.history(period="5d").empty: return ticker, s.info
+            # 只要有任何歷史資料就算存在
+            if not s.history(period="1d").empty: return ticker, s.info
         except: pass
         return None, None
 
-    if ".TW" in query: return try_fetch(query)
-    # 美股直接查
-    found_t, found_i = try_fetch(query)
-    if found_t:
-        name = found_i.get('longName', query)
-        return found_t, name, found_i
+    # 台股純數字 -> 先猜上市, 再猜上櫃
+    if query.isdigit():
+        t, i = try_fetch(f"{query}.TW")
+        if t: return t, i.get('longName', t), i
         
+        t, i = try_fetch(f"{query}.TWO")
+        if t: return t, i.get('longName', t), i
+
+    # 已經有後綴
+    if ".TW" in query or ".TWO" in query:
+        t, i = try_fetch(query)
+        if t: return t, i.get('longName', t), i
+        
+    # 美股/其他
+    t, i = try_fetch(query)
+    if t: return t, i.get('longName', t), i
+    
     return None, None, None
 
 @st.cache_data(ttl=300)
 def get_stock_data_hybrid(ticker, interval, period_days=365):
-    # 混合引擎：台股日線用 FinMind，其他用 Yahoo
     is_tw = ".TW" in ticker or ".TWO" in ticker
     is_intraday = interval in ["1m", "5m", "30m", "60m"]
     
+    # 台股日線用 FinMind
     if is_tw and not is_intraday:
         try:
             stock_id = ticker.split('.')[0]
@@ -203,6 +217,7 @@ def get_stock_data_hybrid(ticker, interval, period_days=365):
                 return df
         except: pass
             
+    # 其他用 Yahoo
     try:
         yf_period = "1d" if is_intraday else ("1y" if period_days < 500 else "2y")
         stock = yf.Ticker(ticker)
@@ -222,10 +237,6 @@ def get_institutional_chips(ticker):
         if df.empty: return None
         df['net'] = (df['buy'] - df['sell']) / 1000
         pivot = df.pivot_table(index='date', columns='name', values='net', aggfunc='sum').fillna(0)
-        # 簡化欄位名
-        pivot.columns = [c.replace('自營商(自行買賣)', '自營').replace('自營商(避險)', '自營').replace('外資及陸資(不含外資自營商)', '外資').replace('投信', '投信') for c in pivot.columns]
-        # 合併重複欄位
-        pivot = pivot.groupby(pivot.columns, axis=1).sum()
         return pivot.sort_index(ascending=False)
     except: return None
 
@@ -234,10 +245,10 @@ def get_news_rss(ticker):
     try:
         q = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
         url = f"https://news.google.com/rss/search?q={q}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-        resp = requests.get(url, timeout=5)
+        resp = requests.get(url, timeout=3)
         root = ET.fromstring(resp.content)
         news = []
-        for item in root.findall('.//item')[:6]:
+        for item in root.findall('.//item')[:5]:
             news.append({'title': item.find('title').text, 'link': item.find('link').text, 'date': item.find('pubDate').text[:16]})
         return news
     except: return []
@@ -256,36 +267,35 @@ def calculate_indicators(df):
 def run_backtest(df):
     bt = df.copy()
     bt['Signal'] = 0
-    bt.loc[bt['MA5'] > bt['MA20'], 'Signal'] = 1 # 黃金交叉持有
+    bt.loc[bt['MA5'] > bt['MA20'], 'Signal'] = 1
     bt['Ret'] = bt['Close'].pct_change() * bt['Signal'].shift(1)
     cum = (1 + bt['Ret']).cumprod()
     total = (cum.iloc[-1] - 1) * 100 if not cum.empty else 0
     return total, bt
 
-# --- 4. UI 主程式 ---
+# --- 5. UI 主程式 ---
 
 st.markdown("<h2 style='text-align:center; margin-bottom:10px;'>🦖 武吉拉 Ultimate</h2>", unsafe_allow_html=True)
 
 c1, c2 = st.columns([2.5, 1.5])
 with c1:
-    query = st.text_input("搜股", placeholder="輸入代號 (4903, 2330)...")
+    query = st.text_input("搜尋 (如 4903, 2330)", placeholder="輸入代號...")
     if query:
-        with st.spinner("🕷️ 大數據檢索..."):
-            t, n, i = smart_search_stock(query)
-            if t:
-                st.session_state.current_ticker = t
-                st.session_state.current_name = n
-                st.session_state.current_info = i
-                st.rerun()
-            else:
-                st.error(f"❌ 查無此股 ({query})，請確認代號。")
+        # 不顯示 loading spinner，讓感覺更快
+        t, n, i = smart_search_stock(query)
+        if t:
+            st.session_state.current_ticker = t
+            st.session_state.current_name = n
+            st.rerun()
+        else:
+            st.error(f"❌ 查無此股 ({query})")
+
 with c2:
-    watch_select = st.selectbox("⭐ 我的自選", ["(切換)"] + st.session_state.watchlist)
+    watch_select = st.selectbox("⭐ 自選股", ["(切換)"] + st.session_state.watchlist)
     if watch_select != "(切換)":
         st.session_state.current_ticker = watch_select
         t, n, i = smart_search_stock(watch_select)
         st.session_state.current_name = n
-        st.session_state.current_info = i
 
 target = st.session_state.current_ticker
 name = st.session_state.get('current_name', target)
@@ -324,8 +334,7 @@ if target:
         </div>
         """, unsafe_allow_html=True)
         
-        # --- 關鍵修復：按鈕並排 ---
-        # 使用 1:1 的 columns，並確保在手機上不換行
+        # --- 按鈕並排區 ---
         b1, b2 = st.columns([1, 1])
         with b1:
             st.link_button("🔗 Yahoo 股市", yahoo_url)
@@ -339,12 +348,12 @@ if target:
         tabs = st.tabs(["📈 K線圖", "📊 大數據", "📰 新聞", "🔙 回測", "🏛️ 籌碼"])
         
         with tabs[0]:
-            t_map = {"1分":"1m", "5分":"5m", "日":"1d", "週":"1wk", "月":"1mo"}
+            t_map = {"1分":"1m", "5分":"5m", "30分":"30m", "60分":"60m", "日":"1d", "週":"1wk", "月":"1mo"}
             sel_p = st.radio("週期", list(t_map.keys()), horizontal=True, label_visibility="collapsed")
             interval = t_map[sel_p]
-            p_days = 5 if interval in ["1m", "5m"] else 365
+            p_days = 5 if interval in ["1m", "5m", "30m", "60m"] else 365
             
-            with st.spinner("繪圖中..."):
+            with st.spinner("載入..."):
                 df_chart = get_stock_data_hybrid(target, interval, p_days)
                 if df_chart is not None:
                     df_chart = calculate_indicators(df_chart)
@@ -362,7 +371,7 @@ if target:
                         fig.add_hline(y=80, line_dash="dot", line_color="gray", row=2, col=1)
                         fig.add_hline(y=20, line_dash="dot", line_color="gray", row=2, col=1)
 
-                    fig.update_layout(height=500, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20,20,20,0.7)', font=dict(color='#eee'), showlegend=False, dragmode='pan', hovermode='x unified')
+                    fig.update_layout(height=450, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20,20,20,0.7)', font=dict(color='#eee'), showlegend=False, dragmode='pan', hovermode='x unified')
                     st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                 else: st.warning("無資料")
 
@@ -370,31 +379,21 @@ if target:
             score = 50
             if latest['Close'] > latest['MA20']: score += 20
             if latest['K'] > latest['D']: score += 10
-            if chips_df is not None and not chips_df.empty:
-                if chips_df.iloc[0].sum() > 0: score += 20
-            
             c_score = "#ff5252" if score >= 60 else "#00e676"
-            st.markdown(f"""
-            <div class="glass-card">
-                <h3>大數據評分：<span style="color:{c_score}">{score} 分</span></h3>
-                <div style="height:10px; width:100%; background:#444; border-radius:5px;"><div style="height:100%; width:{score}%; background:{c_score}; border-radius:5px;"></div></div>
-                <p>評分依據：技術面 + 籌碼面 (FinMind 真實數據)</p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='glass-card'><h3>大數據評分：<span style='color:{c_score}'>{score}</span></h3></div>", unsafe_allow_html=True)
             
         with tabs[2]:
             news = get_news_rss(target)
             for n in news:
-                st.markdown(f"<div style='border-bottom:1px solid #333; padding:8px;'><a href='{n['link']}' style='color:#4FC3F7; text-decoration:none;'>{n['title']}</a><br><small style='color:#888'>{n['date']}</small></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='border-bottom:1px solid #333; padding:8px;'><a href='{n['link']}' style='color:#4FC3F7; text-decoration:none;'>{n['title']}</a></div>", unsafe_allow_html=True)
                 
         with tabs[3]:
             ret, bt_data = run_backtest(df_daily)
             c = "#ff5252" if ret > 0 else "#00e676"
-            st.markdown(f"<div class='glass-card' style='text-align:center'>策略回測 (MA5 > MA20)<br>報酬率：<span style='color:{c}; font-size:1.5rem'>{ret:.1f}%</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='glass-card' style='text-align:center'>回測報酬率<br><span style='color:{c}; font-size:1.5rem'>{ret:.1f}%</span></div>", unsafe_allow_html=True)
             
         with tabs[4]:
             if chips_df is not None:
-                st.markdown("<div class='glass-card'><h4>🏛️ 法人買賣超</h4></div>", unsafe_allow_html=True)
                 st.dataframe(chips_df.head(10).style.format("{:.0f}"), use_container_width=True)
             else: st.info("無籌碼資料")
 

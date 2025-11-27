@@ -72,7 +72,7 @@ st.markdown("""
     .content-card {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 16px;
-        padding: 20px;
+        padding: 25px;
         margin-bottom: 20px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         color: #000 !important;
@@ -253,7 +253,7 @@ def get_market_hot_stocks():
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
     if ".TW" not in ticker and ".TWO" not in ticker: return None
-    stock_id = ticker.replace(".TW", "").replace(".TWO", "")
+    stock_id = ticker.split(".")[0]
     dl = DataLoader(token=FINMIND_API_TOKEN)
     try:
         start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
@@ -272,6 +272,7 @@ def get_institutional_data_finmind(ticker):
         pivot_df = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
         for col in ['Foreign', 'Trust', 'Dealer']:
             if col not in pivot_df.columns: pivot_df[col] = 0
+            
         pivot_df = (pivot_df / 1000).astype(int)
         pivot_df = pivot_df.reset_index()
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
@@ -350,6 +351,13 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
+    df['J'] = 3 * df['K'] - 2 * df['D']
+    
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
@@ -458,8 +466,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul>
-            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
-            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
+            <li><b>🟢 進場數據點 (買入訊號)：</b>{entry}</li>
+            <li><b>🔴 出場數據點 (賣出訊號)：</b>{exit_pt}</li>
         </ul>
         <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>

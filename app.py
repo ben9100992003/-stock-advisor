@@ -47,142 +47,160 @@ set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
     <style>
-    .stApp { color: #333; font-family: "Microsoft JhengHei", sans-serif; }
+    .stApp { color: #333; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* --- 卡片通用設定 --- */
-    .quote-card, .content-card, .kd-card, .market-summary-box {
-        background-color: rgba(255, 255, 255, 0.98) !important;
+    /* 1. 頂部報價卡片 */
+    .quote-card {
+        background-color: #ffffff;
         border-radius: 16px;
-        padding: 20px 24px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        margin-bottom: 15px;
     }
-    
-    /* 強制文字黑色 */
-    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, 
-    .content-card h3, .content-card h4, .content-card p, .content-card li,
-    .quote-card div, .quote-card span {
-        color: #222222 !important;
-        text-shadow: none !important;
-    }
+    .stock-title { font-size: 1.4rem; font-weight: bold; color: #000; margin-bottom: 5px; }
+    .stock-id { font-size: 1rem; color: #666; }
+    .price-big { font-size: 3.2rem; font-weight: 800; line-height: 1; margin: 10px 0; }
+    .price-change { font-size: 1.1rem; font-weight: bold; }
+    .stats-grid { display: flex; justify-content: space-between; margin-top: 15px; font-size: 0.9rem; color: #555; }
+    .stat-box { text-align: right; }
+    .stat-label { color: #888; font-size: 0.8rem; }
+    .stat-val { color: #000; font-weight: bold; }
 
-    /* --- 1. 報價卡片排版 (精準對齊) --- */
-    .quote-header {
-        display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-    }
-    .stock-title { font-size: 1.8rem !important; font-weight: 900 !important; margin: 0; line-height: 1.2;}
-    .stock-id { font-size: 1.2rem !important; color: #666 !important; font-weight: normal; margin-left: 8px;}
-    
-    .price-container {
-        display: flex; align-items: baseline; gap: 12px; margin-bottom: 15px;
-    }
-    .price-big { font-size: 4rem !important; font-weight: 800 !important; line-height: 1; letter-spacing: -1px;}
-    .price-change { font-size: 1.4rem !important; font-weight: 700 !important; }
-    
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px 30px; /* 行距8px 列距30px */
-        border-top: 1px solid #eee;
-        padding-top: 12px;
-    }
-    .stat-row { display: flex; justify-content: space-between; align-items: center; }
-    .stat-label { font-size: 1rem !important; color: #777 !important; font-weight: 500; }
-    .stat-val { font-weight: 700 !important; color: #000 !important; font-size: 1.1rem !important; }
-
-    /* --- 2. 搜尋框 --- */
-    .stTextInput > div > div > input {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 2px solid #FFD700 !important;
-        border-radius: 12px;
-        font-weight: bold;
-        font-size: 1.1rem;
-        padding: 10px;
-    }
-    .stTextInput label { color: #ffffff !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; font-size: 1.1rem; }
-
-    /* --- 3. KD 指標卡片 --- */
-    .kd-card {
-        border-left: 8px solid #2962ff;
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 15px 20px;
-    }
-    .kd-title { font-size: 1.3rem !important; font-weight: bold !important; }
-    .kd-val { font-size: 2rem !important; font-weight: 800 !important; }
-    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white !important; font-weight: bold; font-size: 1rem; }
-
-    /* --- 4. Tab 與 按鈕 --- */
-    .stTabs [data-baseweb="tab-list"] {
+    /* 2. 內容卡片 (分析報告專用) */
+    .content-card {
         background-color: rgba(255, 255, 255, 0.95);
-        border-radius: 12px;
-        padding: 4px;
-        gap: 5px;
-    }
-    .stTabs [data-baseweb="tab-list"] button {
-        border-radius: 8px; border: none; background-color: transparent; flex: 1;
-    }
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        color: #666 !important; font-weight: 700; font-size: 1.05rem; text-shadow: none !important;
-    }
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p {
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         color: #000 !important;
     }
+    .content-card h3 { 
+        color: #000 !important; 
+        border-bottom: 3px solid #FFD700; 
+        padding-bottom: 10px; 
+        margin-bottom: 15px;
+        font-weight: 800 !important;
+    }
+    .content-card h4 {
+        color: #2962ff !important;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+    }
+    .content-card p, .content-card li { 
+        color: #333 !important; 
+        font-size: 1.05rem; 
+        line-height: 1.6; 
+        margin-bottom: 8px;
+    }
+    .content-card b { color: #000 !important; font-weight: 900; }
+    
+    /* 表格樣式 */
+    .analysis-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 0.95rem;
+    }
+    .analysis-table th { background-color: #f0f0f0; padding: 8px; text-align: left; color: #333; }
+    .analysis-table td { border-bottom: 1px solid #eee; padding: 8px; color: #333; }
 
-    /* 週期按鈕 */
-    .stRadio > div {
-        display: flex; flex-direction: row; gap: 5px;
+    /* 3. 搜尋框 */
+    .stTextInput > div > div > input {
+        background-color: #ffffff;
+        color: #000;
+        border: 2px solid #eee;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* 4. KD 指標卡片 */
+    .kd-card {
         background-color: #fff;
-        padding: 5px; border-radius: 20px;
-        width: 100%; overflow-x: auto;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        border: 1px solid #eee;
+        border-left: 6px solid #2962ff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        margin-bottom: 20px;
+    }
+    .kd-title { font-size: 1.3rem; font-weight: bold; color: #444; }
+    .kd-val { font-size: 2rem; font-weight: 900; color: #000; }
+    .kd-tag { padding: 6px 15px; border-radius: 20px; color: white; font-weight: bold; font-size: 1rem; }
+
+    /* 5. Tab 與週期按鈕 */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important; font-size: 1.1rem; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    }
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
+    
+    .stRadio > div {
+        display: flex; flex-direction: row; gap: 0px;
+        background-color: #f0f0f0;
+        padding: 4px; border-radius: 8px;
+        width: 100%;
+        justify-content: space-between;
     }
     .stRadio div[role="radiogroup"] > label {
-        flex: 1; text-align: center; padding: 6px 0;
-        border-radius: 15px; margin: 0; border: none; cursor: pointer;
-        min-width: 50px;
-    }
-    .stRadio div[role="radiogroup"] > label p {
-        color: #555 !important; font-weight: bold; font-size: 0.9rem;
+        flex: 1;
+        text-align: center;
+        background-color: transparent;
+        padding: 8px 0;
+        border-radius: 20px;
+        margin: 0;
+        color: #666 !important;
+        font-weight: bold;
+        border: none;
+        display: flex; justify-content: center;
+        cursor: pointer;
     }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #333 !important;
-    }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] p {
+        background-color: #26a69a !important;
         color: #fff !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     
+    /* 新聞樣式 */
+    .news-item {
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .news-item a {
+        text-decoration: none;
+        color: #333 !important;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+    .news-item a:hover { color: #2962ff !important; }
+    .news-meta {
+        font-size: 0.85rem;
+        color: #888;
+        margin-top: 5px;
+    }
+
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
     
     /* 連結按鈕 */
-    .stLinkButton a { background-color: #fff !important; color: #000 !important; border: 1px solid #ccc !important; font-weight: bold; }
-
-    /* 分析報告標題 */
-    .content-card h3 { 
-        border-bottom: 3px solid #FFD700; padding-bottom: 10px; font-size: 1.5rem !important;
-    }
-    .content-card h4 {
-        color: #004a99 !important; margin-top: 20px; margin-bottom: 10px; font-size: 1.15rem !important; font-weight: 800 !important;
+    .stLinkButton a { 
+        background-color: #fff !important; 
+        color: #333 !important; 
+        border: 1px solid #ccc !important; 
+        font-weight: bold !important; 
     }
     
-    /* 主標題 */
-    h1 { text-shadow: 3px 3px 8px #000; color: white !important; margin-bottom: 20px; font-weight: 900; }
+    /* 標題 */
+    h1, h2 { text-shadow: 2px 2px 5px #000; color: white !important; }
     
-    /* Plotly 背景 */
-    .js-plotly-plot .plotly .main-svg { background: white !important; border-radius: 12px; }
-    
-    /* 新聞 */
-    .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
-    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
-    .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
+    /* Plotly Tooltip */
+    .plotly-notifier { visibility: hidden; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -191,37 +209,21 @@ st.markdown("""
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電",
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
-    "3231.TW": "緯創", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
-    "4903.TWO": "聯光通", "8110.TW": "華東", "6187.TWO": "萬潤", "3131.TWO": "弘塑",
+    "3231.TW": "緯創", "6669.TW": "緯穎", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
+    "4903.TWO": "聯光通", "8110.TW": "華東",
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
     "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "TSM": "台積電 ADR"
 }
 
 @st.cache_data(ttl=3600)
-def get_market_hot_stocks():
-    hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454", "2382", "2303", "2615", "3231"]
-    hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN", "META", "GOOGL", "AVGO"]
-    try:
-        dl = DataLoader(token=FINMIND_API_TOKEN)
-        latest_date = dl.taiwan_stock_daily_adj(stock_id="2330", start_date=(datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')).iloc[-1]['date']
-        df = dl.taiwan_stock_daily_adj(start_date=latest_date)
-        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(15)
-        if not top_df.empty: hot_tw = top_df['stock_id'].tolist()
-    except: pass
-    return hot_tw, hot_us
-
-@st.cache_data(ttl=300)
 def resolve_ticker(user_input):
     user_input = user_input.strip().upper()
     if user_input.isdigit():
-        # 優先嘗試上市
         ticker_tw = f"{user_input}.TW"
         try:
             s = yf.Ticker(ticker_tw)
             if not s.history(period="1d").empty: return ticker_tw, s.info.get('longName', ticker_tw)
         except: pass
-        
-        # 再嘗試上櫃
         ticker_two = f"{user_input}.TWO"
         try:
             s = yf.Ticker(ticker_two)
@@ -229,12 +231,24 @@ def resolve_ticker(user_input):
         except: pass
         return None, None
     else:
-        # 美股
         try:
             s = yf.Ticker(user_input)
             if not s.history(period="1d").empty: return user_input, s.info.get('longName', user_input)
         except: pass
         return None, None
+
+@st.cache_data(ttl=3600)
+def get_market_hot_stocks():
+    hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454", "2382", "2303", "2615", "3231"]
+    hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN", "META", "GOOGL", "AVGO"]
+    try:
+        dl = DataLoader(token=FINMIND_API_TOKEN)
+        latest_trade_date = dl.taiwan_stock_daily_adj(stock_id="2330", start_date=(datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')).iloc[-1]['date']
+        df = dl.taiwan_stock_daily_adj(start_date=latest_trade_date)
+        top_df = df.sort_values(by='Trading_Volume', ascending=False).head(15)
+        if not top_df.empty: hot_tw = top_df['stock_id'].tolist()
+    except: pass
+    return hot_tw, hot_us
 
 @st.cache_data(ttl=300)
 def get_institutional_data_finmind(ticker):
@@ -264,7 +278,8 @@ def get_institutional_data_finmind(ticker):
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
         pivot_df['Date'] = pd.to_datetime(pivot_df['Date']).dt.strftime('%Y/%m/%d')
         return pivot_df
-    except Exception as e: return None
+    except Exception as e:
+        return None
 
 @st.cache_data(ttl=300)
 def get_institutional_data_yahoo(ticker):
@@ -305,8 +320,10 @@ def get_institutional_data_yahoo(ticker):
 @st.cache_data(ttl=300)
 def get_google_news(ticker):
     try:
-        query = f"{ticker} stock" if len(ticker)<5 else ticker.replace(".TW", " TW").replace(".TWO", " TWO")
-        url = f"https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        query_ticker = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
+        if ".TW" not in ticker and ".TWO" not in ticker and len(ticker) < 5:
+             query_ticker = f"{ticker} stock"
+        url = f"https://news.google.com/rss/search?q={query_ticker}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         resp = requests.get(url)
         root = ET.fromstring(resp.content)
         news_list = []
@@ -334,6 +351,12 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
+    
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
@@ -430,8 +453,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul>
-            <li><b>🟢 進場參考：</b>{entry}</li>
-            <li><b>🔴 出場參考：</b>{exit_pt}</li>
+            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
+            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
         </ul>
         <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>
@@ -562,15 +585,15 @@ if target:
             fig.add_trace(go.Scatter(x=df.index, y=df['K'], line=dict(color='#1f77b4', width=1.5), name='K9'), row=3, col=1)
             fig.add_trace(go.Scatter(x=df.index, y=df['D'], line=dict(color='#ff7f0e', width=1.5), name='D9'), row=3, col=1)
 
-            # 設定預設顯示範圍：最近 30 根 (放大)
-            if len(df) > 30:
-                fig.update_xaxes(range=[df.index[-30], df.index[-1]], row=1, col=1)
+            # 設定預設顯示範圍：最近 15 根 (放大)
+            if len(df) > 15:
+                fig.update_xaxes(range=[df.index[-15], df.index[-1]], row=1, col=1)
 
             fig.update_layout(
                 template="plotly_white", height=650, margin=dict(l=15, r=15, t=10, b=10), legend=dict(orientation="h", y=1.01, x=0),
                 dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False)
             )
-            # 十字線
+            # 十字線 (Spikes)
             for row in [1, 2, 3]:
                 fig.update_xaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="#999", spikethickness=1, rangeslider_visible=False, row=row, col=1)
                 fig.update_yaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="#999", spikethickness=1, row=row, col=1)

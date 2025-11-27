@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (核心：修復白底黑字與排版) ---
+# --- 2. CSS 樣式 (核心：穩定版) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -31,10 +31,10 @@ def set_png_as_page_bg(png_file):
     if not bin_str: return
     
     # 使用 format 注入，避免 f-string 解析過長字串導致 TokenError
-    page_bg_img = """
+    style = """
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{0}");
+        background-image: url("data:image/png;base64,{}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -42,10 +42,10 @@ def set_png_as_page_bg(png_file):
     }}
     </style>
     """.format(bin_str)
-    st.markdown(page_bg_img, unsafe_allow_html=True)
+    st.markdown(style, unsafe_allow_html=True)
 
-# 設定背景
-set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
+# 設定背景 (請確認 GitHub 上有 bg.png)
+set_png_as_page_bg('bg.png')
 
 st.markdown("""
     <style>
@@ -103,7 +103,7 @@ st.markdown("""
         font-size: 1.1rem;
         padding: 10px;
     }
-    .stTextInput label { color: #ffffff !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; font-size: 1.1rem; }
+    .stTextInput label { color: #ffffff !important; text-shadow: 1px 1px 3px black; font-weight: bold; font-size: 1.1rem; }
 
     /* --- 3. KD 指標卡片 --- */
     .kd-card {
@@ -132,7 +132,7 @@ st.markdown("""
         color: #000 !important;
     }
 
-    /* 週期按鈕 (橫向滑動) */
+    /* 週期按鈕 */
     .stRadio > div {
         display: flex; flex-direction: row; gap: 5px;
         background-color: #ffffff; padding: 6px; border-radius: 20px;
@@ -201,11 +201,14 @@ def get_market_hot_stocks():
 def resolve_ticker(user_input):
     user_input = user_input.strip().upper()
     if user_input.isdigit():
+        # 優先嘗試上市
         ticker_tw = f"{user_input}.TW"
         try:
             s = yf.Ticker(ticker_tw)
             if not s.history(period="1d").empty: return ticker_tw, s.info.get('longName', ticker_tw)
         except: pass
+        
+        # 再嘗試上櫃
         ticker_two = f"{user_input}.TWO"
         try:
             s = yf.Ticker(ticker_two)
@@ -454,7 +457,8 @@ with c_search:
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 
-target = "2330.TW"
+# --- 處理搜尋邏輯 ---
+target = "2330.TW" # 預設
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
 
 if target_input:
@@ -592,4 +596,5 @@ if target:
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
+
 

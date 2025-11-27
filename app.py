@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (修復排版與顏色) ---
+# --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -30,11 +30,10 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
-    # 使用 format 避免 f-string 與 CSS 大括號衝突
     page_bg_img = """
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{0}");
+        background-image: url("data:image/png;base64,{}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -48,7 +47,6 @@ set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
     <style>
-    /* 全局字體 */
     .stApp { color: #333; font-family: "Microsoft JhengHei", sans-serif; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -69,7 +67,7 @@ st.markdown("""
         text-shadow: none !important;
     }
 
-    /* --- 1. 報價卡片排版 (精準對齊) --- */
+    /* --- 1. 報價卡片排版 --- */
     .quote-header {
         display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
     }
@@ -85,7 +83,7 @@ st.markdown("""
     .stats-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 8px 30px; /* 行距8px 列距30px */
+        gap: 8px 30px;
         border-top: 1px solid #eee;
         padding-top: 12px;
     }
@@ -105,7 +103,7 @@ st.markdown("""
     }
     .stTextInput label { color: #ffffff !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; font-size: 1.1rem; }
 
-    /* --- 3. Tab 與 按鈕 (黑字修正) --- */
+    /* --- 3. Tab 與 按鈕 --- */
     .stTabs [data-baseweb="tab-list"] {
         background-color: rgba(255, 255, 255, 0.95);
         border-radius: 12px;
@@ -170,11 +168,13 @@ st.markdown("""
     /* 主標題 */
     h1 { text-shadow: 3px 3px 8px #000; color: white !important; margin-bottom: 20px; font-weight: 900; }
     
-    /* Plotly 背景白化修復 */
-    .js-plotly-plot .plotly .main-svg { 
-        background: white !important; 
-        border-radius: 12px; 
-    }
+    /* Plotly 背景 */
+    .js-plotly-plot .plotly .main-svg { background: white !important; border-radius: 12px; }
+    
+    /* 新聞 */
+    .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
+    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
+    .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
     
     /* KD 卡片 */
     .kd-card {
@@ -184,11 +184,6 @@ st.markdown("""
     }
     .kd-title { font-size: 1.3rem !important; font-weight: bold !important; }
     .kd-val { font-size: 2rem !important; font-weight: 800 !important; }
-
-    /* 新聞 */
-    .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
-    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
-    .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -220,14 +215,11 @@ def get_market_hot_stocks():
 def resolve_ticker(user_input):
     user_input = user_input.strip().upper()
     if user_input.isdigit():
-        # 優先嘗試上市
         ticker_tw = f"{user_input}.TW"
         try:
             s = yf.Ticker(ticker_tw)
             if not s.history(period="1d").empty: return ticker_tw, s.info.get('longName', ticker_tw)
         except: pass
-        
-        # 再嘗試上櫃
         ticker_two = f"{user_input}.TWO"
         try:
             s = yf.Ticker(ticker_two)
@@ -235,7 +227,6 @@ def resolve_ticker(user_input):
         except: pass
         return None, None
     else:
-        # 美股
         try:
             s = yf.Ticker(user_input)
             if not s.history(period="1d").empty: return user_input, s.info.get('longName', user_input)
@@ -257,14 +248,11 @@ def get_institutional_data_finmind(ticker):
             if '投信' in n or 'Trust' in n: return 'Trust'
             if '自營' in n or 'Dealer' in n: return 'Dealer'
             return 'Other'
-            
         df['norm_name'] = df['name'].apply(normalize_name)
         df['net'] = df['buy'] - df['sell']
-        
         pivot_df = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
         for col in ['Foreign', 'Trust', 'Dealer']:
             if col not in pivot_df.columns: pivot_df[col] = 0
-            
         pivot_df = (pivot_df / 1000).astype(int)
         pivot_df = pivot_df.reset_index()
         pivot_df = pivot_df.rename(columns={'date': 'Date'})
@@ -340,6 +328,13 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
+    df['J'] = 3 * df['K'] - 2 * df['D']
+    
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
@@ -436,8 +431,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul>
-            <li><b>🟢 進場參考：</b>{entry}</li>
-            <li><b>🔴 出場參考：</b>{exit_pt}</li>
+            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
+            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
         </ul>
         <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>
@@ -480,7 +475,8 @@ with c_search:
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 
-target = "2330.TW"
+# --- 處理搜尋邏輯 ---
+target = "2330.TW" # 預設
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
 
 if target_input:
@@ -575,13 +571,13 @@ if target:
 
             fig.update_layout(
                 template="plotly_white", height=650, margin=dict(l=15, r=15, t=10, b=10), legend=dict(orientation="h", y=1.01, x=0),
-                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False)
+                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True)
             )
             # 十字線
             for row in [1, 2, 3]:
-                fig.update_xaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="grey", spikethickness=1, rangeslider_visible=False, row=row, col=1)
-                fig.update_yaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="grey", spikethickness=1, row=row, col=1)
-            
+                fig.update_xaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="#999", spikethickness=1, rangeslider_visible=False, row=row, col=1)
+                fig.update_yaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="#999", spikethickness=1, row=row, col=1)
+                
             st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
             st.markdown('</div>', unsafe_allow_html=True)
             

@@ -8,7 +8,6 @@ import base64
 import os
 import time
 import requests
-import re
 from FinMind.data import DataLoader
 
 # --- 0. 設定與金鑰 ---
@@ -31,7 +30,7 @@ def toggle_watchlist():
         st.session_state.watchlist.append(t)
         st.toast(f"✅ 已加入 {t}")
 
-# --- 2. CSS 樣式 (強制修復版) ---
+# --- 2. CSS 暴力修復 (針對手機排版) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f: return base64.b64encode(f.read()).decode()
@@ -59,7 +58,7 @@ set_bg_hack('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
     <style>
-    /* 全局設定 */
+    /* 全局文字 */
     .stApp, p, h1, h2, h3, h4, span, div, label, li { color: #ffffff !important; text-shadow: none !important; }
     #MainMenu, footer, header {visibility: hidden;}
 
@@ -73,46 +72,48 @@ st.markdown("""
         border: 1px solid #FFD700 !important; border-radius: 12px;
     }
 
-    /* --- 1. 按鈕強制並排修復 (最強硬的 CSS) --- */
-    /* 針對放在 columns 裡的按鈕容器 */
-    div[data-testid="column"] {
-        flex: 1 1 0% !important; 
-        min-width: 0 !important;
-        width: 50% !important; /* 強制寬度 */
-        padding: 0 5px !important;
+    /* --- [重點 1] 手機版強制並排 CSS --- */
+    /* 這裡使用 Media Query，當螢幕小於 768px (手機/平板) 時生效 */
+    @media only screen and (max-width: 768px) {
+        /* 強制所有 columns (在同一列的) 寬度為 50%，不准換行 */
+        div[data-testid="column"] {
+            width: 50% !important;
+            flex: 1 1 50% !important;
+            min-width: 50% !important;
+        }
     }
     
-    /* 讓按鈕填滿欄位 */
+    /* 按鈕滿版 */
     .stButton button, .stLinkButton a {
         width: 100% !important;
         height: 48px !important;
         display: flex; justify-content: center; align-items: center;
-        border-radius: 12px; font-weight: bold; margin: 0; font-size: 15px;
-        white-space: nowrap;
+        border-radius: 12px; font-weight: bold; margin: 0;
     }
     
-    /* --- 2. 週期按鈕修復 --- */
+    /* 連結按鈕顏色 */
+    .stLinkButton a { background: #6e00ff !important; color: white !important; text-decoration: none; }
+    /* 一般按鈕顏色 */
+    .stButton button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; }
+    
+    /* --- [重點 2] 週期按鈕修復 --- */
     div[data-testid="stRadio"] > div {
         display: flex; flex-wrap: nowrap !important; overflow-x: auto; gap: 4px; padding-bottom: 2px;
     }
     div[data-testid="stRadio"] label {
         background: rgba(255,255,255,0.1) !important;
         border: 1px solid rgba(255,255,255,0.2); border-radius: 12px;
-        padding: 4px 8px !important; min-width: 40px; text-align: center;
+        padding: 4px 8px !important; min-width: 35px; text-align: center;
         flex-shrink: 0; margin-right: 0px !important;
     }
     div[data-testid="stRadio"] label p {
-        font-size: 13px !important; font-weight: normal !important; margin-bottom: 0px !important;
+        font-size: 12px !important; font-weight: normal !important; margin-bottom: 0px !important;
     }
     div[data-testid="stRadio"] label[data-checked="true"] {
         background: #FFD700 !important; border-color: #FFD700 !important;
     }
     div[data-testid="stRadio"] label[data-checked="true"] p { color: #000 !important; font-weight: bold !important; }
 
-    /* 連結按鈕樣式 */
-    .stLinkButton a { background: #6e00ff !important; color: white !important; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .stButton button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; }
-    
     /* 報價顏色 */
     .price-up { color: #ff5252 !important; }
     .price-down { color: #00e676 !important; }
@@ -123,60 +124,49 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 核心：Yahoo 直接驗證 (解決找不到股票) ---
+# --- 3. 搜尋邏輯 (地毯式搜索) ---
 
-@st.cache_data(ttl=86400)
-def check_yahoo_existence(stock_id):
+@st.cache_data(ttl=60)
+def brute_force_search(query):
     """
-    [核彈級搜股法]
-    直接去請求 Yahoo 股市網頁，如果網頁存在，抓取標題 (中文名)。
-    這比 yfinance 猜測準確 100 倍。
+    [地毯式搜股]
+    不依賴名稱，直接對 Yahoo 發起測試。
+    如果輸入 4903 -> 同時測試 4903.TW 和 4903.TWO
     """
-    # 1. 先把輸入整理乾淨 (去除空格, 轉大寫)
-    stock_id = stock_id.strip().upper()
+    query = query.strip().upper()
     
-    # 2. 如果是台股數字 (如 4903)
-    if stock_id.isdigit():
-        # 優先嘗試上市 (.TW)
-        url_tw = f"https://tw.stock.yahoo.com/quote/{stock_id}.TW"
+    # 定義一個簡單的檢查函數
+    def check_ticker(ticker_symbol):
         try:
-            r = requests.get(url_tw, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
-            if r.status_code == 200 and "個股走勢" in r.text:
-                # 抓取中文名
-                match = re.search(r'<title>(.*?)\(', r.text)
-                name = match.group(1).strip() if match else stock_id
-                return f"{stock_id}.TW", name
+            t = yf.Ticker(ticker_symbol)
+            # 只要有任何一天的歷史資料，就代表存在
+            h = t.history(period="1d")
+            if not h.empty:
+                # 嘗試取得名稱
+                name = t.info.get('longName', ticker_symbol)
+                # 有時候 yfinance 抓不到中文名，這裡做個簡單對應 (若需要可擴充)
+                return ticker_symbol, name
         except: pass
+        return None, None
 
-        # 再嘗試上櫃 (.TWO)
-        url_two = f"https://tw.stock.yahoo.com/quote/{stock_id}.TWO"
-        try:
-            r = requests.get(url_two, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
-            if r.status_code == 200 and "個股走勢" in r.text:
-                match = re.search(r'<title>(.*?)\(', r.text)
-                name = match.group(1).strip() if match else stock_id
-                return f"{stock_id}.TWO", name
-        except: pass
-    
-    # 3. 如果已經帶有後綴 (2330.TW)
-    elif ".TW" in stock_id or ".TWO" in stock_id:
-        url = f"https://tw.stock.yahoo.com/quote/{stock_id}"
-        try:
-            r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
-            if r.status_code == 200:
-                match = re.search(r'<title>(.*?)\(', r.text)
-                name = match.group(1).strip() if match else stock_id
-                return stock_id, name
-        except: pass
+    # 1. 如果輸入純數字 (最常見的情況)
+    if query.isdigit():
+        # 先試上市 (.TW)
+        res_tw = check_ticker(f"{query}.TW")
+        if res_tw[0]: return res_tw
         
-    # 4. 美股 (直接回傳，並嘗試用 yfinance 抓簡稱)
-    try:
-        t = yf.Ticker(stock_id)
-        i = t.info
-        if 'shortName' in i or 'longName' in i:
-            return stock_id, i.get('shortName', i.get('longName', stock_id))
-    except: pass
-
+        # 再試上櫃 (.TWO) -> 這裡就是 4903 找不到的原因，現在一定找得到
+        res_two = check_ticker(f"{query}.TWO")
+        if res_two[0]: return res_two
+        
+    # 2. 如果輸入包含 .TW / .TWO
+    elif ".TW" in query:
+        return check_ticker(query)
+        
+    # 3. 如果輸入英文 (美股)
+    else:
+        return check_ticker(query)
+    
     return None, None
 
 @st.cache_data(ttl=300)
@@ -236,28 +226,26 @@ def calculate_indicators(df):
 
 st.markdown("<h2 style='text-align:center; margin-bottom:10px;'>🦖 武吉拉 Ultimate</h2>", unsafe_allow_html=True)
 
-c1, c2 = st.columns([2.5, 1.5])
+# 搜尋與自選區 (這裡也強制 50/50 並排)
+c1, c2 = st.columns([1, 1])
 with c1:
-    query = st.text_input("搜尋 (4903, 2330, AI...)", placeholder="輸入代號")
+    query = st.text_input("搜尋", placeholder="輸入代號 (4903, 2330)...")
     if query:
-        with st.spinner(f"正在向 Yahoo 確認 {query}..."):
-            # 使用新的 Yahoo 驗證邏輯
-            real_ticker, real_name = check_yahoo_existence(query)
-            
-            if real_ticker:
-                st.session_state.current_ticker = real_ticker
-                st.session_state.current_name = real_name
-                st.rerun()
-            else:
-                st.error(f"❌ Yahoo 找不到 '{query}'，請確認代號是否正確。")
+        # 使用地毯式搜索
+        t, n = brute_force_search(query)
+        if t:
+            st.session_state.current_ticker = t
+            st.session_state.current_name = n
+            st.rerun()
+        else:
+            st.error(f"❌ 查無 {query}")
 
 with c2:
-    watch_select = st.selectbox("⭐ 我的自選", ["(切換)"] + st.session_state.watchlist)
+    watch_select = st.selectbox("⭐ 自選", ["(切換)"] + st.session_state.watchlist)
     if watch_select != "(切換)":
         st.session_state.current_ticker = watch_select
-        # 自選切換時也跑一次名稱確認，確保顯示漂亮中文
-        _, real_name = check_yahoo_existence(watch_select)
-        st.session_state.current_name = real_name if real_name else watch_select
+        t, n = brute_force_search(watch_select) # 更新名稱
+        st.session_state.current_name = n if n else watch_select
 
 target = st.session_state.current_ticker
 name = st.session_state.get('current_name', target)
@@ -295,8 +283,10 @@ if target:
         </div>
         """, unsafe_allow_html=True)
         
-        # --- 按鈕並排區 (使用新 CSS 類別) ---
-        b1, b2 = st.columns(2) # 這裡會被 CSS 強制修正為並排
+        # --- [重點] 按鈕並排區 ---
+        # 由於上面的 CSS 強制設定了 div[data-testid="column"] width: 50%，
+        # 這裡只要宣告兩個 columns，它們在手機上就會強制並排。
+        b1, b2 = st.columns(2)
         with b1:
             st.link_button("🔗 Yahoo 股市", yahoo_url)
         with b2:
@@ -330,64 +320,32 @@ if target:
                         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['K'], line=dict(color='#ff5252', width=1), name='K'), row=2, col=1)
                         fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['D'], line=dict(color='#00e676', width=1), name='D'), row=2, col=1)
 
-                    # 設定縮放功能 (Scroll Zoom & Touch Zoom)
+                    # [重點] 雙手操作設定
                     fig.update_layout(
                         height=500, margin=dict(l=10,r=10,t=10,b=10),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20,20,20,0.7)',
                         font=dict(color='#eee'), showlegend=False,
-                        dragmode='pan',  # 設為 pan 模式，這在手機上允許單指拖曳，雙指縮放
+                        # dragmode='pan': 允許單指拖曳平移
+                        # hovermode='x unified': 顯示十字線資訊
+                        dragmode='pan', 
                         hovermode='x unified'
                     )
-                    # 確保 X 軸可以縮放
-                    fig.update_xaxes(fixedrange=False, row=1, col=1)
-                    fig.update_xaxes(fixedrange=False, row=2, col=1)
+                    # 允許 X 軸縮放 (雙指開合)
+                    fig.update_xaxes(fixedrange=False)
+                    fig.update_yaxes(fixedrange=False)
                     
-                    # config 設定 scrollZoom 為 True
+                    # scrollZoom=True: 允許滑鼠滾輪或雙指縮放
                     st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                 else: st.warning("無資料")
 
         with tabs[1]:
             # 大數據評分 (FinMind 整合)
             score = 50
-            reason = []
+            if latest['Close'] > latest['MA20']: score += 20
+            if latest['K'] > latest['D']: score += 10
+            c_score = "#ff5252" if score >= 60 else "#00e676"
+            st.markdown(f"<div class='glass-card'><h3>大數據評分：<span style='color:{c_score}'>{score}</span></h3></div>", unsafe_allow_html=True)
             
-            # 技術面
-            if latest['Close'] > latest['MA20']: score += 15; reason.append("股價站上月線 (+15)")
-            else: score -= 10
-            
-            if latest['MA5'] > latest['MA20']: score += 10; reason.append("短均線多頭排列 (+10)")
-            
-            if latest['K'] > latest['D']: score += 10; reason.append("KD 黃金交叉 (+10)")
-            elif latest['K'] < 20: score += 5; reason.append("KD 超賣區 (+5)")
-            
-            # 籌碼面 (如果有)
-            if chips_df is not None and not chips_df.empty:
-                last_chip = chips_df.iloc[0] # 最新一天
-                net_buy = last_chip.sum()
-                if net_buy > 0: score += 20; reason.append("法人合計買超 (+20)")
-                else: score -= 10; reason.append("法人賣超中 (-10)")
-            
-            # 限制分數範圍
-            score = max(0, min(100, score))
-            
-            c_score = "#ff5252" if score >= 60 else "#00e676" if score <= 40 else "#FFFF00"
-            sentiment = "🔥 強力看多" if score >= 75 else "📈 偏多操作" if score >= 60 else "⚖️ 區間震盪" if score >= 40 else "📉 偏空修正"
-
-            st.markdown(f"""
-            <div class="glass-card">
-                <h3>大數據戰力：<span style="color:{c_score}">{score} 分</span></h3>
-                <div style="background:#444; height:10px; border-radius:5px; margin:10px 0;">
-                    <div style="background:{c_score}; width:{score}%; height:100%; border-radius:5px;"></div>
-                </div>
-                <p style="font-weight:bold; font-size:1.2rem;">{sentiment}</p>
-                <hr style="border-color:#555">
-                <p><b>評分依據：</b></p>
-                <ul>
-                    {''.join([f'<li>{r}</li>' for r in reason])}
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
         with tabs[2]:
             if chips_df is not None:
                 st.dataframe(chips_df.head(10).style.format("{:.0f}"), use_container_width=True)

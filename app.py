@@ -12,16 +12,18 @@ import xml.etree.ElementTree as ET
 from FinMind.data import DataLoader
 
 # --- 0. 設定與金鑰 ---
-st.set_page_config(page_title="武吉拉 Wujila Ultimate", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
 FINMIND_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
 # --- 1. Session State ---
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = ["2330.TW", "NVDA"]
-
 if 'current_ticker' not in st.session_state:
     st.session_state.current_ticker = "2330.TW"
+# 緩存全台股票清單
+if 'tw_stock_map' not in st.session_state:
+    st.session_state.tw_stock_map = {}
 
 def toggle_watchlist():
     t = st.session_state.current_ticker
@@ -32,7 +34,7 @@ def toggle_watchlist():
         st.session_state.watchlist.append(t)
         st.toast(f"✅ 已加入 {t}")
 
-# --- 2. 視覺樣式 (Glassmorphism + UI 優化) ---
+# --- 2. 視覺樣式 (強制並排修復) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -55,8 +57,7 @@ def set_bg_hack(png_file):
         }}
         .stApp::before {{
             content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            pointer-events: none; z-index: 0;
+            background: rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 0;
         }}
         </style>
         ''', unsafe_allow_html=True)
@@ -66,108 +67,107 @@ set_bg_hack('Gemini_Generated_Image_enh52venh52venh5.png')
 st.markdown("""
     <style>
     /* 全局文字 */
-    .stApp, p, h1, h2, h3, h4, span, div, label, li {
-        color: #ffffff !important;
-        text-shadow: none !important;
-    }
+    .stApp, p, h1, h2, h3, h4, span, div, label, li { color: #ffffff !important; text-shadow: none !important; }
     #MainMenu, footer, header {visibility: hidden;}
 
-    /* 卡片樣式 */
+    /* 卡片與輸入框 */
     .glass-card {
-        background: rgba(25, 25, 25, 0.85);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 16px;
-        padding: 16px;
-        margin-bottom: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        background: rgba(25, 25, 25, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border-radius: 16px; padding: 16px; margin-bottom: 15px; border: 1px solid rgba(255, 255, 255, 0.15);
     }
-    
-    /* 輸入框 */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
-        background-color: rgba(0, 0, 0, 0.8) !important;
-        color: #fff !important;
-        border: 1px solid #FFD700 !important;
-        border-radius: 12px;
+        background-color: rgba(0, 0, 0, 0.8) !important; color: #fff !important;
+        border: 1px solid #FFD700 !important; border-radius: 12px;
     }
     
     /* 週期按鈕 */
-    div[data-testid="stRadio"] > div {
-        display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-bottom: 5px;
-    }
+    div[data-testid="stRadio"] > div { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; }
     div[data-testid="stRadio"] label {
-        background: rgba(255,255,255,0.1) !important;
-        border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 15px;
-        padding: 4px 12px !important;
-        min-width: 45px;
-        text-align: center;
-        flex-shrink: 0;
+        background: rgba(255,255,255,0.1) !important; border-radius: 15px;
+        padding: 4px 12px !important; min-width: 45px; text-align: center;
     }
-    div[data-testid="stRadio"] label p { font-size: 13px !important; font-weight: normal !important; }
     div[data-testid="stRadio"] label[data-checked="true"] {
         background: #FFD700 !important; border-color: #FFD700 !important;
     }
-    div[data-testid="stRadio"] label[data-checked="true"] p {
-        color: #000 !important; font-weight: bold !important;
-    }
+    div[data-testid="stRadio"] label[data-checked="true"] p { color: #000 !important; font-weight: bold !important; }
 
-    /* 報價與按鈕 */
-    .price-big { font-size: 2.8rem; font-weight: 800; margin: 5px 0; line-height: 1.1; }
+    /* --- 關鍵修復：強制按鈕並排 (Mobile Flex Fix) --- */
+    /* 針對按鈕區的 Columns 強制不換行 */
+    div[data-testid="column"] {
+        flex: 1 !important;
+        min-width: 0 !important; /* 允許縮小 */
+    }
+    
+    /* 按鈕樣式 */
+    .stButton button, .stLinkButton a {
+        width: 100%; height: 45px;
+        display: flex; justify-content: center; align-items: center;
+        border-radius: 12px; font-weight: bold; margin: 0;
+    }
+    .stLinkButton a { background: #6e00ff !important; color: white !important; text-decoration: none; }
+    .stButton button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; }
+    .stButton button:hover { border-color: #FFD700; color: #FFD700; }
+    
+    /* 報價顏色 */
     .price-up { color: #ff5252 !important; }
     .price-down { color: #00e676 !important; }
-    
-    /* 左右並排按鈕專用 */
-    .stLinkButton a, .stButton button {
-        display: flex; justify-content: center; align-items: center;
-        width: 100%; height: 48px;
-        border-radius: 12px; font-weight: bold;
-        text-decoration: none;
-        margin: 0;
-    }
-    .stLinkButton a {
-        background: #6e00ff !important; color: white !important;
-    }
-    .stButton button {
-        background: rgba(255,255,255,0.15); color: white;
-        border: 1px solid rgba(255,255,255,0.3);
-    }
-    .stButton button:hover { border-color: #FFD700; color: #FFD700; background: rgba(255,255,255,0.25); }
+    .price-big { font-size: 2.8rem; font-weight: 800; line-height: 1.1; }
 
-    /* Plotly 圖表背景透明化，讓玻璃質感透出來 */
+    /* 圖表 */
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
-    
-    /* 大數據分數條 */
-    .score-bar {
-        height: 10px; width: 100%; background: #444; border-radius: 5px; overflow: hidden; margin-top:5px;
-    }
-    .score-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 資料與邏輯引擎 ---
+# --- 3. 大數據引擎 (FinMind Database) ---
 
-@st.cache_data(ttl=86400) 
-def get_chinese_name_from_yahoo(stock_id):
-    if not stock_id[0].isdigit(): return None
+@st.cache_data(ttl=86400)
+def load_all_tw_stocks():
+    """
+    [大數據] 下載全台所有股票代號對照表
+    這就是為什麼之前會找不到：原本是用猜的，現在我們直接拿名單！
+    """
     try:
-        clean_id = stock_id.split('.')[0]
-        url = f"https://tw.stock.yahoo.com/quote/{clean_id}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        r = requests.get(url, headers=headers, timeout=3)
-        if r.status_code == 200:
-            start = r.text.find('<title>')
-            end = r.text.find('</title>')
-            if start != -1 and end != -1:
-                title = r.text[start+7:end]
-                if "(" in title: return title.split('(')[0].strip()
-    except: pass
-    return None
+        dl = DataLoader(token=FINMIND_TOKEN)
+        # 抓上市
+        df_tse = dl.taiwan_stock_info()
+        # 建立對照表: "2330" -> "2330.TW"
+        stock_map = {}
+        if not df_tse.empty:
+            for _, row in df_tse.iterrows():
+                sid = row['stock_id']
+                # 簡單區分：一般用 .TW (上市) 或 .TWO (上櫃，FinMind 統一回傳 ID，我們需自行判斷)
+                # 這裡我們先存基本 ID，搜尋時驗證
+                stock_map[sid] = row['stock_name']
+        return stock_map
+    except:
+        return {}
+
+# 啟動時載入清單 (解決找不到股票的問題)
+tw_stocks = load_all_tw_stocks()
 
 @st.cache_data(ttl=300)
 def smart_search_stock(query):
     query = query.strip().upper()
+    
+    # 1. 優先查「大數據清單」 (秒殺台股)
+    if query in tw_stocks:
+        name = tw_stocks[query]
+        # 嘗試判斷是上市還上櫃
+        # 策略：先試 .TW，若 yfinance 沒資料再試 .TWO
+        # 這樣比盲猜準確很多，因為我們已經知道這個代號 "一定存在"
+        try:
+            test_tw = yf.Ticker(f"{query}.TW")
+            if not test_tw.history(period="1d").empty:
+                return f"{query}.TW", name, test_tw.info
+            
+            test_two = yf.Ticker(f"{query}.TWO")
+            if not test_two.history(period="1d").empty:
+                return f"{query}.TWO", name, test_two.info
+        except: pass
+        # 如果都連不上，預設回傳上市，讓介面顯示
+        return f"{query}.TW", name, {}
+
+    # 2. 查不到清單，可能是美股或 ETF
     def try_fetch(ticker):
         try:
             s = yf.Ticker(ticker)
@@ -175,29 +175,18 @@ def smart_search_stock(query):
         except: pass
         return None, None
 
-    found_ticker, found_info = None, None
-    if query.isdigit():
-        t, i = try_fetch(f"{query}.TW")
-        if t: found_ticker, found_info = t, i
-        else:
-            t, i = try_fetch(f"{query}.TWO")
-            if t: found_ticker, found_info = t, i
-    elif ".TW" in query: found_ticker, found_info = try_fetch(query)
-    else: found_ticker, found_info = try_fetch(query)
-
-    stock_name = found_ticker
-    if found_ticker:
-        if ".TW" in found_ticker:
-            cn_name = get_chinese_name_from_yahoo(found_ticker)
-            if cn_name: stock_name = cn_name
-            elif found_info and 'longName' in found_info: stock_name = found_info['longName']
-        else:
-            if found_info and 'longName' in found_info: stock_name = found_info['longName']
-            
-    return found_ticker, stock_name, found_info
+    if ".TW" in query: return try_fetch(query)
+    # 美股直接查
+    found_t, found_i = try_fetch(query)
+    if found_t:
+        name = found_i.get('longName', query)
+        return found_t, name, found_i
+        
+    return None, None, None
 
 @st.cache_data(ttl=300)
 def get_stock_data_hybrid(ticker, interval, period_days=365):
+    # 混合引擎：台股日線用 FinMind，其他用 Yahoo
     is_tw = ".TW" in ticker or ".TWO" in ticker
     is_intraday = interval in ["1m", "5m", "30m", "60m"]
     
@@ -208,11 +197,9 @@ def get_stock_data_hybrid(ticker, interval, period_days=365):
             start_date = (datetime.now() - timedelta(days=period_days)).strftime('%Y-%m-%d')
             df = dl.taiwan_stock_daily(stock_id=stock_id, start_date=start_date)
             if not df.empty:
-                df = df.rename(columns={'date': 'Date', 'open': 'Open', 'max': 'High', 'min': 'Low', 'close': 'Close', 'Trading_Volume': 'Volume'})
+                df = df.rename(columns={'date':'Date','open':'Open','max':'High','min':'Low','close':'Close','Trading_Volume':'Volume'})
                 df['Date'] = pd.to_datetime(df['Date'])
                 df = df.set_index('Date')
-                if interval == "1wk": df = df.resample('W').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}).dropna()
-                elif interval == "1mo": df = df.resample('M').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}).dropna()
                 return df
         except: pass
             
@@ -233,42 +220,32 @@ def get_institutional_chips(ticker):
         start_date = (datetime.now() - timedelta(days=40)).strftime('%Y-%m-%d')
         df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
         if df.empty: return None
-        
-        def map_name(n):
-            if '外資' in n: return '外資'
-            if '投信' in n: return '投信'
-            if '自營' in n: return '自營商'
-            return '其他'
-        df['type'] = df['name'].apply(map_name)
         df['net'] = (df['buy'] - df['sell']) / 1000
-        pivot = df.pivot_table(index='date', columns='type', values='net', aggfunc='sum').fillna(0)
+        pivot = df.pivot_table(index='date', columns='name', values='net', aggfunc='sum').fillna(0)
+        # 簡化欄位名
+        pivot.columns = [c.replace('自營商(自行買賣)', '自營').replace('自營商(避險)', '自營').replace('外資及陸資(不含外資自營商)', '外資').replace('投信', '投信') for c in pivot.columns]
+        # 合併重複欄位
+        pivot = pivot.groupby(pivot.columns, axis=1).sum()
         return pivot.sort_index(ascending=False)
     except: return None
 
 @st.cache_data(ttl=300)
 def get_news_rss(ticker):
-    """[爬蟲] Google News RSS"""
     try:
         q = ticker.replace(".TW", " TW").replace(".TWO", " TWO")
         url = f"https://news.google.com/rss/search?q={q}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
         resp = requests.get(url, timeout=5)
         root = ET.fromstring(resp.content)
         news = []
-        for item in root.findall('.//item')[:8]:
-            news.append({
-                'title': item.find('title').text,
-                'link': item.find('link').text,
-                'date': item.find('pubDate').text[:16]
-            })
+        for item in root.findall('.//item')[:6]:
+            news.append({'title': item.find('title').text, 'link': item.find('link').text, 'date': item.find('pubDate').text[:16]})
         return news
     except: return []
 
 def calculate_indicators(df):
     if df is None or len(df) < 5: return df
-    if 'Volume' not in df.columns: df['Volume'] = 0
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
-    df['MA60'] = df['Close'].rolling(60).mean()
     low_min = df['Low'].rolling(9).min()
     high_max = df['High'].rolling(9).max()
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
@@ -277,56 +254,23 @@ def calculate_indicators(df):
     return df
 
 def run_backtest(df):
-    """[回測] 簡單均線策略"""
-    bt_df = df.copy()
-    bt_df['Signal'] = 0
-    # 策略：MA5 > MA20 持有 (1)，否則空手 (0)
-    bt_df.loc[bt_df['MA5'] > bt_df['MA20'], 'Signal'] = 1
-    bt_df['Daily_Ret'] = bt_df['Close'].pct_change()
-    bt_df['Strategy_Ret'] = bt_df['Signal'].shift(1) * bt_df['Daily_Ret']
-    
-    cum_ret = (1 + bt_df['Strategy_Ret']).cumprod()
-    total_ret = (cum_ret.iloc[-1] - 1) * 100
-    
-    # 簡單統計
-    win_days = len(bt_df[bt_df['Strategy_Ret'] > 0])
-    total_trade_days = len(bt_df[bt_df['Signal'].shift(1) == 1])
-    win_rate = (win_days / total_trade_days * 100) if total_trade_days > 0 else 0
-    
-    return total_ret, win_rate, bt_df
-
-def calculate_big_data_score(df, chips_df):
-    """[大數據] 計算多空分數 (0-100)"""
-    score = 50 # 基礎分
-    latest = df.iloc[-1]
-    
-    # 技術面 (佔 60%)
-    if latest['Close'] > latest['MA20']: score += 15 # 站上月線
-    if latest['MA5'] > latest['MA20']: score += 10 # 均線多排
-    if latest['K'] > latest['D']: score += 10 # KD 金叉
-    elif latest['K'] < 20: score += 5 # 超賣反彈機會
-    
-    # 籌碼面 (佔 40%) - 僅台股有效
-    if chips_df is not None and not chips_df.empty:
-        last_chip = chips_df.iloc[0]
-        f = last_chip.get('外資', 0)
-        t = last_chip.get('投信', 0)
-        if f > 0: score += 10
-        if t > 0: score += 15 # 投信權重較高
-        if f > 0 and t > 0: score += 5 # 土洋合擊
-        
-    return min(100, max(0, score))
+    bt = df.copy()
+    bt['Signal'] = 0
+    bt.loc[bt['MA5'] > bt['MA20'], 'Signal'] = 1 # 黃金交叉持有
+    bt['Ret'] = bt['Close'].pct_change() * bt['Signal'].shift(1)
+    cum = (1 + bt['Ret']).cumprod()
+    total = (cum.iloc[-1] - 1) * 100 if not cum.empty else 0
+    return total, bt
 
 # --- 4. UI 主程式 ---
 
 st.markdown("<h2 style='text-align:center; margin-bottom:10px;'>🦖 武吉拉 Ultimate</h2>", unsafe_allow_html=True)
 
-# 搜尋區
 c1, c2 = st.columns([2.5, 1.5])
 with c1:
-    query = st.text_input("搜股", placeholder="輸入代號 (4903, 2330, AI)...")
+    query = st.text_input("搜股", placeholder="輸入代號 (4903, 2330)...")
     if query:
-        with st.spinner("🕷️ 智能搜尋..."):
+        with st.spinner("🕷️ 大數據檢索..."):
             t, n, i = smart_search_stock(query)
             if t:
                 st.session_state.current_ticker = t
@@ -334,28 +278,24 @@ with c1:
                 st.session_state.current_info = i
                 st.rerun()
             else:
-                st.error(f"❌ 找不到：{query}")
+                st.error(f"❌ 查無此股 ({query})，請確認代號。")
 with c2:
-    watch_select = st.selectbox("⭐ 我的自選", ["(切換股票)"] + st.session_state.watchlist)
-    if watch_select != "(切換股票)":
+    watch_select = st.selectbox("⭐ 我的自選", ["(切換)"] + st.session_state.watchlist)
+    if watch_select != "(切換)":
         st.session_state.current_ticker = watch_select
         t, n, i = smart_search_stock(watch_select)
         st.session_state.current_name = n
         st.session_state.current_info = i
 
 target = st.session_state.current_ticker
-display_name = st.session_state.get('current_name', target)
-info = st.session_state.get('current_info', {})
+name = st.session_state.get('current_name', target)
 
 if target:
-    # 預載日線
     df_daily = get_stock_data_hybrid(target, "1d", 365)
-    
     if df_daily is not None and not df_daily.empty:
         df_daily = calculate_indicators(df_daily)
         chips_df = get_institutional_chips(target)
         
-        # 報價區
         latest = df_daily.iloc[-1]
         prev = df_daily.iloc[-2]
         change = latest['Close'] - prev['Close']
@@ -367,158 +307,94 @@ if target:
         if ".TW" in target: yahoo_url = f"https://tw.stock.yahoo.com/quote/{target.replace('.TW','')}"
         elif ".TWO" in target: yahoo_url = f"https://tw.stock.yahoo.com/quote/{target.replace('.TWO','')}"
 
-        # Info Card
+        # 報價卡片
         st.markdown(f"""
         <div class="glass-card">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
-                    <div style="font-size:1.4rem; font-weight:bold;">{display_name}</div>
+                    <div style="font-size:1.4rem; font-weight:bold;">{name}</div>
                     <div style="font-size:0.9rem; opacity:0.7;">{target}</div>
                 </div>
                 <div style="text-align:right;">
-                    <div class="{color_cls}" style="font-size:1.2rem; font-weight:bold;">
-                        {arrow} {abs(change):.2f} ({abs(pct):.2f}%)
-                    </div>
+                    <div class="{color_cls}" style="font-size:1.2rem; font-weight:bold;">{arrow} {abs(change):.2f} ({abs(pct):.2f}%)</div>
                 </div>
             </div>
             <div class="{color_cls} price-big">{latest['Close']:.2f}</div>
-            <div style="font-size:0.8rem; opacity:0.8;">
-                量: {int(latest['Volume']/1000):,} K | K: {latest['K']:.1f} | D: {latest['D']:.1f}
-            </div>
+            <div style="font-size:0.8rem; opacity:0.8;">量: {int(latest['Volume']/1000):,} K</div>
         </div>
         """, unsafe_allow_html=True)
         
-        # 按鈕區 (左右並排)
+        # --- 關鍵修復：按鈕並排 ---
+        # 使用 1:1 的 columns，並確保在手機上不換行
         b1, b2 = st.columns([1, 1])
-        with b1: st.link_button("🔗 Yahoo 股市", yahoo_url)
+        with b1:
+            st.link_button("🔗 Yahoo 股市", yahoo_url)
         with b2:
             if target in st.session_state.watchlist:
                 if st.button("🗑️ 移除自選"): toggle_watchlist(); st.rerun()
             else:
                 if st.button("❤️ 加入自選"): toggle_watchlist(); st.rerun()
 
-        # 分頁功能
-        tabs = st.tabs(["📈 K線圖", "📊 大數據分析", "📰 新聞", "🔙 策略回測", "🏛️ 籌碼"])
+        # 分頁
+        tabs = st.tabs(["📈 K線圖", "📊 大數據", "📰 新聞", "🔙 回測", "🏛️ 籌碼"])
         
         with tabs[0]:
-            # K線圖 (含十字線、獨立KD、縮放)
-            t_map = {"1分":"1m", "5分":"5m", "30分":"30m", "60分":"60m", "日":"1d", "週":"1wk", "月":"1mo"}
+            t_map = {"1分":"1m", "5分":"5m", "日":"1d", "週":"1wk", "月":"1mo"}
             sel_p = st.radio("週期", list(t_map.keys()), horizontal=True, label_visibility="collapsed")
             interval = t_map[sel_p]
             p_days = 5 if interval in ["1m", "5m"] else 365
             
-            with st.spinner("繪製專業圖表..."):
+            with st.spinner("繪圖中..."):
                 df_chart = get_stock_data_hybrid(target, interval, p_days)
                 if df_chart is not None:
                     df_chart = calculate_indicators(df_chart)
+                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.03)
                     
-                    # 建立雙子圖 (上方 K線, 下方 KD)
-                    fig = make_subplots(
-                        rows=2, cols=1, shared_xaxes=True, 
-                        row_heights=[0.7, 0.3], vertical_spacing=0.03,
-                        subplot_titles=(f"{target} K線走勢", "KD 指標")
-                    )
+                    # K線
+                    fig.add_trace(go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name="K線", increasing_line_color='#ff5252', decreasing_line_color='#00e676'), row=1, col=1)
+                    if 'MA5' in df_chart.columns: fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA5'], line=dict(color='cyan', width=1), name='MA5'), row=1, col=1)
+                    if 'MA20' in df_chart.columns: fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA20'], line=dict(color='orange', width=1), name='MA20'), row=1, col=1)
                     
-                    # Row 1: K線 + 均線
-                    fig.add_trace(go.Candlestick(
-                        x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'],
-                        name="K線", increasing_line_color='#ff5252', decreasing_line_color='#00e676'
-                    ), row=1, col=1)
-                    
-                    if 'MA5' in df_chart.columns:
-                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA5'], line=dict(color='cyan', width=1), name='MA5'), row=1, col=1)
-                    if 'MA20' in df_chart.columns:
-                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA20'], line=dict(color='orange', width=1), name='MA20'), row=1, col=1)
-
-                    # Row 2: KD
+                    # KD
                     if 'K' in df_chart.columns:
-                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['K'], line=dict(color='#ff5252', width=1.5), name='K'), row=2, col=1)
-                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['D'], line=dict(color='#00e676', width=1.5), name='D'), row=2, col=1)
-                        # 加入 80/20 參考線
+                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['K'], line=dict(color='#ff5252', width=1), name='K'), row=2, col=1)
+                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['D'], line=dict(color='#00e676', width=1), name='D'), row=2, col=1)
                         fig.add_hline(y=80, line_dash="dot", line_color="gray", row=2, col=1)
                         fig.add_hline(y=20, line_dash="dot", line_color="gray", row=2, col=1)
 
-                    # 樣式設定 (十字線、縮放)
-                    fig.update_layout(
-                        height=550, margin=dict(l=10, r=40, t=10, b=10),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20, 20, 20, 0.7)',
-                        font=dict(color='#eee'), showlegend=False,
-                        dragmode='pan', # 預設拖曳平移
-                        hovermode='x unified' # 統一顯示十字線資訊
-                    )
-                    
-                    # 十字線 (Crosshair) 設定
-                    axes_dict = dict(
-                        showspikes=True, spikemode='across', spikesnap='cursor', 
-                        showline=True, spikedash='dash', spikecolor="rgba(255,255,255,0.5)", spikethickness=1,
-                        gridcolor='rgba(255,255,255,0.1)'
-                    )
-                    fig.update_xaxes(**axes_dict, row=1, col=1)
-                    fig.update_yaxes(**axes_dict, row=1, col=1)
-                    fig.update_xaxes(**axes_dict, row=2, col=1)
-                    fig.update_yaxes(**axes_dict, row=2, col=1)
-                    
-                    # 啟用滑鼠滾輪縮放
-                    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True})
-                else:
-                    st.warning("無資料")
+                    fig.update_layout(height=500, margin=dict(l=10,r=10,t=10,b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(20,20,20,0.7)', font=dict(color='#eee'), showlegend=False, dragmode='pan', hovermode='x unified')
+                    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+                else: st.warning("無資料")
 
         with tabs[1]:
-            # 大數據戰情分析
-            score = calculate_big_data_score(df_daily, chips_df)
-            color = "#ff5252" if score >= 60 else "#00e676" if score <= 40 else "#FFFF00"
-            sentiment = "🔥 極度看多" if score >= 80 else "📈 偏多操作" if score >= 60 else "⚖️ 多空震盪" if score >= 40 else "📉 偏空修正"
+            score = 50
+            if latest['Close'] > latest['MA20']: score += 20
+            if latest['K'] > latest['D']: score += 10
+            if chips_df is not None and not chips_df.empty:
+                if chips_df.iloc[0].sum() > 0: score += 20
             
-            summary = info.get('longBusinessSummary', '')[:100] + "..." if info.get('longBusinessSummary') else "無公司簡介"
-
+            c_score = "#ff5252" if score >= 60 else "#00e676"
             st.markdown(f"""
             <div class="glass-card">
-                <h3>📊 大數據戰力評分：<span style="color:{color}">{score} 分</span></h3>
-                <div class="score-bar"><div class="score-fill" style="width:{score}%; background-color:{color};"></div></div>
-                <p style="margin-top:10px; font-weight:bold;">{sentiment}</p>
-                <hr style="border-color:#555">
-                <p><b>🏢 公司題材：</b>{summary}</p>
-                <p><b>💡 智能解讀：</b></p>
-                <ul>
-                    <li>技術面：股價 {'站上' if latest['Close']>latest['MA20'] else '跌破'} 月線，KD指標 {latest['K']:.1f}/{latest['D']:.1f}。</li>
-                    <li>籌碼面：{'FinMind 數據顯示有法人進駐' if score > 60 else '法人動向不明或偏保守'}。</li>
-                </ul>
+                <h3>大數據評分：<span style="color:{c_score}">{score} 分</span></h3>
+                <div style="height:10px; width:100%; background:#444; border-radius:5px;"><div style="height:100%; width:{score}%; background:{c_score}; border-radius:5px;"></div></div>
+                <p>評分依據：技術面 + 籌碼面 (FinMind 真實數據)</p>
             </div>
             """, unsafe_allow_html=True)
-
+            
         with tabs[2]:
-            # 個股新聞
-            st.markdown(f"#### 📰 {display_name} 最新消息")
-            news_items = get_news_rss(target)
-            if news_items:
-                for n in news_items:
-                    st.markdown(f"""
-                    <div style="border-bottom:1px solid #333; padding:10px;">
-                        <a href="{n['link']}" target="_blank" style="color:#4FC3F7; text-decoration:none; font-size:1.1rem; font-weight:bold;">{n['title']}</a>
-                        <div style="color:#888; font-size:0.8rem; margin-top:5px;">{n['date']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            else:
-                st.info("暫無相關新聞")
-
+            news = get_news_rss(target)
+            for n in news:
+                st.markdown(f"<div style='border-bottom:1px solid #333; padding:8px;'><a href='{n['link']}' style='color:#4FC3F7; text-decoration:none;'>{n['title']}</a><br><small style='color:#888'>{n['date']}</small></div>", unsafe_allow_html=True)
+                
         with tabs[3]:
-            # 回測系統
-            st.markdown("#### 🔙 均線策略回測 (MA5 黃金交叉 MA20)")
-            ret, win, bt_data = run_backtest(df_daily)
+            ret, bt_data = run_backtest(df_daily)
+            c = "#ff5252" if ret > 0 else "#00e676"
+            st.markdown(f"<div class='glass-card' style='text-align:center'>策略回測 (MA5 > MA20)<br>報酬率：<span style='color:{c}; font-size:1.5rem'>{ret:.1f}%</span></div>", unsafe_allow_html=True)
             
-            c_res1, c_res2 = st.columns(2)
-            ret_color = "#ff5252" if ret > 0 else "#00e676"
-            c_res1.markdown(f"<div class='glass-card' style='text-align:center'>總報酬率<br><span style='color:{ret_color};font-size:1.5rem'>{ret:.1f}%</span></div>", unsafe_allow_html=True)
-            c_res2.markdown(f"<div class='glass-card' style='text-align:center'>交易勝率<br><span style='color:#FFD700;font-size:1.5rem'>{win:.1f}%</span></div>", unsafe_allow_html=True)
-            
-            with st.expander("查看詳細交易數據"):
-                st.dataframe(bt_data[['Close', 'MA5', 'MA20', 'Signal', 'Strategy_Ret']].tail(30), use_container_width=True)
-
         with tabs[4]:
-            # 籌碼 (FinMind)
             if chips_df is not None:
-                st.markdown("<div class='glass-card'><h4>🏛️ 三大法人買賣超</h4></div>", unsafe_allow_html=True)
-                st.dataframe(chips_df.head(20).style.format("{:.0f}"), use_container_width=True)
-            else:
-                st.info("⚠️ 僅台股支援籌碼數據")
+                st.markdown("<div class='glass-card'><h4>🏛️ 法人買賣超</h4></div>", unsafe_allow_html=True)
+                st.dataframe(chips_df.head(10).style.format("{:.0f}"), use_container_width=True)
+            else: st.info("無籌碼資料")
 

@@ -532,6 +532,6 @@ if target:
                 st.markdown(f"<div class='news-item'><a href='{news['link']}' target='_blank'>{news['title']}</a><div class='news-meta'>{news['pubDate']} | {news['source']}</div></div>", unsafe_allow_html=True)
 
     except Exception as e:
-        st.error(f"無法取得資料，請確認代號是否正確。({e})")
+        st.error(f"無法取得資料，請確認代號是否正確。({e})"
 
 

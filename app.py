@@ -591,4 +591,3 @@ if target:
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
 
-

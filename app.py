@@ -36,7 +36,6 @@ def get_base64_of_bin_file(bin_file):
     except: return ""
 
 def set_bg_hack(png_file):
-    # 預設深色底
     st.markdown('<style>.stApp {background-color: #121212;}</style>', unsafe_allow_html=True)
     bin_str = get_base64_of_bin_file(png_file)
     if bin_str:
@@ -121,41 +120,29 @@ st.markdown("""
     /* 按鈕樣式統一 */
     .stButton button {
         width: 100%;
-        background: rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.15);
         color: white;
         border-radius: 12px;
         border: 1px solid rgba(255,255,255,0.3);
         padding: 0.5rem;
-        height: 45px; /* 固定高度讓並排好看 */
+        height: 48px; /* 加高一點更好按 */
+        font-weight: bold;
     }
     .stButton button:hover {
         border-color: #FFD700; color: #FFD700;
+        background: rgba(255,255,255,0.25);
     }
     
-    /* 連結按鈕 (Link Button) */
+    /* 連結按鈕 (Yahoo) */
     .stLinkButton a {
-        display: block;
-        width: 100%;
-        text-align: center;
-        background: rgba(75, 0, 130, 0.6) !important; /* 紫色底區分 */
+        display: flex; justify-content: center; align-items: center;
+        width: 100%; height: 48px;
+        background: #6e00ff !important; /* Yahoo 紫色 */
         color: white !important;
         border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.3);
-        padding: 0.5rem;
         text-decoration: none;
-        height: 45px;
-        line-height: 28px; /* 垂直置中 */
-    }
-
-    /* 靜態標籤 (已在自選) */
-    .static-badge {
-        display: flex; justify-content: center; align-items: center;
-        width: 100%; height: 45px;
-        background: rgba(255,255,255,0.1);
-        border: 1px solid #555;
-        border-radius: 12px;
-        color: #aaa;
         font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
 
     /* Plotly 圖表背景 */
@@ -163,7 +150,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 搜尋與資料邏輯 ---
+# --- 3. 搜尋邏輯 (強化版) ---
 
 @st.cache_data(ttl=600)
 def search_stock(query):
@@ -172,21 +159,37 @@ def search_stock(query):
     def check_valid(ticker):
         try:
             s = yf.Ticker(ticker)
-            h = s.history(period="1d")
-            if not h.empty: return ticker, s.info
+            # 策略：先抓 5 天，如果剛好遇到假日只抓 1 天會掛掉
+            h = s.history(period="5d")
+            if not h.empty:
+                return ticker, s.info
+            
+            # 如果 5 天沒資料，嘗試抓 1 個月 (應對冷門股或長假)
+            h_long = s.history(period="1mo")
+            if not h_long.empty:
+                return ticker, s.info
+                
         except: pass
         return None, None
 
-    # 1. 完整代號
-    if "." in query: return check_valid(query)
-    # 2. 數字 (先市後櫃)
+    # A. 已經包含 .TW 或 .TWO (使用者明確指定)
+    if ".TW" in query: return check_valid(query)
+
+    # B. 純數字 -> 優先查台股
     if query.isdigit():
         res = check_valid(f"{query}.TW")
         if res[0]: return res
         res = check_valid(f"{query}.TWO")
         if res[0]: return res
-    # 3. 美股/其他
-    return check_valid(query)
+        # 如果台股都找不到，才試試看是不是美股 (雖然純數字美股很少)
+        return check_valid(query)
+
+    # C. 英文/混合 -> 優先查美股 (解決 AI 找不到的問題)
+    # yfinance 查美股不需要後綴
+    res = check_valid(query)
+    if res[0]: return res
+    
+    return None, None
 
 @st.cache_data(ttl=30) 
 def get_stock_data(ticker, period, interval):
@@ -215,7 +218,7 @@ st.markdown("<h2 style='text-align:center; margin-bottom:10px;'>🦖 武吉拉 W
 
 c1, c2 = st.columns([2.5, 1.5])
 with c1:
-    query = st.text_input("搜尋 (如 4903, 2330)", placeholder="輸入代號...")
+    query = st.text_input("搜尋 (如 4903, AI, NVDA)", placeholder="輸入代號...")
     if query:
         with st.spinner("搜尋中..."):
             t, i = search_stock(query)
@@ -233,7 +236,7 @@ with c2:
 target = st.session_state.current_ticker
 
 if target:
-    df_daily = get_stock_data(target, "5d", "1d")
+    df_daily = get_stock_data(target, "1mo", "1d") # 預載多一點避免計算指標錯誤
     
     if df_daily is not None:
         latest = df_daily.iloc[-1]
@@ -244,8 +247,8 @@ if target:
         color_cls = "price-up" if change >= 0 else "price-down"
         arrow = "▲" if change >= 0 else "▼"
         
-        # 嘗試取得 Yahoo 連結
-        yahoo_url = f"https://finance.yahoo.com/quote/{target}" # 預設美股
+        # Yahoo 連結生成
+        yahoo_url = f"https://finance.yahoo.com/quote/{target}"
         if ".TW" in target:
             stock_id = target.replace(".TW", "")
             yahoo_url = f"https://tw.stock.yahoo.com/quote/{stock_id}"
@@ -281,29 +284,28 @@ if target:
         </div>
         """, unsafe_allow_html=True)
         
-        # --- B. 操作區 (並排按鈕) ---
-        # 使用 3 欄位：[加入/已加入] [移除] [Yahoo連結]
-        b1, b2, b3 = st.columns([1.2, 1, 1])
-        is_in_watch = target in st.session_state.watchlist
+        # --- B. 操作按鈕 (修正版：左右並排) ---
+        # 邏輯：左邊固定是 Yahoo，右邊是切換按鈕 (加入/移除)
+        # 這樣就不會有三個元件擠在一起導致換行
         
-        with b1:
-            if is_in_watch:
-                # 靜態顯示 "已在自選"
-                st.markdown("<div class='static-badge'>✅ 已在自選</div>", unsafe_allow_html=True)
-            else:
-                if st.button("❤️ 加入自選"): toggle_watchlist()
+        btn_col1, btn_col2 = st.columns(2)
         
-        with b2:
-            if is_in_watch:
-                # 只有在自選清單內才顯示移除
-                if st.button("🗑️ 移除"): toggle_watchlist()
+        with btn_col1:
+            # 左邊：Yahoo 連結
+            st.link_button("🔗 Yahoo 股市", yahoo_url)
+            
+        with btn_col2:
+            # 右邊：加入/移除 切換
+            if target in st.session_state.watchlist:
+                # 如果已經在清單，顯示灰色的移除按鈕
+                if st.button("🗑️ 移除自選"):
+                    toggle_watchlist()
+                    st.rerun()
             else:
-                # 佔位符，保持排版
-                st.markdown("") 
-
-        with b3:
-            # 外部連結
-            st.link_button("🔗 Yahoo", yahoo_url)
+                # 如果沒在清單，顯示紅色的加入按鈕
+                if st.button("❤️ 加入自選"):
+                    toggle_watchlist()
+                    st.rerun()
 
         # --- C. 圖表區 ---
         tabs = st.tabs(["📈 K線圖", "📝 分析"])
@@ -313,7 +315,7 @@ if target:
             sel_p = st.radio("週期", list(t_map.keys()), horizontal=True, label_visibility="collapsed")
             interval = t_map[sel_p]
             
-            # 分時只抓當日
+            # 分時只抓當日，避免線條擠在一起
             if interval in ["1m", "5m", "30m", "60m"]: period = "1d"
             else: period = "1y"
             
@@ -370,9 +372,7 @@ if target:
                 <ul>
                     <li>趨勢：<span style="color:{'#ff5252' if trend_txt=='多頭' else '#00e676'}">{trend_txt}</span> (股價 vs 20MA)</li>
                     <li>KD值：K={k:.1f}, D={d:.1f}</li>
-                    <li>資料來源：Yahoo Finance (yfinance)</li>
                 </ul>
-                <p style="font-size:0.8rem; color:#aaa;">* 本數據透過 Yahoo Finance API 抓取，若有延遲請以券商軟體為準。</p>
             </div>
             """, unsafe_allow_html=True)
 

@@ -6,19 +6,15 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import base64
 import os
+import time
 import requests
-from FinMind.data import DataLoader
-import xml.etree.ElementTree as ET 
 
 # --- 0. 設定與金鑰 ---
-# 設定頁面資訊 (必須是第一行 Streamlit 指令)
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-
-# --- 1. Session State (自選股管理) ---
+# --- 1. Session State (自選股與錯誤處理) ---
 if 'watchlist' not in st.session_state:
-    st.session_state.watchlist = ["2330.TW", "NVDA", "2317.TW"] # 預設自選股
+    st.session_state.watchlist = ["2330.TW", "NVDA"]
 
 if 'current_ticker' not in st.session_state:
     st.session_state.current_ticker = "2330.TW"
@@ -27,14 +23,17 @@ def add_to_watchlist():
     ticker = st.session_state.current_ticker
     if ticker not in st.session_state.watchlist:
         st.session_state.watchlist.append(ticker)
-        st.toast(f"✅ 已將 {ticker} 加入自選股！")
+        st.toast(f"✅ 已加入 {ticker}")
 
-def remove_from_watchlist(ticker_to_remove):
-    if ticker_to_remove in st.session_state.watchlist:
-        st.session_state.watchlist.remove(ticker_to_remove)
-        st.toast(f"🗑️ 已移除 {ticker_to_remove}")
+def remove_from_watchlist(t):
+    if t in st.session_state.watchlist:
+        st.session_state.watchlist.remove(t)
+        st.toast(f"🗑️ 已移除 {t}")
+        # 如果移除的是當前顯示的，切換回預設
+        if t == st.session_state.current_ticker:
+            st.session_state.current_ticker = "2330.TW" if "2330.TW" in st.session_state.watchlist else st.session_state.watchlist[0] if st.session_state.watchlist else "2330.TW"
 
-# --- 2. CSS 樣式 (視覺核心修復) ---
+# --- 2. 視覺樣式 (深色毛玻璃風格) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -42,245 +41,184 @@ def get_base64_of_bin_file(bin_file):
         return base64.b64encode(data).decode()
     except: return ""
 
-def set_png_as_page_bg(png_file):
-    # 預設深色背景，避免圖片載入失敗時全白刺眼
-    if not os.path.exists(png_file): 
-        st.markdown('<style>.stApp {background-color: #1a1a1a;}</style>', unsafe_allow_html=True)
-        return
-        
-    bin_str = get_base64_of_bin_file(png_file)
-    if not bin_str: return
+def set_bg_hack(png_file):
+    # 預設深色底，防止圖片載入失敗刺眼
+    st.markdown('<style>.stApp {background-color: #121212;}</style>', unsafe_allow_html=True)
     
-    page_bg_img = f'''
-    <style>
-    .stApp {{
-        background-image: url("data:image/png;base64,{bin_str}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }}
-    </style>
-    '''
-    st.markdown(page_bg_img, unsafe_allow_html=True)
+    bin_str = get_base64_of_bin_file(png_file)
+    if bin_str:
+        st.markdown(f'''
+        <style>
+        .stApp {{
+            background-image: url("data:image/png;base64,{bin_str}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        /* 遮罩層，讓背景暗一點，字才看得清楚 */
+        .stApp::before {{
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4); 
+            pointer-events: none;
+            z-index: 0;
+        }}
+        </style>
+        ''', unsafe_allow_html=True)
 
-# 設定背景圖
-set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
+set_bg_hack('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
     <style>
-    /* --- 1. 全局強制黑字 --- */
-    .stApp, .stMarkdown, .stText, p, h1, h2, h3, h4, h5, h6, span, li, div {
-        text-shadow: none !important;
+    /* 全局文字設定 - 預設白色，易讀 */
+    .stApp, p, h1, h2, h3, h4, h5, h6, span, li, div, label {
+        color: #ffffff !important;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     
-    /* 除了主標題外，所有內容文字強制黑色 */
-    .stMarkdown p, .stMarkdown li, .stMarkdown span, .stDataFrame, .stTable {
-        color: #000000 !important;
-    }
-    
-    /* --- 2. 卡片系統 --- */
-    .content-card, .quote-card, .kd-card, .market-summary-box {
-        background-color: #ffffff !important;
+    /* 隱藏預設元素 */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* --- 核心：毛玻璃卡片 (Glassmorphism) --- */
+    .glass-card {
+        background: rgba(30, 30, 30, 0.85); /* 深色半透明 */
+        backdrop-filter: blur(12px);         /* 背後模糊 */
+        -webkit-backdrop-filter: blur(12px);
         border-radius: 16px;
         padding: 20px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        border: 1px solid #e0e0e0;
+        border: 1px solid rgba(255, 255, 255, 0.15); /* 淡淡的白邊 */
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
-
-    /* --- 3. 橫向滑動週期選單 (手機優化) --- */
-    [data-testid="stRadio"] > div {
+    
+    /* 輸入框美化 */
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        color: #fff !important;
+        border: 1px solid #FFD700 !important; /* 金邊 */
+        border-radius: 12px;
+    }
+    
+    /* 橫向滑動選單 (手機優化) */
+    .scroll-wrapper {
+        display: flex;
+        overflow-x: auto;
+        gap: 8px;
+        padding-bottom: 5px;
+        margin-bottom: 10px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .scroll-wrapper::-webkit-scrollbar { height: 0px; } /* 隱藏捲軸 */
+    
+    /* 自訂 Radio 按鈕樣式 (取代 Streamlit 原生) */
+    div[data-testid="stRadio"] > div {
         display: flex;
         flex-direction: row;
         flex-wrap: nowrap;
         overflow-x: auto;
-        gap: 8px;
-        padding-bottom: 5px;
-        -webkit-overflow-scrolling: touch;
     }
-    [data-testid="stRadio"] label {
-        background-color: #f0f0f0 !important;
-        color: #333 !important;
-        border: 1px solid #ccc;
+    div[data-testid="stRadio"] label {
+        background: rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2);
+        color: #fff !important;
         border-radius: 20px;
-        padding: 6px 14px !important;
-        min-width: 50px;
+        padding: 5px 15px !important;
+        margin-right: 5px;
+        min-width: 60px;
         text-align: center;
-        margin-right: 0 !important;
-        white-space: nowrap;
-        cursor: pointer;
+        transition: 0.3s;
     }
-    [data-testid="stRadio"] label[data-checked="true"] {
-        background-color: #222 !important;
+    div[data-testid="stRadio"] label[data-checked="true"] {
+        background: #FFD700 !important; /* 選中變金色 */
         border-color: #FFD700 !important;
     }
-    [data-testid="stRadio"] label[data-checked="true"] p {
-        color: #FFD700 !important;
-    }
-    [data-testid="stRadio"] label p {
-        font-weight: bold !important;
-        font-size: 0.9rem !important;
-        margin: 0 !important;
-    }
-
-    /* --- 4. 輸入框與按鈕 --- */
-    .stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 2px solid #FFD700 !important;
-        border-radius: 10px;
+    div[data-testid="stRadio"] label[data-checked="true"] p {
+        color: #000 !important; /* 選中字變黑 */
+        text-shadow: none !important;
         font-weight: bold;
     }
-    .stTextInput label, .stSelectbox label {
-        color: #ffffff !important;
-        font-weight: bold;
-        text-shadow: 1px 1px 2px #000;
-    }
-    button[kind="secondary"] {
-        background-color: #fff !important;
-        color: #000 !important;
-        border: 1px solid #ccc !important;
-    }
 
-    /* --- 5. 圖表修復 --- */
-    /* 強制 Plotly 背景為白，避免透明 */
-    .js-plotly-plot .plotly .main-svg {
-        background: #ffffff !important;
-        border-radius: 8px;
-    }
+    /* 報價大數字 */
+    .price-big { font-size: 2.8rem; font-weight: 800; margin: 5px 0; line-height: 1.1; }
+    .price-up { color: #ff5252 !important; text-shadow: 0 0 10px rgba(255, 82, 82, 0.4); }
+    .price-down { color: #69f0ae !important; text-shadow: 0 0 10px rgba(105, 240, 174, 0.4); }
     
-    /* --- 6. 其他細節 --- */
-    .price-big { font-size: 3rem !important; font-weight: 800; line-height: 1; margin: 10px 0; }
-    .stock-title { font-size: 1.4rem; font-weight: 900; color: #000; }
-    .stock-id { font-size: 1rem; color: #666 !important; }
-    h1 { color: #FFFFFF !important; text-shadow: 2px 2px 4px #000; font-weight: 900; text-align: center; }
-    
-    /* Tab 標籤 */
-    .stTabs [aria-selected="true"] {
-        background-color: #fff !important;
+    /* 按鈕 */
+    .stButton button {
+        background: rgba(255,255,255,0.1);
+        color: white;
         border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.3);
     }
-    .stTabs [aria-selected="true"] p { color: #000 !important; }
-    .stTabs [aria-selected="false"] p { color: #fff !important; opacity: 0.9; }
-    
+
+    /* Plotly 圖表容器 (修正空白問題) */
+    .js-plotly-plot .plotly .main-svg {
+        background: transparent !important; /* 透明背景 */
+    }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# --- 3. 核心功能函式 ---
+# --- 3. 資料處理 (增加 Retry 機制) ---
 
-@st.cache_data(ttl=300)
-def resolve_ticker_and_info(user_input):
+@st.cache_data(ttl=600)
+def search_stock(query):
     """
-    智慧搜尋：
-    1. 輸入數字 -> 嘗試 .TW (上市) -> 失敗嘗試 .TWO (上櫃)
-    2. 輸入英文 -> 嘗試美股
-    回傳: (ticker, info_dict) 或 (None, None)
+    強化的搜尋邏輯：
+    1. 嘗試直接代號 (如 2330.TW)
+    2. 數字 -> 嘗試上市 (.TW) -> 失敗嘗試上櫃 (.TWO) -> 失敗當美股
     """
-    user_input = user_input.strip().upper()
+    query = query.strip().upper()
     
-    # 狀況 A: 純數字 (假設是台股)
-    if user_input.isdigit():
-        # 1. 嘗試上市
-        ticker_tw = f"{user_input}.TW"
+    # 定義重試函式
+    def try_fetch(ticker):
         try:
-            stock = yf.Ticker(ticker_tw)
-            hist = stock.history(period="1d")
+            # 加入 headers 模擬瀏覽器，減少被擋機率
+            stock = yf.Ticker(ticker)
+            # 必須真的抓到歷史資料才算存在
+            hist = stock.history(period="5d")
             if not hist.empty:
-                return ticker_tw, stock.info
-        except: pass
-        
-        # 2. 嘗試上櫃
-        ticker_two = f"{user_input}.TWO"
-        try:
-            stock = yf.Ticker(ticker_two)
-            hist = stock.history(period="1d")
-            if not hist.empty:
-                return ticker_two, stock.info
-        except: pass
-        
+                return ticker, stock.info
+        except Exception:
+            return None, None
         return None, None
 
-    # 狀況 B: 英文/混雜 (假設是美股或已帶後綴)
-    else:
-        # 如果使用者自己打了 .TW 或 .TWO，直接用
-        if ".TW" in user_input or ".TWO" in user_input:
-            target = user_input
-        else:
-            target = user_input # 假設美股
+    # 情境 A: 使用者已經輸入完整代號 (有小數點)
+    if "." in query:
+        return try_fetch(query)
 
-        try:
-            stock = yf.Ticker(target)
-            hist = stock.history(period="1d")
-            if not hist.empty:
-                return target, stock.info
-        except: pass
+    # 情境 B: 純數字 (優先查台股)
+    if query.isdigit():
+        # 1. 優先試上市
+        res = try_fetch(f"{query}.TW")
+        if res[0]: return res
         
-        return None, None
+        # 2. 其次試上櫃 (這是您遇到 4903 的問題點)
+        res = try_fetch(f"{query}.TWO")
+        if res[0]: return res
 
-@st.cache_data(ttl=300)
-def get_institutional_data(ticker):
-    """取得法人資料 (FinMind 優先，Yahoo 備援)"""
-    if ".TW" not in ticker and ".TWO" not in ticker: return None
-    stock_id = ticker.split(".")[0]
-    
-    # 1. FinMind
+    # 情境 C: 英文或混雜 (當美股查)
+    return try_fetch(query)
+
+@st.cache_data(ttl=60)
+def get_stock_data(ticker, period, interval):
+    """
+    取得股價並快取，防止重複請求導致 Rate Limit
+    """
     try:
-        dl = DataLoader(token=FINMIND_API_TOKEN)
-        start_date = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
-        df = dl.taiwan_stock_institutional_investors(stock_id=stock_id, start_date=start_date)
-        if not df.empty:
-            def normalize_name(n):
-                if '外資' in n or 'Foreign' in n: return 'Foreign'
-                if '投信' in n or 'Trust' in n: return 'Trust'
-                if '自營' in n or 'Dealer' in n: return 'Dealer'
-                return 'Other'
-            df['norm_name'] = df['name'].apply(normalize_name)
-            df['net'] = df['buy'] - df['sell']
-            pivot = df.pivot_table(index='date', columns='norm_name', values='net', aggfunc='sum').fillna(0)
-            pivot = (pivot / 1000).astype(int) # 轉張數
-            pivot = pivot.reset_index().rename(columns={'date': 'Date'})
-            pivot['Date'] = pd.to_datetime(pivot['Date']).dt.strftime('%Y/%m/%d')
-            return pivot.sort_values('Date', ascending=False)
-    except: pass
-    
-    # 2. Yahoo (備援)
-    try:
-        url = f"https://tw.stock.yahoo.com/quote/{ticker}/institutional-trading"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        r = requests.get(url, headers=headers)
-        dfs = pd.read_html(r.text)
-        target_df = dfs[0] # 通常是第一個
-        # 簡單處理欄位
-        target_df.columns = [str(c) for c in target_df.columns]
-        # 尋找關鍵字
-        cols = target_df.columns
-        date_col = next((c for c in cols if '日期' in c), None)
-        foreign_col = next((c for c in cols if '外資' in c), None)
-        trust_col = next((c for c in cols if '投信' in c), None)
-        dealer_col = next((c for c in cols if '自營' in c), None)
-        
-        if date_col and foreign_col:
-            res = pd.DataFrame()
-            res['Date'] = target_df[date_col]
-            
-            def clean_num(x):
-                if isinstance(x, str):
-                    return int(x.replace(',','').replace('+',''))
-                return x
-            
-            res['Foreign'] = target_df[foreign_col].apply(clean_num)
-            res['Trust'] = target_df[trust_col].apply(clean_num) if trust_col else 0
-            res['Dealer'] = target_df[dealer_col].apply(clean_num) if dealer_col else 0
-            # 日期處理
-            res['Date'] = res['Date'].apply(lambda x: f"{datetime.now().year}/{x}" if len(str(x)) <= 5 else x)
-            return res.head(30)
-    except: pass
-    
-    return None
+        stock = yf.Ticker(ticker)
+        df = stock.history(period=period, interval=interval)
+        if df.empty: return None
+        return df
+    except:
+        return None
 
 def calculate_indicators(df):
-    if len(df) < 20: return df
+    if df is None or len(df) < 5: return df
+    
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
     df['MA20'] = df['Close'].rolling(20).mean()
@@ -293,222 +231,202 @@ def calculate_indicators(df):
     df['D'] = df['K'].ewm(com=2).mean()
     return df
 
-def generate_report(name, ticker, latest, df, info):
-    price = latest['Close']
-    ma5, ma20 = latest.get('MA5', price), latest.get('MA20', price)
-    k, d = latest.get('K', 50), latest.get('D', 50)
-    
-    # 判斷
-    tech_trend = "偏多" if price > ma20 else "偏空"
-    kd_sig = "黃金交叉 (看漲)" if k > d else "死亡交叉 (看跌)"
-    
-    # 建議
-    if price > ma20 and k > d:
-        action = "🟢 偏多操作"
-        entry = f"拉回 5日線 {ma5:.1f} 不破可進場"
-    elif price < ma20 and k < d:
-        action = "🔴 保守觀望"
-        entry = f"需站回月線 {ma20:.1f} 再觀察"
-    else:
-        action = "🟡 區間震盪"
-        entry = "箱型操作，低買高賣"
+# --- 4. UI 主程式 ---
 
-    summary = info.get('longBusinessSummary', '暫無資料')[:100] + "..."
-    
-    return f"""
-    <div class="content-card">
-        <h3>📊 {name} 分析報告</h3>
-        <p><b>{info.get('sector', '產業')}</b>：{summary}</p>
-        <hr>
-        <h4>技術面分析</h4>
-        <ul>
-            <li><b>趨勢：</b>股價 {tech_trend} (收盤 {price:.2f})</li>
-            <li><b>KD指標：</b>K={k:.1f}, D={d:.1f} -> <b>{kd_sig}</b></li>
-        </ul>
-        <h4>💡 操作建議：{action}</h4>
-        <p>{entry}</p>
-    </div>
-    """
+st.markdown("<h1 style='text-align:center;'>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
 
-def analyze_index(symbol, name):
-    try:
-        t = yf.Ticker(symbol)
-        h = t.history(period="5d")
-        if h.empty: return None
-        last = h.iloc[-1]
-        prev = h.iloc[-2]
-        chg = last['Close'] - prev['Close']
-        color = "#e53935" if chg > 0 else "#43a047"
-        return f"<span style='color:{color}; font-weight:bold;'>{last['Close']:.0f} ({chg:+.0f})</span>"
-    except: return "N/A"
+# 控制區 (搜尋 + 自選)
+with st.container():
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        query = st.text_input("🔍 搜尋 (輸入 4903, 2330, NVDA...)", placeholder="股票代號")
+        if query:
+            with st.spinner("搜尋中..."):
+                ticker, info = search_stock(query)
+                if ticker:
+                    st.session_state.current_ticker = ticker
+                    # 清空輸入框的小技巧 (非必要，但體驗較好)
+                else:
+                    st.error(f"❌ 找不到 '{query}'，請確認代號是否正確。")
 
-# --- 4. UI 主流程 ---
+    with c2:
+        # 自選股選單
+        select = st.selectbox("⭐ 自選股", ["(選擇股票)"] + st.session_state.watchlist)
+        if select != "(選擇股票)":
+            st.session_state.current_ticker = select
 
-st.markdown("<h1>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
-
-# 頂部控制列 (兩欄：左邊搜尋，右邊自選)
-col_search, col_watch = st.columns([2, 1])
-
-with col_search:
-    # 搜尋框
-    search_query = st.text_input("🔍 搜尋股票 (輸入代號如 2330 或 NVDA)", value="")
-    if st.button("搜尋 Go"):
-        if search_query:
-            resolved_ticker, resolved_info = resolve_ticker_and_info(search_query)
-            if resolved_ticker:
-                st.session_state.current_ticker = resolved_ticker
-                # st.session_state.current_info = resolved_info # 避免存太大物件
-            else:
-                st.error(f"❌ 找不到股票：{search_query}，請確認代號。")
-
-with col_watch:
-    # 自選股下拉選單
-    selected_watch = st.selectbox("⭐ 我的自選股", ["(請選擇)"] + st.session_state.watchlist)
-    if selected_watch != "(請選擇)":
-        st.session_state.current_ticker = selected_watch
-
-# --- 5. 顯示股票內容 ---
-
+# 主內容區
 target = st.session_state.current_ticker
 
 if target:
-    try:
-        stock = yf.Ticker(target)
-        # 抓取基本資料
-        info = stock.info
-        name = info.get('longName', target)
-        if 'TW' in target and 'longName' in info: name = info['longName'] # 修正台股名稱
+    # 取得資料 (日線預設，用來顯示報價)
+    df_daily = get_stock_data(target, "1y", "1d")
+    
+    if df_daily is None:
+        st.warning(f"⚠️ 無法載入 {target} 的數據，可能是連線問題或 API 限制，請稍後再試。")
+    else:
+        # 計算指標
+        df_daily = calculate_indicators(df_daily)
+        latest = df_daily.iloc[-1]
+        prev = df_daily.iloc[-2]
+        change = latest['Close'] - prev['Close']
+        pct = (change / prev['Close']) * 100
         
-        # 抓取股價 (預設日線)
-        df = stock.history(period="1y") # 抓長一點計算均線
+        # 決定顏色 (台股紅漲綠跌)
+        color_cls = "price-up" if change >= 0 else "price-down"
+        arrow = "▲" if change >= 0 else "▼"
         
-        if df.empty:
-            st.warning("⚠️ 無法取得股價資料，可能代號有誤或暫停交易。")
-        else:
-            # 報價卡片
-            latest = df.iloc[-1]
-            prev = df.iloc[-2]
-            change = latest['Close'] - prev['Close']
-            pct = (change / prev['Close']) * 100
-            color = "#e53935" if change >= 0 else "#43a047"
-            arrow = "▲" if change >= 0 else "▼"
-            
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.markdown(f"""
-                <div class="quote-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                        <div>
-                            <div class="stock-title">{name} <span class="stock-id">{target}</span></div>
-                            <div class="price-big" style="color:{color};">{latest['Close']:.2f}</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:1.5rem; font-weight:bold; color:{color};">
-                                {arrow} {abs(change):.2f} ({abs(pct):.2f}%)
-                            </div>
-                            <div style="font-size:0.9rem; color:#666;">量: {int(latest['Volume']/1000):,} K</div>
-                        </div>
+        # 取得名稱 (盡量處理)
+        try:
+            stock_obj = yf.Ticker(target)
+            # 使用 fast_info 比較不耗資源
+            # 或是從 search_stock 緩存中拿
+            stock_name = target
+            if 'longName' in stock_obj.info:
+                stock_name = stock_obj.info['longName']
+        except: stock_name = target
+
+        # --- A. 報價卡片 (Glass Card) ---
+        st.markdown(f"""
+        <div class="glass-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div style="font-size:1.2rem; opacity:0.8;">{stock_name}</div>
+                    <div style="font-size:0.9rem; opacity:0.6;">{target}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="{color_cls}" style="font-size:1.5rem; font-weight:bold;">
+                        {arrow} {abs(change):.2f} ({abs(pct):.2f}%)
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-            with c2:
-                # 加入自選股按鈕
-                if st.button("❤️ 加入\n自選"):
-                    add_to_watchlist()
-                # 移除按鈕 (只有在列表中才顯示)
-                if target in st.session_state.watchlist:
-                    if st.button("🗑️ 移除"):
-                        remove_from_watchlist(target)
+            </div>
+            <div class="{color_cls} price-big">{latest['Close']:.2f}</div>
+            <div style="display:flex; gap:15px; font-size:0.9rem; opacity:0.8; margin-top:5px;">
+                <span>量: {int(latest['Volume']/1000):,} K</span>
+                <span>高: {latest['High']:.2f}</span>
+                <span>低: {latest['Low']:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 自選股操作按鈕
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
+            if st.button("❤️ 加入自選"): add_to_watchlist()
+        with c_btn2:
+            if st.button("🗑️ 移除自選"): remove_from_watchlist(target)
 
-            # 分頁
-            tab1, tab2, tab3 = st.tabs(["📈 K線圖", "📝 分析報告", "🏛️ 籌碼"])
+        # --- B. 圖表與分析 ---
+        tabs = st.tabs(["📈 K線圖", "📝 戰情分析", "🏛️ 籌碼"])
+
+        with tabs[0]:
+            # 週期按鈕
+            t_map = {"1分": "1m", "5分": "5m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
+            selected_period = st.radio("週期", list(t_map.keys()), horizontal=True, label_visibility="collapsed")
             
-            with tab1:
-                # 週期選擇 (橫向)
-                st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-                period = st.radio("週期", ["1分", "5分", "30分", "60分", "日", "週", "月"], horizontal=True, label_visibility="collapsed")
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 根據週期抓資料
-                p_map = {"1分":"1m", "5分":"5m", "30分":"30m", "60分":"60m", "日":"1d", "週":"1wk", "月":"1mo"}
-                interval = p_map[period]
-                
-                # 調整抓取長度
-                fetch_period = "2y"
-                if interval in ["1m", "5m"]: fetch_period = "5d"
-                elif interval in ["30m", "60m"]: fetch_period = "1mo"
-                
-                with st.spinner("繪製圖表中..."):
-                    df_chart = stock.history(period=fetch_period, interval=interval)
-                    if df_chart.empty:
-                        st.error("此週期無資料")
-                    else:
-                        # 計算指標
-                        df_chart = calculate_indicators(df_chart)
-                        
-                        # --- Plotly 繪圖 (修復空白問題) ---
-                        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.03)
-                        
-                        # K線
-                        fig.add_trace(go.Candlestick(
-                            x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'],
-                            name="K線", increasing_line_color='#e53935', decreasing_line_color='#43a047'
-                        ), row=1, col=1)
-                        
-                        # 均線
-                        if 'MA5' in df_chart.columns:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA5'], line=dict(color='blue', width=1), name='MA5'), row=1, col=1)
-                        if 'MA20' in df_chart.columns:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA20'], line=dict(color='orange', width=1), name='MA20'), row=1, col=1)
-                            
-                        # KD
-                        if 'K' in df_chart.columns:
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['K'], line=dict(color='#e53935', width=1), name='K'), row=2, col=1)
-                            fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['D'], line=dict(color='#43a047', width=1), name='D'), row=2, col=1)
-
-                        # 設定顯示範圍 (最近 60 根)
-                        if len(df_chart) > 60:
-                            fig.update_xaxes(range=[df_chart.index[-60], df_chart.index[-1]], row=1, col=1)
-
-                        # 佈局設定 (關鍵修復：強制背景色)
-                        fig.update_layout(
-                            height=500,
-                            margin=dict(l=10, r=40, t=10, b=10),
-                            paper_bgcolor='rgba(255,255,255,1)', # 卡片背景
-                            plot_bgcolor='rgba(255,255,255,1)',  # 圖表背景
-                            showlegend=False,
-                            xaxis_rangeslider_visible=False,
-                            dragmode='pan',
-                            hovermode='x unified'
-                        )
-                        # Y軸格式
-                        fig.update_yaxes(showgrid=True, gridcolor='#eee', row=1, col=1)
-                        fig.update_yaxes(showgrid=True, gridcolor='#eee', row=2, col=1)
-                        fig.update_xaxes(showgrid=True, gridcolor='#eee', row=2, col=1)
-
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True})
-
-            with tab2:
-                # 分析報告
-                df_daily = calculate_indicators(df) # 確保用日線分析
-                st.markdown(generate_report(name, target, df_daily.iloc[-1], df_daily, info), unsafe_allow_html=True)
+            interval = t_map[selected_period]
+            period_len = "2y" if interval in ["1d", "1wk", "1mo"] else "5d"
             
-            with tab3:
-                # 籌碼 (僅台股)
-                inst_data = get_institutional_data(target)
-                if inst_data is not None:
-                    st.markdown("<div class='content-card'><h3>🏛️ 三大法人 (近30日)</h3></div>", unsafe_allow_html=True)
-                    st.dataframe(inst_data.head(10), use_container_width=True, hide_index=True)
+            with st.spinner("載入圖表..."):
+                # 使用 unique key 強制重繪
+                chart_key = f"chart_{target}_{interval}"
+                df_chart = get_stock_data(target, period_len, interval)
+                
+                if df_chart is not None:
+                    df_chart = calculate_indicators(df_chart)
+                    
+                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
+                    
+                    # K線
+                    fig.add_trace(go.Candlestick(
+                        x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'],
+                        name="K線", increasing_line_color='#ff5252', decreasing_line_color='#69f0ae'
+                    ), row=1, col=1)
+                    
+                    # 均線
+                    if 'MA5' in df_chart.columns:
+                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA5'], line=dict(color='cyan', width=1), name='MA5'), row=1, col=1)
+                    if 'MA20' in df_chart.columns:
+                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['MA20'], line=dict(color='yellow', width=1), name='MA20'), row=1, col=1)
+
+                    # KD
+                    if 'K' in df_chart.columns:
+                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['K'], line=dict(color='#ff5252', width=1), name='K'), row=2, col=1)
+                        fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['D'], line=dict(color='#69f0ae', width=1), name='D'), row=2, col=1)
+
+                    # 佈局 (深色主題)
+                    fig.update_layout(
+                        height=450,
+                        margin=dict(l=10, r=40, t=10, b=10),
+                        paper_bgcolor='rgba(0,0,0,0)', # 透明
+                        plot_bgcolor='rgba(0,0,0,0)',  # 透明
+                        font=dict(color='white'),
+                        xaxis_rangeslider_visible=False,
+                        dragmode='pan',
+                        showlegend=False
+                    )
+                    # 網格淡化
+                    fig.update_xaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)', row=1, col=1)
+                    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)', row=1, col=1)
+                    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)', row=2, col=1)
+
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True}, key=chart_key)
                 else:
-                    st.info("此股票無法人籌碼資料或為美股。")
+                    st.error("暫無此週期數據")
 
-    except Exception as e:
-        st.error(f"發生錯誤：{e}")
+        with tabs[1]:
+            # 分析報告
+            ma5 = latest.get('MA5', 0)
+            ma20 = latest.get('MA20', 0)
+            k = latest.get('K', 50)
+            d = latest.get('D', 50)
+            
+            trend = "多頭排列" if latest['Close'] > ma20 else "空方控盤"
+            kd_msg = "黃金交叉 (↑)" if k > d else "死亡交叉 (↓)"
+            
+            # 策略建議
+            if latest['Close'] > ma20 and k > d:
+                advice = "✅ 偏多操作：股價站上月線且指標翻多，可沿 5 日線佈局。"
+            elif latest['Close'] < ma20 and k < d:
+                advice = "⚠️ 保守觀望：股價位於月線下且指標偏弱，建議等待止跌。"
+            else:
+                advice = "⚖️ 區間震盪：多空拉鋸中，建議低買高賣操作。"
 
-# 大盤 (Footer)
+            st.markdown(f"""
+            <div class="glass-card">
+                <h3>📊 戰情分析</h3>
+                <p><b>技術趨勢：</b>{trend}</p>
+                <p><b>KD 指標：</b>K({k:.1f}) / D({d:.1f}) - <span style="color:#FFD700">{kd_msg}</span></p>
+                <hr style="border-color:rgba(255,255,255,0.2);">
+                <h4>💡 策略建議</h4>
+                <p>{advice}</p>
+                <p style="font-size:0.8rem; opacity:0.6;">(支撐參考: {ma20:.2f} | 壓力參考: {ma5*1.05:.2f})</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 公司簡介 (如果有)
+            if 'longBusinessSummary' in stock_obj.info:
+                summary = stock_obj.info['longBusinessSummary'][:150] + "..."
+                st.markdown(f"<div class='glass-card' style='font-size:0.9rem; opacity:0.8'>{summary}</div>", unsafe_allow_html=True)
+
+        with tabs[2]:
+             st.markdown("<div class='glass-card'>籌碼資料暫時維護中，請參考技術面。</div>", unsafe_allow_html=True)
+
+# 底部市場概況
 st.markdown("---")
-c1, c2 = st.columns(2)
-with c1: st.markdown(f"🇹🇼 加權指數: {analyze_index('^TWII', '台股')}", unsafe_allow_html=True)
-with c2: st.markdown(f"🇺🇸 那斯達克: {analyze_index('^IXIC', '美股')}", unsafe_allow_html=True)
-
+c_tw, c_us = st.columns(2)
+with c_tw:
+    tw_idx = get_stock_data("^TWII", "5d", "1d")
+    if tw_idx is not None:
+        last = tw_idx.iloc[-1]['Close']
+        chg = last - tw_idx.iloc[-2]['Close']
+        color = "#ff5252" if chg > 0 else "#69f0ae"
+        st.markdown(f"<div style='text-align:center'>🇹🇼 加權<br><span style='color:{color};font-weight:bold;font-size:1.2rem'>{last:.0f} ({chg:+.0f})</span></div>", unsafe_allow_html=True)
+with c_us:
+    us_idx = get_stock_data("^IXIC", "5d", "1d")
+    if us_idx is not None:
+        last = us_idx.iloc[-1]['Close']
+        chg = last - us_idx.iloc[-2]['Close']
+        color = "#ff5252" if chg > 0 else "#69f0ae"
+        st.markdown(f"<div style='text-align:center'>🇺🇸 那指<br><span style='color:{color};font-weight:bold;font-size:1.2rem'>{last:.0f} ({chg:+.0f})</span></div>", unsafe_allow_html=True)
 

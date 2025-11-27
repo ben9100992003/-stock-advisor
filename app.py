@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (核心：穩定版) ---
+# --- 2. CSS 樣式 (核心：修復白底黑字與排版) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -31,10 +31,10 @@ def set_png_as_page_bg(png_file):
     if not bin_str: return
     
     # 使用 format 注入，避免 f-string 解析過長字串導致 TokenError
-    style = """
+    page_bg_img = """
     <style>
     .stApp {{
-        background-image: url("data:image/png;base64,{}");
+        background-image: url("data:image/png;base64,{0}");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -42,7 +42,7 @@ def set_png_as_page_bg(png_file):
     }}
     </style>
     """.format(bin_str)
-    st.markdown(style, unsafe_allow_html=True)
+    st.markdown(page_bg_img, unsafe_allow_html=True)
 
 # 設定背景
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
@@ -103,7 +103,7 @@ st.markdown("""
         font-size: 1.1rem;
         padding: 10px;
     }
-    .stTextInput label { color: #ffffff !important; text-shadow: 1px 1px 3px black; font-weight: bold; font-size: 1.1rem; }
+    .stTextInput label { color: #ffffff !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; font-size: 1.1rem; }
 
     /* --- 3. KD 指標卡片 --- */
     .kd-card {
@@ -132,7 +132,7 @@ st.markdown("""
         color: #000 !important;
     }
 
-    /* 週期按鈕 */
+    /* 週期按鈕 (橫向滑動) */
     .stRadio > div {
         display: flex; flex-direction: row; gap: 5px;
         background-color: #ffffff; padding: 6px; border-radius: 20px;
@@ -144,9 +144,15 @@ st.markdown("""
         border-radius: 15px; margin: 0; border: none; cursor: pointer;
         min-width: 50px; background-color: transparent;
     }
-    .stRadio div[role="radiogroup"] > label p { color: #555 !important; font-weight: bold; font-size: 0.9rem; }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] { background-color: #333 !important; }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; }
+    .stRadio div[role="radiogroup"] > label p {
+        color: #555 !important; font-weight: bold; font-size: 0.9rem;
+    }
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] {
+        background-color: #333 !important;
+    }
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] p {
+        color: #fff !important;
+    }
     
     /* 隱藏預設 Metric */
     [data-testid="stMetric"] { display: none; }
@@ -163,6 +169,7 @@ st.markdown("""
     /* 新聞 */
     .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
     .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
+    .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -393,7 +400,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>2. 三大法人籌碼分析</h4>
         <table class="analysis-table">
-            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
+            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營</th><th>合計</th></tr></thead>
             <tbody>{inst_table_html}</tbody>
         </table>
         <p><b>籌碼解讀：</b>{inst_desc}</p>
@@ -403,8 +410,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul>
-            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
-            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
+            <li><b>🟢 進場參考：</b>{entry}</li>
+            <li><b>🔴 出場參考：</b>{exit_pt}</li>
         </ul>
         <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>
@@ -447,8 +454,7 @@ with c_search:
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 
-# --- 處理搜尋邏輯 ---
-target = "2330.TW" # 預設
+target = "2330.TW"
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
 
 if target_input:
@@ -543,14 +549,14 @@ if target:
 
             fig.update_layout(
                 template="plotly_white", height=650, margin=dict(l=15, r=15, t=10, b=10), legend=dict(orientation="h", y=1.01, x=0),
-                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False),
+                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True),
                 paper_bgcolor='white', plot_bgcolor='white'
             )
-            # 十字線 (Spikes)
+            # 十字線
             for row in [1, 2, 3]:
                 fig.update_xaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="#999", spikethickness=1, rangeslider_visible=False, row=row, col=1)
                 fig.update_yaxes(showspikes=True, spikemode='across', spikesnap='cursor', showline=True, spikedash='dash', spikecolor="#999", spikethickness=1, row=row, col=1)
-                
+            
             st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
             st.markdown('</div>', unsafe_allow_html=True)
             

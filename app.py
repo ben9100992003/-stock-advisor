@@ -8,15 +8,16 @@ from datetime import datetime, timedelta
 import base64
 import os
 import requests
-# 這裡需要 tqdm，請確保 requirements.txt 有安裝
+# 確保 requirements.txt 有安裝 tqdm，否則這行會報錯
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
 
 # --- 0. 設定與金鑰 ---
+# 請將您的 FinMind API Token 填入下方
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
-# 已填入您的 Gemini API Key
+# Gemini API Key (已直接填入)
 GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8"
 
 # --- 1. 頁面設定 ---
@@ -35,6 +36,7 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
+    # 使用 format 注入，避免 f-string 解析錯誤
     page_bg_img = """
     <style>
     .stApp {{
@@ -44,7 +46,7 @@ def set_png_as_page_bg(png_file):
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
-    /* 背景遮罩 */
+    /* 背景遮罩，讓白卡更突出 */
     .stApp::before {{
         content: "";
         position: absolute;

@@ -17,7 +17,7 @@ FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (核心：懸浮白卡 + 強制黑字) ---
+# --- 2. CSS 樣式 (核心：白底黑字 + 懸浮卡片) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -145,8 +145,8 @@ st.markdown("""
 
     /* 週期按鈕 (橫向滑動) */
     .stRadio > div {
-        display: flex; flex-direction: row; gap: 8px;
-        background-color: #ffffff; padding: 8px; border-radius: 20px;
+        display: flex; flex-direction: row; gap: 5px;
+        background-color: #ffffff; padding: 6px; border-radius: 20px;
         width: 100%; overflow-x: auto;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         border: 1px solid #eee;
@@ -175,6 +175,7 @@ st.markdown("""
     /* 新聞 */
     .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
     .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
+    .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -182,10 +183,11 @@ st.markdown("""
 
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電",
-    "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航",
+    "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
     "3231.TW": "緯創", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
     "4903.TWO": "聯光通", "8110.TW": "華東", "6187.TWO": "萬潤", "3131.TWO": "弘塑",
-    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "MSFT": "微軟"
+    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
+    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "TSM": "台積電 ADR"
 }
 
 @st.cache_data(ttl=3600)
@@ -319,6 +321,12 @@ def calculate_indicators(df):
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
     
+    delta = df['Close'].diff()
+    u = delta.clip(lower=0)
+    d = -1 * delta.clip(upper=0)
+    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
+    df['RSI'] = 100 - (100 / (1 + rs))
+    
     return df
 
 def generate_narrative_report(name, ticker, latest, inst_df, df, info):
@@ -414,8 +422,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul>
-            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
-            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
+            <li><b>🟢 進場參考：</b>{entry}</li>
+            <li><b>🔴 出場參考：</b>{exit_pt}</li>
         </ul>
         <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>
@@ -458,7 +466,8 @@ with c_search:
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 
-target = "2330.TW"
+# --- 處理搜尋邏輯 ---
+target = "2330.TW" # 預設
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
 
 if target_input:

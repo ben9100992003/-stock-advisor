@@ -6,3 +6,4 @@ plotly
 FinMind
 requests
 lxml
+tqdm

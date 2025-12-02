@@ -8,17 +8,16 @@ from datetime import datetime, timedelta
 import base64
 import os
 import requests
+# 這裡需要 tqdm，請確保 requirements.txt 有安裝
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
 
 # --- 0. 設定與金鑰 ---
-# 請將您的 FinMind API Token 填入下方
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 
-# --- Gemini API 設定 (請填入您的 Key，或使用環境變數) ---
-# 為了安全，建議使用 st.secrets，這裡僅作示範
-GEMINI_API_KEY = "" # ⚠️ 請在此填入您的 Gemini API Key，否則 AI 功能將無法運作
+# 已填入您的 Gemini API Key
+GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8"
 
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
@@ -36,7 +35,6 @@ def set_png_as_page_bg(png_file):
     bin_str = get_base64_of_bin_file(png_file)
     if not bin_str: return
     
-    # 使用 format 注入，避免 f-string 解析錯誤
     page_bg_img = """
     <style>
     .stApp {{
@@ -46,7 +44,7 @@ def set_png_as_page_bg(png_file):
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
-    /* 背景遮罩，讓白卡更突出 */
+    /* 背景遮罩 */
     .stApp::before {{
         content: "";
         position: absolute;
@@ -59,7 +57,7 @@ def set_png_as_page_bg(png_file):
     """.format(bin_str)
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 設定背景 (請確保檔案存在)
+# 設定背景
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
@@ -185,9 +183,9 @@ st.markdown("""
 
     /* AI 對話框 */
     .ai-msg-user { text-align: right; margin: 10px 0; }
-    .ai-msg-user span { background-color: #dcf8c6; padding: 8px 12px; border-radius: 12px; display: inline-block; }
+    .ai-msg-user span { background-color: #dcf8c6; padding: 8px 12px; border-radius: 12px; display: inline-block; color: #000; }
     .ai-msg-bot { text-align: left; margin: 10px 0; }
-    .ai-msg-bot span { background-color: #f1f0f0; padding: 8px 12px; border-radius: 12px; display: inline-block; }
+    .ai-msg-bot span { background-color: #f1f0f0; padding: 8px 12px; border-radius: 12px; display: inline-block; color: #000; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -439,7 +437,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>2. 三大法人籌碼分析</h4>
         <table class="analysis-table">
-            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營</th><th>合計</th></tr></thead>
+            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
             <tbody>{inst_table_html}</tbody>
         </table>
         <p><b>籌碼解讀：</b>{inst_desc}</p>
@@ -589,7 +587,8 @@ if target:
 
             fig.update_layout(
                 template="plotly_white", height=650, margin=dict(l=15, r=15, t=10, b=10), legend=dict(orientation="h", y=1.01, x=0),
-                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True)
+                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True),
+                paper_bgcolor='white', plot_bgcolor='white'
             )
             # 十字線
             for row in [1, 2, 3]:

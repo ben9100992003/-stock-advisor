@@ -149,7 +149,7 @@ st.markdown("""
         color: #000 !important;
     }
 
-    /* 週期按鈕 */
+    /* 週期按鈕 (橫向滑動) */
     .stRadio > div {
         display: flex; flex-direction: row; gap: 8px;
         background-color: #ffffff; padding: 8px; border-radius: 20px;

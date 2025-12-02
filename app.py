@@ -439,7 +439,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>2. 三大法人籌碼分析</h4>
         <table class="analysis-table">
-            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
+            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營</th><th>合計</th></tr></thead>
             <tbody>{inst_table_html}</tbody>
         </table>
         <p><b>籌碼解讀：</b>{inst_desc}</p>
@@ -449,8 +449,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul>
-            <li><b>🟢 進場參考：</b>{entry}</li>
-            <li><b>🔴 出場參考：</b>{exit_pt}</li>
+            <li><b>🟢 進場參考 (買訊)：</b>{entry}</li>
+            <li><b>🔴 出場參考 (賣訊)：</b>{exit_pt}</li>
         </ul>
         <p style="font-size:0.8rem; color:#888;">* 投資有風險，分析僅供參考，請獨立判斷。</p>
     </div>
@@ -589,8 +589,7 @@ if target:
 
             fig.update_layout(
                 template="plotly_white", height=650, margin=dict(l=15, r=15, t=10, b=10), legend=dict(orientation="h", y=1.01, x=0),
-                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True),
-                paper_bgcolor='white', plot_bgcolor='white'
+                dragmode='pan', hovermode='x unified', xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True)
             )
             # 十字線
             for row in [1, 2, 3]:

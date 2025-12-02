@@ -9,15 +9,21 @@ import base64
 import os
 import requests
 from FinMind.data import DataLoader
-import xml.etree.ElementTree as ET 
+import xml.etree.ElementTree as ET
+import json
 
 # --- 0. 設定與金鑰 ---
+# 請將您的 FinMind API Token 填入下方
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
+
+# --- Gemini API 設定 (請填入您的 Key，或使用環境變數) ---
+# 為了安全，建議使用 st.secrets，這裡僅作示範
+GEMINI_API_KEY = "" # ⚠️ 請在此填入您的 Gemini API Key，否則 AI 功能將無法運作
 
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (核心：白底黑字 + 懸浮卡片) ---
+# --- 2. CSS 樣式 (核心：懸浮白卡 + 強制黑字) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -64,8 +70,8 @@ st.markdown("""
     footer {visibility: hidden;}
     
     /* --- 卡片通用設定 (白底) --- */
-    .quote-card, .content-card, .kd-card, .market-summary-box, .chart-container-box {
-        background-color: #ffffff !important;
+    .quote-card, .content-card, .kd-card, .market-summary-box, .chart-container-box, .ai-chat-box {
+        background-color: rgba(255, 255, 255, 0.98) !important;
         border-radius: 16px;
         padding: 20px 24px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -77,7 +83,7 @@ st.markdown("""
     }
     
     /* 強制卡片內所有文字為黑色 */
-    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .chart-container-box * {
+    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .chart-container-box *, .ai-chat-box * {
         color: #000000 !important;
         text-shadow: none !important;
     }
@@ -143,18 +149,18 @@ st.markdown("""
         color: #000 !important;
     }
 
-    /* 週期按鈕 (橫向滑動) */
+    /* 週期按鈕 */
     .stRadio > div {
-        display: flex; flex-direction: row; gap: 5px;
-        background-color: #ffffff; padding: 6px; border-radius: 20px;
+        display: flex; flex-direction: row; gap: 8px;
+        background-color: #ffffff; padding: 8px; border-radius: 20px;
         width: 100%; overflow-x: auto;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         border: 1px solid #eee;
     }
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto; min-width: 50px; text-align: center;
-        background-color: #f0f0f0; border-radius: 15px; padding: 6px 12px;
-        border: 1px solid #ddd; margin: 0; cursor: pointer;
+        flex: 1; text-align: center; padding: 8px 0;
+        border-radius: 15px; margin: 0; border: none; cursor: pointer;
+        min-width: 50px; background-color: transparent;
     }
     .stRadio div[role="radiogroup"] > label p { color: #333 !important; font-weight: bold; margin: 0; }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] { background-color: #333 !important; border-color: #333; }
@@ -176,18 +182,23 @@ st.markdown("""
     .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
     .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
     .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
+
+    /* AI 對話框 */
+    .ai-msg-user { text-align: right; margin: 10px 0; }
+    .ai-msg-user span { background-color: #dcf8c6; padding: 8px 12px; border-radius: 12px; display: inline-block; }
+    .ai-msg-bot { text-align: left; margin: 10px 0; }
+    .ai-msg-bot span { background-color: #f1f0f0; padding: 8px 12px; border-radius: 12px; display: inline-block; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. 資料串接邏輯 ---
+# --- 3. 資料串接邏輯 & Gemini API ---
 
 STOCK_NAMES = {
     "2330.TW": "台積電", "2317.TW": "鴻海", "2454.TW": "聯發科", "2308.TW": "台達電",
     "2603.TW": "長榮", "2609.TW": "陽明", "2615.TW": "萬海", "2618.TW": "長榮航", "2610.TW": "華航",
     "3231.TW": "緯創", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
     "4903.TWO": "聯光通", "8110.TW": "華東", "6187.TWO": "萬潤", "3131.TWO": "弘塑",
-    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "PLTR": "Palantir",
-    "MSFT": "微軟", "GOOGL": "谷歌", "AMZN": "亞馬遜", "META": "Meta", "TSM": "台積電 ADR"
+    "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "MSFT": "微軟"
 }
 
 @st.cache_data(ttl=3600)
@@ -306,6 +317,28 @@ def get_google_news(ticker):
         return news_list
     except: return []
 
+def call_gemini_api(prompt):
+    """呼叫 Gemini API"""
+    if not GEMINI_API_KEY:
+        return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={GEMINI_API_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7}
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"AI 回應錯誤: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"連線錯誤: {e}"
+
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
@@ -320,12 +353,6 @@ def calculate_indicators(df):
     df['RSV'] = 100 * (df['Close'] - low_min) / (high_max - low_min)
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
-    
-    delta = df['Close'].diff()
-    u = delta.clip(lower=0)
-    d = -1 * delta.clip(upper=0)
-    rs = u.ewm(com=13).mean() / d.ewm(com=13).mean()
-    df['RSI'] = 100 - (100 / (1 + rs))
     
     return df
 
@@ -528,7 +555,7 @@ if target:
             """, unsafe_allow_html=True)
         
         # 分頁
-        tab1, tab2, tab3, tab4 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧"])
         
         with tab1:
             st.markdown('<div class="chart-container-box">', unsafe_allow_html=True)
@@ -602,6 +629,29 @@ if target:
             news_list = get_google_news(target)
             for news in news_list:
                 st.markdown(f"<div class='news-item'><a href='{news['link']}' target='_blank'>{news['title']}</a><div class='news-meta'>{news['pubDate']} | {news['source']}</div></div>", unsafe_allow_html=True)
+        
+        with tab5:
+            st.markdown("<div class='ai-chat-box'><h3>🤖 AI 智能投顧</h3><p>請輸入您的問題，AI 將為您分析。</p></div>", unsafe_allow_html=True)
+            user_query = st.text_input("問問 AI 關於這檔股票...", key="ai_query")
+            if user_query:
+                with st.spinner("AI 正在思考中..."):
+                    # 構建 Prompt
+                    prompt = f"""
+                    你是一位專業的股市分析師「武吉拉」。請針對 {name} ({target}) 回答使用者的問題。
+                    目前股價 {latest['Close']:.2f}，MA5 {latest['MA5']:.2f}，MA20 {latest['MA20']:.2f}。
+                    KD指標 K={latest['K']:.1f}, D={latest['D']:.1f}。
+                    
+                    使用者問題：{user_query}
+                    
+                    請用繁體中文回答，語氣專業且親切。
+                    """
+                    ai_response = call_gemini_api(prompt)
+                    st.markdown(f"""
+                    <div class='ai-chat-box'>
+                        <div class='ai-msg-user'><span>👤 {user_query}</span></div>
+                        <div class='ai-msg-bot'><span>🦖 {ai_response}</span></div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")

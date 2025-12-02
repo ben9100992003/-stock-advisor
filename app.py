@@ -19,7 +19,7 @@ GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8"
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (深色透明風格) ---
+# --- 2. CSS 樣式 (深色透明風格 + 橫向滑動優化) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -64,7 +64,7 @@ def set_png_as_page_bg(png_file):
     """.format(bin_str)
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 設定背景 (建議使用較暗的圖片，或者程式碼會自動使用深色漸層)
+# 設定背景
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
@@ -151,12 +151,14 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] {
         background-color: rgba(0, 0, 0, 0.3);
         border-radius: 12px; padding: 4px; gap: 4px;
+        white-space: nowrap; overflow-x: auto;
     }
     .stTabs [data-baseweb="tab-list"] button {
-        border-radius: 8px; border: none; background-color: transparent; flex: 1;
+        border-radius: 8px; border: none; background-color: transparent; flex: 0 0 auto;
     }
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
         color: #aaa !important; font-weight: 700; font-size: 1.1rem; text-shadow: none !important;
+        white-space: nowrap;
     }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
         background-color: rgba(255, 255, 255, 0.15); box-shadow: 0 2px 5px rgba(0,0,0,0.2);
@@ -165,22 +167,55 @@ st.markdown("""
         color: #FFD700 !important;
     }
 
-    /* 週期按鈕 (橫向滑動) */
-    .stRadio > div {
-        display: flex; flex-direction: row; gap: 8px;
-        background-color: rgba(0,0,0,0.3); padding: 8px; border-radius: 20px;
-        width: 100%; overflow-x: auto;
+    /* --- 5. 週期按鈕 (橫向滑動 + 防止換行) --- */
+    .stRadio > div[role="radiogroup"] {
+        display: flex; 
+        flex-direction: row; 
+        gap: 8px;
+        background-color: rgba(0,0,0,0.3); 
+        padding: 8px; 
+        border-radius: 20px;
+        width: 100%; 
+        overflow-x: auto; /* 允許橫向捲動 */
+        white-space: nowrap; /* 禁止內容換行 */
         box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         border: 1px solid #444;
+        
+        /* 隱藏捲軸但保留功能 */
+        scrollbar-width: none; 
+        -ms-overflow-style: none;
     }
+    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { 
+        display: none; 
+    }
+
     .stRadio div[role="radiogroup"] > label {
-        flex: 1; text-align: center; padding: 8px 0;
-        border-radius: 15px; margin: 0; border: none; cursor: pointer;
-        min-width: 50px; background-color: transparent;
+        flex: 0 0 auto; /* 關鍵：禁止壓縮按鈕，保持原始寬度 */
+        text-align: center; 
+        padding: 8px 16px; /* 增加寬度讓文字舒服顯示 */
+        border-radius: 15px; 
+        margin: 0; 
+        border: none; 
+        cursor: pointer;
+        min-width: 60px; /* 設定最小寬度 */
+        background-color: transparent;
     }
-    .stRadio div[role="radiogroup"] > label p { color: #aaa !important; font-weight: bold; margin: 0; }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] { background-color: #FFD700 !important; border-color: #FFD700; }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #000 !important; }
+    
+    .stRadio div[role="radiogroup"] > label p { 
+        color: #aaa !important; 
+        font-weight: bold; 
+        margin: 0; 
+        font-size: 1rem;
+        white-space: nowrap; /* 確保按鈕內文字不換行 */
+    }
+    
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] { 
+        background-color: #FFD700 !important; 
+        border-color: #FFD700; 
+    }
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] p { 
+        color: #000 !important; 
+    }
     
     [data-testid="stMetric"] { display: none; }
     .stLinkButton a { background-color: #333 !important; color: #fff !important; border: 1px solid #555 !important; font-weight: bold; }

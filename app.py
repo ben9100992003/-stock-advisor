@@ -82,6 +82,38 @@ st.markdown("""
         color: #333 !important;
     }
     
+    /* --- AI 回測深色卡片 (仿圖風格) --- */
+    .ai-backtest-card {
+        background-color: #0e1117 !important; /* 深黑底色 */
+        border-radius: 16px;
+        padding: 25px;
+        color: white !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
+        border: 1px solid #333;
+    }
+    .ai-backtest-header {
+        display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;
+    }
+    .ai-title-block { display: flex; align-items: center; gap: 10px; }
+    .ai-icon { font-size: 2rem; background: #007bff; border-radius: 10px; padding: 5px; }
+    .ai-title-text h3 { color: white !important; margin: 0; font-size: 1.3rem; font-weight: bold; }
+    .ai-title-text p { color: #888 !important; margin: 0; font-size: 0.8rem; }
+    
+    .ai-win-rate { text-align: right; }
+    .ai-win-val { font-size: 2.5rem; font-weight: bold; color: #4facfe; line-height: 1; }
+    .ai-win-label { color: #888; font-size: 0.9rem; }
+    
+    .prediction-row { display: flex; gap: 15px; margin-top: 15px; }
+    .prediction-box {
+        flex: 1; background: #1c1f26; border-radius: 12px; padding: 15px;
+        border: 1px solid #333;
+    }
+    .pred-label { color: #aaa; font-size: 0.9rem; margin-bottom: 5px; }
+    .pred-value { font-size: 1.8rem; font-weight: bold; }
+    .pred-up { color: #43a047; } /* 綠色 */
+    .pred-down { color: #e53935; } /* 紅色 */ /* 注意：您提供的圖中壓力是紅色，支撐是綠色，這裡依照圖片邏輯 */
+
     /* 強制卡片內文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
         text-shadow: none !important;
@@ -349,6 +381,11 @@ def run_backtest(df, strategy_type, initial_capital=100000):
     df['Total_Assets'] = initial_capital
     trades = []
     
+    # 計算勝率用的變數
+    winning_trades = 0
+    total_completed_trades = 0
+    entry_price = 0
+    
     for i in range(1, len(df)):
         price = df['Close'].iloc[i]
         date = df.index[i]
@@ -359,18 +396,27 @@ def run_backtest(df, strategy_type, initial_capital=100000):
                     cost = shares * price
                     capital -= cost
                     position += shares
+                    entry_price = price
                     trades.append({'日期': date, '動作': '買進', '價格': price, '股數': shares, '餘額': capital})
         elif df['Signal'].iloc[i] == -1 and df['Signal'].iloc[i-1] != -1:
             if position > 0:
                 revenue = position * price
                 capital += revenue
+                
+                # 計算是否獲利
+                if price > entry_price:
+                    winning_trades += 1
+                total_completed_trades += 1
+                
                 trades.append({'日期': date, '動作': '賣出', '價格': price, '股數': position, '餘額': capital})
                 position = 0
         df.iloc[i, df.columns.get_loc('Total_Assets')] = capital + (position * price)
         
     final_assets = df['Total_Assets'].iloc[-1]
     return_rate = ((final_assets - initial_capital) / initial_capital) * 100
-    return df, trades, final_assets, return_rate
+    win_rate = (winning_trades / total_completed_trades * 100) if total_completed_trades > 0 else 0
+    
+    return df, trades, final_assets, return_rate, win_rate
 
 def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     price = latest['Close']
@@ -572,11 +618,12 @@ if target:
                 df = calculate_indicators(df)
                 latest = df.iloc[-1]
                 
-                # --- [修正] 移除原本只取單日的限制，顯示完整5日資料，解決縮小時空白問題 ---
                 plot_df = df.copy()
                 
-                # 若為分時K線，不鎖定單日，而是顯示完整 fetch 下來的區間 (通常為5天)
-                # 原本代碼: if is_intraday: last_date=... plot_df=... (已移除)
+                # --- [修正] 如果是分時K線，只取最後一天的資料 ---
+                if is_intraday:
+                    last_date = df.index[-1].date()
+                    plot_df = df[df.index.date == last_date]
                 
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 
@@ -593,9 +640,6 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-                # 不強制設定 range，讓 Plotly 自動適應完整數據範圍
-                # if not is_intraday and len(plot_df) > 60: ... (這部分可以保留給日線，但分時線我們希望看到完整5日)
-                
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
@@ -609,14 +653,13 @@ if target:
                     font=dict(color='black')
                 )
                 
-                # --- [修正] 嘗試隱藏非交易時段，讓圖表更連續 (針對分時線) ---
+                # --- [修正] 隱藏非交易時段 (13:30 ~ 09:00) 以避免空白 ---
+                # 只有分時線需要這個設定，日線不需要
                 if is_intraday:
-                    # 隱藏每天收盤到隔天開盤的空檔 (大約下午1:30到早上9:00)
-                    # 注意：這裡使用簡單的 hour pattern，可能需要根據實際市場微調
                     fig.update_xaxes(
                         rangebreaks=[
+                            dict(bounds=[13.5, 9], pattern="hour"), # 隱藏下午1:30到隔天早上9:00
                             dict(bounds=["sat", "mon"]), # 隱藏週末
-                            dict(bounds=[13.5, 9], pattern="hour"), # 隱藏 13:30 ~ 09:00 (數值需依資料時區而定，yfinance通常為本地時間)
                         ]
                     )
 
@@ -738,6 +781,7 @@ if target:
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tab6:
+            # --- [修改] Tab 6 介面與顯示風格 ---
             st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測</p></div>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1: initial_capital = st.number_input("初始資金", value=100000, step=10000)
@@ -746,8 +790,44 @@ if target:
             if st.button("開始回測"):
                 backtest_df = stock.history(period="1y", interval="1d")
                 backtest_df = calculate_indicators(backtest_df)
-                res_df, trades, final_assets, return_rate = run_backtest(backtest_df, strategy, initial_capital)
+                res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
                 
+                # 計算支撐與壓力 (簡單模擬：使用近期高低點)
+                recent_high = backtest_df['High'].tail(20).max()
+                recent_low = backtest_df['Low'].tail(20).min()
+                
+                # --- [新增] 深色卡片 UI (仿照您提供的圖片) ---
+                backtest_html = f"""
+                <div class="ai-backtest-card">
+                    <div class="ai-backtest-header">
+                        <div class="ai-title-block">
+                            <div class="ai-icon">💻</div>
+                            <div class="ai-title-text">
+                                <h3>AI 大數據回測</h3>
+                                <p>Pattern Matching</p>
+                            </div>
+                        </div>
+                        <div class="ai-win-rate">
+                            <div class="ai-win-val">{int(win_rate)}%</div>
+                            <div class="ai-win-label">上漲機率</div>
+                        </div>
+                    </div>
+                    
+                    <div class="prediction-row">
+                        <div class="prediction-box">
+                            <div class="pred-label">支撐預測</div>
+                            <div class="pred-value pred-up">{recent_low:.0f}</div>
+                        </div>
+                        <div class="prediction-box">
+                            <div class="pred-label">壓力預測</div>
+                            <div class="pred-value pred-down">{recent_high:.0f}</div>
+                        </div>
+                    </div>
+                </div>
+                """
+                st.markdown(backtest_html, unsafe_allow_html=True)
+                
+                # 傳統文字報告 (保留在下方)
                 color_ret = "text-up" if return_rate > 0 else "text-down"
                 st.markdown(f"""
                 <div class="market-summary-box" style="margin-bottom: 20px;">

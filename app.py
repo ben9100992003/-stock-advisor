@@ -85,12 +85,13 @@ st.markdown("""
     /* --- AI 回測深色卡片 --- */
     .ai-backtest-card {
         background-color: #050505 !important;
-        border-radius: 24px;
+        border-radius: 24px 24px 0 0; /* 下方圓角由圖表接手 */
         padding: 25px;
         color: white !important;
         box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-        margin-bottom: 20px;
+        margin-bottom: 0px; /* 貼合圖表 */
         border: 1px solid #222;
+        border-bottom: none;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         overflow: hidden;
     }
@@ -149,13 +150,6 @@ st.markdown("""
     .pred-num { font-size: 1.8rem; font-weight: 700; letter-spacing: 0.5px; font-family: 'Roboto Mono', monospace;}
     .color-green { color: #4ade80 !important; }
     .color-red { color: #f87171 !important; }
-    
-    .chart-container { 
-        margin-top: 0px; 
-        border-radius: 0 0 20px 20px; 
-        overflow: hidden; 
-    }
-    .chart-container img { display: block; }
     
     /* 修正元件顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
@@ -358,8 +352,8 @@ def get_yahoo_stock_url(ticker):
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 嘗試列表：先試最新的 Flash 別名，若失敗則退回 Pro
-    models_to_try = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"]
+    # 嘗試列表：加入 001 版本以增加相容性
+    models_to_try = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-pro", "gemini-pro"]
     
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
@@ -830,13 +824,13 @@ if target:
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tab6:
-            st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測</p></div>", unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            # 更改預設資金為 500000
-            with c1: initial_capital = st.number_input("初始資金", value=500000, step=10000)
-            with c2: strategy = st.selectbox("選擇策略", ["MA 均線策略 (MA5穿過MA20)", "KD 策略 (黃金交叉)"])
+            st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測 (初始資金: 500,000)</p></div>", unsafe_allow_html=True)
             
-            # --- 自動回測邏輯 (移除按鈕，直接執行) ---
+            # --- 固定參數與自動回測 ---
+            initial_capital = 500000
+            strategy = "KD 策略 (黃金交叉)"
+            
+            # 直接執行回測
             backtest_df = stock.history(period="1y", interval="1d")
             
             # 簡單的錯誤處理防止當機
@@ -855,29 +849,16 @@ if target:
                 fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
                 fig_bt.update_layout(
                     template="plotly_dark",
-                    height=180, 
+                    height=200, 
                     margin=dict(l=0, r=0, t=10, b=0),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='#050505', # 配合深色卡片背景
+                    plot_bgcolor='#050505',  # 配合深色卡片背景
                     showlegend=False,
                     xaxis=dict(visible=False), 
                     yaxis=dict(visible=False),
                 )
                 
-                # 嘗試產生靜態圖片以避免前端卡頓
-                chart_html = ""
-                try:
-                    # 嘗試使用 to_image
-                    img_bytes = fig_bt.to_image(format="png", width=800, height=250, scale=2)
-                    img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                    chart_html = f'<img src="data:image/png;base64,{img_base64}" style="width:100%; height:auto; border-radius: 0 0 20px 20px;">'
-                except Exception as e:
-                    # 如果產生靜態圖失敗，回退到輕量級互動圖表
-                    fig_bt.update_layout(dragmode=False, hovermode=False)
-                    chart_html = fig_bt.to_html(full_html=False, config={'staticPlot': True, 'displayModeBar': False})
-                    chart_html = f'<div class="plotly-html-container">{chart_html}</div>'
-
-                # --- 復刻深色卡片 HTML ---
+                # --- 復刻深色卡片 HTML (上方資訊) ---
                 backtest_html = f"""
                 <div class="ai-backtest-card">
                     <div class="ai-header-row">
@@ -904,18 +885,20 @@ if target:
                             <div class="pred-num color-red">{recent_high:.0f}</div>
                         </div>
                     </div>
-                    
-                    <div class="chart-container">
-                        {chart_html}
-                    </div>
                 </div>
                 """
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
+                # --- 獨立顯示圖表 (避免當機的關鍵：使用 staticPlot=True) ---
+                # 將圖表放在卡片下方，透過 CSS 調整 margin 讓它看起來像是在卡片內
+                st.markdown('<div style="margin-top: -25px; border-radius: 0 0 24px 24px; overflow: hidden; border: 1px solid #222; border-top: none;">', unsafe_allow_html=True)
+                st.plotly_chart(fig_bt, use_container_width=True, config={'staticPlot': True, 'displayModeBar': False})
+                st.markdown('</div>', unsafe_allow_html=True)
+                
                 # 文字報告
                 color_ret = "text-up" if return_rate > 0 else "text-down"
                 st.markdown(f"""
-                <div class="market-summary-box" style="margin-bottom: 20px;">
+                <div class="market-summary-box" style="margin-bottom: 20px; margin-top: 20px;">
                     <div style="font-size: 1.2rem;">最終資產: <b>{int(final_assets):,}</b> 元</div>
                     <div style="font-size: 1.5rem;">報酬率: <b class="{color_ret}">{return_rate:.2f}%</b></div>
                     <div>總交易次數: {len(trades)} 次</div>

@@ -113,7 +113,12 @@ st.markdown("""
     .pred-label { color: #aaa; font-size: 0.9rem; margin-bottom: 5px; }
     .pred-value { font-size: 1.8rem; font-weight: bold; }
     .pred-up { color: #43a047; } /* 綠色 */
-    .pred-down { color: #e53935; } /* 紅色 */ 
+    .pred-down { color: #e53935; } /* 紅色 */
+    
+    /* --- 讓 Plotly 圖表在深色卡片中更自然 --- */
+    .ai-backtest-card .js-plotly-plot .plotly .main-svg {
+        background: transparent !important;
+    }
 
     /* 強制卡片內文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
@@ -742,6 +747,7 @@ if target:
             if 'last_target' not in st.session_state: st.session_state['last_target'] = None
             if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
 
+            # --- [修正] 當切換股票時，自動重置並觸發 AI 分析 ---
             if st.session_state['last_target'] != target:
                 st.session_state['last_target'] = target
                 st.session_state['ai_analysis'] = None
@@ -797,7 +803,22 @@ if target:
                 recent_high = backtest_df['High'].tail(20).max()
                 recent_low = backtest_df['Low'].tail(20).min()
                 
-                # --- [新增] 深色卡片 UI (仿照您提供的圖片) ---
+                # --- [新增] 建立圖表，並將其設置為深色透明背景 ---
+                fig_bt = go.Figure()
+                fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#FFD700', width=2)))
+                fig_bt.update_layout(
+                    title="資產成長曲線",
+                    template="plotly_dark", # 改為深色主題
+                    height=350,
+                    paper_bgcolor='rgba(0,0,0,0)', # 透明背景
+                    plot_bgcolor='rgba(0,0,0,0)', # 透明背景
+                    font=dict(color='white'), # 字體改為白色
+                    margin=dict(l=20, r=20, t=50, b=20)
+                )
+                # 將圖表轉換為 HTML 字串，不顯示工具列
+                chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False})
+
+                # --- [新增] 深色卡片 UI (仿照您提供的圖片)，並將圖表嵌入其中 ---
                 backtest_html = f"""
                 <div class="ai-backtest-card">
                     <div class="ai-backtest-header">
@@ -824,6 +845,10 @@ if target:
                             <div class="pred-value pred-down">{recent_high:.0f}</div>
                         </div>
                     </div>
+                    <!-- 嵌入圖表 HTML -->
+                    <div style="margin-top: 20px;">
+                        {chart_html}
+                    </div>
                 </div>
                 """
                 st.markdown(backtest_html, unsafe_allow_html=True)
@@ -837,19 +862,6 @@ if target:
                     <div>總交易次數: {len(trades)} 次</div>
                 </div>
                 """, unsafe_allow_html=True)
-                
-                fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#FFD700', width=2)))
-                # --- [修改] 將圖表模板改為深色，並設定背景透明以融入卡片 ---
-                fig_bt.update_layout(
-                    title="資產成長曲線",
-                    template="plotly_dark", # 改為深色主題
-                    height=350,
-                    paper_bgcolor='rgba(0,0,0,0)', # 透明背景
-                    plot_bgcolor='rgba(0,0,0,0)', # 透明背景
-                    font=dict(color='white') # 字體改為白色
-                )
-                st.plotly_chart(fig_bt, use_container_width=True)
                 
                 if trades:
                     st.write("📝 近期交易明細：")

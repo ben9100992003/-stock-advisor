@@ -14,9 +14,10 @@ import json
 import textwrap
 
 # --- 0. 設定與金鑰 ---
-# 建議：正式部署時應將 Key 放入 st.secrets，避免直接寫在程式碼中
+# 注意：請確認您的 FinMind 和 Gemini API Key 是否正確
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8"
+# 如果出現 403 錯誤，通常代表 API Key 無效，請更換為您自己的有效 Key
+GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8" 
 
 # --- 1. 頁面設定 ---
 st.set_page_config(
@@ -72,7 +73,7 @@ st.markdown("""
     .stApp { font-family: "Microsoft JhengHei", "sans-serif"; color: #333; }
     h1, h2, h3, h4, h5, h6 { color: #333; }
     
-    /* --- 卡片通用設定 (灰白色背景) --- */
+    /* --- 卡片通用設定 --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 16px; padding: 25px;
@@ -92,127 +93,68 @@ st.markdown("""
     .text-up { color: #e53935 !important; }
     .text-down { color: #43a047 !important; }
     .text-flat { color: #333 !important; }
-    .text-gray { color: #888 !important; }
-
-    /* --- 報價卡片特定樣式 (仿圖片風格) --- */
-    .quote-header {
-        display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px;
-    }
+    
+    /* --- 報價卡片樣式 (仿圖片風格) --- */
+    .quote-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
     .stock-name { font-size: 1.8rem; font-weight: 900; color: #222; }
     .stock-id { font-size: 1.2rem; color: #888; font-weight: 500; }
     
-    .price-row {
-        display: flex; align-items: center; gap: 15px; margin-bottom: 15px;
-    }
-    .main-price {
-        font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px;
-    }
-    .change-info {
-        display: flex; flex-direction: column; justify-content: center;
-        font-size: 1.1rem; font-weight: 600; line-height: 1.4;
-    }
+    .price-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+    .main-price { font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
+    
+    .change-info { display: flex; flex-direction: column; justify-content: center; font-size: 1.1rem; font-weight: 600; line-height: 1.4; }
     
     .market-tag {
-        display: inline-block;
-        padding: 3px 12px;
-        border: 1px solid #ddd;
-        border-radius: 20px;
-        color: #666;
-        font-size: 0.9rem;
-        background-color: #f9f9f9;
-        margin-bottom: 20px;
+        display: inline-block; padding: 3px 12px; border: 1px solid #ddd;
+        border-radius: 20px; color: #666; font-size: 0.9rem;
+        background-color: #f9f9f9; margin-bottom: 20px;
     }
 
     .detail-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        column-gap: 20px;
-        row-gap: 8px;
-        font-size: 1.1rem;
+        display: grid; grid-template-columns: 1fr 1fr;
+        column-gap: 20px; row-gap: 8px; font-size: 1.1rem;
     }
-    .detail-item {
-        display: flex; justify-content: flex-start; align-items: center; gap: 10px;
-    }
+    .detail-item { display: flex; justify-content: flex-start; align-items: center; gap: 10px; }
     .detail-label { color: #888; min-width: 40px; }
     .detail-value { font-weight: 700; font-family: 'Roboto', sans-serif; }
 
+    /* --- 表格樣式 --- */
+    table.analysis-table { width: 100%; border-collapse: collapse; }
+    table.analysis-table td, table.analysis-table th { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
+
     /* --- K線選擇器 --- */
     .stRadio > div[role="radiogroup"] {
-        background-color: #ffffff !important;
-        border-radius: 30px !important; 
-        padding: 8px 12px !important;
-        display: flex !important; 
-        flex-direction: row !important; 
-        gap: 8px !important;
-        overflow-x: auto !important;
-        white-space: nowrap !important;
-        flex-wrap: nowrap !important;
-        border: 1px solid #ddd;
-        scrollbar-width: none;
-        width: 100%;
-        align-items: center;
-        -webkit-overflow-scrolling: touch;
+        background-color: #ffffff !important; border-radius: 30px !important; 
+        padding: 8px 12px !important; display: flex !important; flex-direction: row !important; 
+        gap: 8px !important; overflow-x: auto !important; white-space: nowrap !important;
+        border: 1px solid #ddd; scrollbar-width: none; width: 100%; align-items: center;
     }
-    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
-    
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important;
-        min-width: 60px !important;
-        background-color: transparent !important; 
-        border: none !important;
-        padding: 6px 14px !important; 
-        border-radius: 20px !important;
-        cursor: pointer; 
-        transition: all 0.2s;
-        margin: 0 !important;
-        text-align: center;
+        flex: 0 0 auto !important; min-width: 60px !important; background-color: transparent !important; 
+        border: none !important; padding: 6px 14px !important; border-radius: 20px !important;
+        cursor: pointer; margin: 0 !important; text-align: center;
     }
-    
-    .stRadio div[role="radiogroup"] > label p { 
-        color: #555 !important; font-weight: 600; font-size: 0.95rem; margin: 0; padding: 0;
-        white-space: nowrap !important;
-    }
-    
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #e53935 !important;
-        box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
+        background-color: #e53935 !important; box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
     }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; font-weight: bold; }
+    .stRadio div[role="radiogroup"] > label p { color: #555 !important; font-weight: 600; margin: 0; }
+    .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; }
 
     /* --- 其他元件 --- */
-    .stTextInput input {
-        background-color: #fff !important; color: #333 !important;
-        border: 1px solid #ccc !important; border-radius: 8px;
-    }
-    .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #fff !important; color: #333 !important;
-        border-color: #ccc !important;
-    }
-    .stButton button {
-        border-radius: 12px; height: 100%; width: 100%;
-        padding: 0.5rem 0; background-color: #fff;
-        border: 1px solid #ccc; color: #333; font-weight: bold;
-    }
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] > div { background-color: #fff !important; color: #333 !important; }
+    .stButton button { background-color: #fff; color: #333; border: 1px solid #ccc; font-weight: bold; }
     
-    .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; white-space: nowrap; }
-    .stTabs button { border-radius: 8px; flex: 0 0 auto; background: transparent; border: none; }
+    .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; }
     .stTabs button[aria-selected="true"] { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .stTabs button p { color: #555 !important; font-weight: 600; }
     .stTabs button[aria-selected="true"] p { color: #e53935 !important; }
 
     h1 { text-shadow: 0 2px 4px rgba(0,0,0,0.5); color: #fff !important; text-align: center; font-weight: 900; }
-    .ai-msg-user span { background-color: #e3f2fd; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 0 15px; border: 1px solid #bbdefb; }
-    .ai-msg-bot span { background-color: #f5f5f5; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 15px 0; border: 1px solid #e0e0e0; }
+    .ai-msg-user span { background-color: #e3f2fd; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 0 15px; }
+    .ai-msg-bot span { background-color: #f5f5f5; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 15px 0; }
     
-    .js-plotly-plot .plotly .main-svg { background: transparent !important; }
-    
-    /* 新聞樣式優化 */
     .news-item { padding: 15px 0; border-bottom: 1px solid #eee; }
-    .news-item:last-child { border-bottom: none; }
-    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; display: block; margin-bottom: 6px; }
+    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; }
     .news-meta { font-size: 0.9rem !important; color: #666 !important; }
-    
-    .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -341,7 +283,6 @@ def get_google_news(ticker):
         return news_list
     except: return []
 
-# 產生 Yahoo 股市連結
 def get_yahoo_stock_url(ticker):
     if ".TW" in ticker:
         return f"https://tw.stock.yahoo.com/quote/{ticker.replace('.TW', '')}"
@@ -350,15 +291,22 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
+# 修改 AI API 呼叫，更換為通用模型以避免 403 錯誤
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={GEMINI_API_KEY}"
+    
+    # 更改為通用模型 gemini-1.5-flash
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
     try:
         response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200: return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else: return f"AI 回應錯誤: {response.status_code} - 請檢查 API Key 或網路連線。"
+        if response.status_code == 200: 
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        elif response.status_code == 403:
+            return "AI 回應錯誤: 403 (權限不足)。請檢查您的 API Key 是否正確，或是否有該模型的使用權限。"
+        else: 
+            return f"AI 回應錯誤: {response.status_code} - {response.text}"
     except Exception as e: return f"連線錯誤: {e}"
 
 def calculate_indicators(df):
@@ -437,6 +385,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         color_total = 'text-up' if total > 0 else 'text-down'
         inst_desc = f"法人單日合計 <b class='{color_total}'>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
         
+        # 絕對靠左，無縮排
         inst_table_html = f"""
 <tr>
     <td>{last['Date']}</td>
@@ -444,8 +393,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     <td class="{'text-up' if t_val>0 else 'text-down'}">{t_val:,}</td>
     <td class="{'text-up' if d_val>0 else 'text-down'}">{d_val:,}</td>
     <td class="{'text-up' if total>0 else 'text-down'}"><b>{total:,}</b></td>
-</tr>
-"""
+</tr>"""
 
     sector = info.get('sector', '科技')
     summary = info.get('longBusinessSummary', '暫無詳細說明。')[:150] + "..."
@@ -467,27 +415,26 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    return textwrap.dedent(f"""
-    <div class="content-card">
-        <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
-        <h4>1. 技術指標分析</h4>
-        <table class="analysis-table">
-            <tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
-            <tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
-            <tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
-        </table>
-        <h4>2. 三大法人籌碼分析</h4>
-        <table class="analysis-table">
-            <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
-            <tbody>{inst_table_html}</tbody>
-        </table>
-        <p><b>籌碼解讀：</b>{inst_desc}</p>
-        <h4>3. 公司題材與願景</h4>
-        <p>{theme_text}</p>
-        <h4>4. 💡 進出場價格建議 ({action})</h4>
-        <ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
-    </div>
-    """)
+    # 使用 f-string 直接靠左撰寫，不使用 dedent 以避免邊緣情況
+    return f"""<div class="content-card">
+<h3>📊 {name} ({ticker}) 綜合分析報告</h3>
+<h4>1. 技術指標分析</h4>
+<table class="analysis-table">
+<tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
+<tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
+<tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
+</table>
+<h4>2. 三大法人籌碼分析</h4>
+<table class="analysis-table">
+<thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
+<tbody>{inst_table_html}</tbody>
+</table>
+<p><b>籌碼解讀：</b>{inst_desc}</p>
+<h4>3. 公司題材與願景</h4>
+<p>{theme_text}</p>
+<h4>4. 💡 進出場價格建議 ({action})</h4>
+<ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
+</div>"""
 
 def analyze_market_index(ticker_symbol):
     try:
@@ -562,12 +509,10 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 判斷市場別
             market_tag = "上市"
             if ".TWO" in target: market_tag = "上櫃"
             elif ".TW" not in target: market_tag = "美股"
 
-            # 判斷詳細數據顏色 (相對於昨收)
             def get_color(val, ref):
                 if val > ref: return "text-up"
                 elif val < ref: return "text-down"
@@ -577,54 +522,32 @@ if target:
             c_low = get_color(latest_fast['Low'], prev_close)
             c_open = get_color(latest_fast['Open'], prev_close)
             
-            # 重製為仿圖片風格的 HTML
-            quote_html = textwrap.dedent(f"""
-            <div class="quote-card">
-                <div class="quote-header">
-                    <span class="stock-name">
-                        <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a>
-                    </span>
-                    <span class="stock-id">{target.replace('.TW','').replace('.TWO','')}</span>
-                </div>
-                
-                <div class="price-row">
-                    <div class="main-price {color_class}">{latest_fast['Close']:.2f}</div>
-                    <div class="change-info {color_class}">
-                        <div>{arrow} {abs(change):.2f}</div>
-                        <div>{arrow} {abs(pct):.2f}%</div>
-                    </div>
-                </div>
-
-                <div>
-                    <span class="market-tag">{market_tag}</span>
-                </div>
-                
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <span class="detail-label">最高</span>
-                        <span class="detail-value {c_high}">{latest_fast['High']:.2f}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">昨收</span>
-                        <span class="detail-value text-flat">{prev_close:.2f}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">最低</span>
-                        <span class="detail-value {c_low}">{latest_fast['Low']:.2f}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">開盤</span>
-                        <span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span>
-                    </div>
-                </div>
-            </div>
-            """)
+            # 直接靠左撰寫，避免 st.markdown 縮排誤判
+            quote_html = f"""<div class="quote-card">
+<div class="quote-header">
+<span class="stock-name"><a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a></span>
+<span class="stock-id">{target.replace('.TW','').replace('.TWO','')}</span>
+</div>
+<div class="price-row">
+<div class="main-price {color_class}">{latest_fast['Close']:.2f}</div>
+<div class="change-info {color_class}">
+<div>{arrow} {abs(change):.2f}</div>
+<div>{arrow} {abs(pct):.2f}%</div>
+</div>
+</div>
+<div><span class="market-tag">{market_tag}</span></div>
+<div class="detail-grid">
+<div class="detail-item"><span class="detail-label">最高</span><span class="detail-value {c_high}">{latest_fast['High']:.2f}</span></div>
+<div class="detail-item"><span class="detail-label">昨收</span><span class="detail-value text-flat">{prev_close:.2f}</span></div>
+<div class="detail-item"><span class="detail-label">最低</span><span class="detail-value {c_low}">{latest_fast['Low']:.2f}</span></div>
+<div class="detail-item"><span class="detail-label">開盤</span><span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span></div>
+</div>
+</div>"""
             st.markdown(quote_html, unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
-            # 左右滑動的按鈕 (亮白色風格，解決看不清楚問題)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
             
@@ -645,7 +568,6 @@ if target:
                 
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 
-                # K線圖: 漲紅跌綠
                 fig.add_trace(go.Candlestick(
                     x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], 
                     name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047'
@@ -662,7 +584,6 @@ if target:
                 if not is_intraday and len(plot_df) > 60:
                     fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
 
-                # 減少邊距，去除圖表周圍的空白
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
@@ -672,7 +593,7 @@ if target:
                     yaxis=dict(fixedrange=True),
                     yaxis2=dict(fixedrange=True),
                     yaxis3=dict(fixedrange=True),
-                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', # 修正背景顏色
+                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white',
                     font=dict(color='black')
                 )
                 
@@ -706,21 +627,19 @@ if target:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
                 
-                # 修復圖表重複參數錯誤並優化顯示
                 fig_inst.update_layout(
                     barmode='group', template="plotly_white", height=400,
-                    margin=dict(t=0, b=10, l=10, r=10), # 移除上方空白
+                    margin=dict(t=0, b=10, l=10, r=10),
                     paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', 
                     font=dict(color='black'), 
                     yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333', gridcolor='#e0e0e0'), 
-                    dragmode='pan', # 允許拖曳平移 (左右移動)
-                    xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0', fixedrange=False) # 允許 X 軸移動
+                    dragmode='pan',
+                    xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0', fixedrange=False)
                 )
                 
                 st.markdown("<div class='content-card'>", unsafe_allow_html=True)
                 st.plotly_chart(fig_inst, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True})
                 
-                # 增加 overflow-x: auto 以支援表格左右滑動
                 table_html = "<div style='overflow-x: auto;'><table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
                 for _, row in inst_df.sort_values('Date', ascending=False).head(10).iterrows():
                     table_html += f"<tr><td>{row['Date']}</td><td class='{'text-up' if row['Foreign']>0 else 'text-down'}'>{row['Foreign']:,}</td><td class='{'text-up' if row['Trust']>0 else 'text-down'}'>{row['Trust']:,}</td><td class='{'text-up' if row['Dealer']>0 else 'text-down'}'>{row['Dealer']:,}</td></tr>"
@@ -730,32 +649,25 @@ if target:
             else: st.info("無法人籌碼資料")
 
         with tab4:
-            # 構建完整的新聞區塊 HTML，再一次性渲染
             news_list = get_google_news(target)
             news_html_content = ""
-            
-            # 修正：確保迴圈內的 HTML 字串完全沒有縮排
             for news in news_list:
-                news_html_content += f"""
-<div class='news-item'>
-    <a href='{news['link']}' target='_blank'>{news['title']}</a>
-    <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
-</div>
-"""
+                # 絕對靠左，無縮排
+                news_html_content += f"""<div class='news-item'>
+<a href='{news['link']}' target='_blank'>{news['title']}</a>
+<div class='news-meta'>{news['pubDate']} | {news['source']}</div>
+</div>"""
             
-            # 修正：使用 textwrap.dedent 移除外層縮排
-            final_news_html = textwrap.dedent(f"""
-            <div class='light-card'>
-                <h3>📰 個股相關新聞</h3>
-                {news_html_content}
-            </div>
-            """)
+            # 絕對靠左，無縮排
+            final_news_html = f"""<div class='light-card'>
+<h3>📰 個股相關新聞</h3>
+{news_html_content}
+</div>"""
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:
             st.markdown("<div class='ai-chat-box'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
-            # --- AI 自動分析邏輯 ---
             if 'last_target' not in st.session_state: st.session_state['last_target'] = None
             if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
 
@@ -764,7 +676,6 @@ if target:
                 st.session_state['ai_analysis'] = None
             
             if st.session_state['ai_analysis'] is None:
-                # 預先顯示正在分析的 UI，避免畫面空白
                 st.info(f"正在為您分析 {name} 的各項數據，請稍候...")
                 try:
                     auto_prompt = f"""
@@ -775,7 +686,7 @@ if target:
                     """
                     result = call_gemini_api(auto_prompt)
                     st.session_state['ai_analysis'] = result
-                    st.rerun() # 重新執行以顯示結果
+                    st.rerun() 
                 except Exception as e:
                     st.error(f"AI 分析連線失敗，請稍後再試。({e})")
             

@@ -16,7 +16,7 @@ import io
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 使用您提供的新 API Key
+# 使用您提供的 API Key
 GEMINI_API_KEY = "AIzaSyCXWXZC2CFyCxlAegMNVdcwraEcqAh6Fp0" 
 
 # --- 1. 頁面設定 ---
@@ -348,16 +348,23 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，加入更完整的模型清單 (地毯式搜索)
+# 修改 AI API 呼叫，加入超級完整的模型清單 (地毯式搜索)
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 擴充模型清單，涵蓋最新與最舊的穩定版本
+    # 擴充模型清單，涵蓋最新與最舊的穩定版本，甚至加入 002 等實驗性名稱
     models_to_try = [
-        "gemini-1.5-flash",       # 標準 Flash
-        "gemini-1.5-flash-latest",# Flash 最新
-        "gemini-1.5-pro",         # Pro 版本
-        "gemini-pro"              # 最通用名稱
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash-002",
+        "gemini-1.5-pro",
+        "gemini-1.5-pro-latest",
+        "gemini-1.5-pro-001",
+        "gemini-1.5-pro-002",
+        "gemini-1.0-pro",
+        "gemini-pro"
     ]
     
     headers = {'Content-Type': 'application/json'}
@@ -388,7 +395,7 @@ def call_gemini_api(prompt):
             last_error = f"連線錯誤: {e}"
             continue
 
-    return f"AI 服務暫時無法使用。最後錯誤: {last_error}"
+    return f"AI 服務暫時無法使用。所有模型嘗試失敗。最後錯誤: {last_error}"
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()

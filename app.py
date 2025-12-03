@@ -14,11 +14,17 @@ import json
 import textwrap
 
 # --- 0. 設定與金鑰 ---
+# 建議：正式部署時應將 Key 放入 st.secrets，避免直接寫在程式碼中
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8"
 
 # --- 1. 頁面設定 ---
-st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="武吉拉 Wujila", 
+    page_icon="🦖", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
 
 # --- 2. CSS 樣式 ---
 def get_base64_of_bin_file(bin_file):
@@ -29,6 +35,7 @@ def get_base64_of_bin_file(bin_file):
     except: return ""
 
 def set_png_as_page_bg(png_file):
+    # 如果找不到圖片，使用預設漸層背景
     if not os.path.exists(png_file): 
         st.markdown("""
         <style>
@@ -49,7 +56,7 @@ def set_png_as_page_bg(png_file):
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
-    /* 背景深色遮罩 */
+    /* 背景深色遮罩，讓文字更清晰 */
     .stApp::before {{
         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 0;
@@ -58,6 +65,7 @@ def set_png_as_page_bg(png_file):
     """.format(bin_str)
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
+# 請確保您的目錄下有這張圖片，或更換為有效的圖片路徑
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
@@ -137,28 +145,28 @@ st.markdown("""
         border-bottom: none;
     }
 
-    /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
+    /* --- K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
     .stRadio > div[role="radiogroup"] {
-        background-color: #ffffff !important; /* 白色背景 */
+        background-color: #ffffff !important;
         border-radius: 30px !important; 
         padding: 8px 12px !important;
         display: flex !important; 
         flex-direction: row !important; 
         gap: 8px !important;
-        overflow-x: auto !important; /* 核心：開啟水平滾動 */
-        white-space: nowrap !important; /* 核心：禁止換行 */
-        flex-wrap: nowrap !important; /* 核心：禁止 Flex 換行 */
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        flex-wrap: nowrap !important;
         border: 1px solid #ddd;
-        scrollbar-width: none; /* Firefox 隱藏捲軸 */
+        scrollbar-width: none;
         width: 100%;
         align-items: center;
-        -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
+        -webkit-overflow-scrolling: touch;
     }
-    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
+    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; /* 禁止壓縮按鈕 */
-        min-width: 60px !important; /* 設定最小寬度，強迫溢出 */
+        flex: 0 0 auto !important;
+        min-width: 60px !important;
         background-color: transparent !important; 
         border: none !important;
         padding: 6px 14px !important; 
@@ -169,13 +177,11 @@ st.markdown("""
         text-align: center;
     }
     
-    /* 文字樣式 */
     .stRadio div[role="radiogroup"] > label p { 
         color: #555 !important; font-weight: 600; font-size: 0.95rem; margin: 0; padding: 0;
         white-space: nowrap !important;
     }
     
-    /* 選中樣式 (紅底白字) */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #e53935 !important;
         box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
@@ -442,15 +448,16 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         color_total = 'text-up' if total > 0 else 'text-down'
         inst_desc = f"法人單日合計 <b class='{color_total}'>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
         
+        # 修正：移除縮排
         inst_table_html = f"""
-        <tr>
-            <td>{last['Date']}</td>
-            <td class="{'text-up' if f_val>0 else 'text-down'}">{f_val:,}</td>
-            <td class="{'text-up' if t_val>0 else 'text-down'}">{t_val:,}</td>
-            <td class="{'text-up' if d_val>0 else 'text-down'}">{d_val:,}</td>
-            <td class="{'text-up' if total>0 else 'text-down'}"><b>{total:,}</b></td>
-        </tr>
-        """
+<tr>
+    <td>{last['Date']}</td>
+    <td class="{'text-up' if f_val>0 else 'text-down'}">{f_val:,}</td>
+    <td class="{'text-up' if t_val>0 else 'text-down'}">{t_val:,}</td>
+    <td class="{'text-up' if d_val>0 else 'text-down'}">{d_val:,}</td>
+    <td class="{'text-up' if total>0 else 'text-down'}"><b>{total:,}</b></td>
+</tr>
+"""
 
     sector = info.get('sector', '科技')
     summary = info.get('longBusinessSummary', '暫無詳細說明。')[:150] + "..."
@@ -472,7 +479,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    return f"""
+    # 修正：使用 textwrap.dedent 處理多行字串縮排
+    return textwrap.dedent(f"""
     <div class="content-card">
         <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
         <h4>1. 技術指標分析</h4>
@@ -492,7 +500,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         <h4>4. 💡 進出場價格建議 ({action})</h4>
         <ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
     </div>
-    """
+    """)
 
 def analyze_market_index(ticker_symbol):
     try:
@@ -540,6 +548,7 @@ if target_input:
 
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
+    # 修正：移除多行字串的縮排
     with t1:
         tw = analyze_market_index("^TWII")
         if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
@@ -567,7 +576,7 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 使用 textwrap.dedent 確保 HTML 表格被正確渲染 (不顯示原始碼)
+            # 修正：這裡是最容易出錯的地方。使用 textwrap.dedent 並確保 HTML 標籤靠左
             quote_html = textwrap.dedent(f"""
             <div class="quote-card">
                 <div style="display:flex; justify-content:space-between; align-items:start;">
@@ -728,21 +737,23 @@ if target:
             # 構建完整的新聞區塊 HTML，再一次性渲染
             news_list = get_google_news(target)
             news_html_content = ""
+            
+            # 修正：確保迴圈內的 HTML 字串完全沒有縮排
             for news in news_list:
                 news_html_content += f"""
-                <div class='news-item'>
-                    <a href='{news['link']}' target='_blank'>{news['title']}</a>
-                    <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
-                </div>
-                """
+<div class='news-item'>
+    <a href='{news['link']}' target='_blank'>{news['title']}</a>
+    <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
+</div>
+"""
             
-            # 將所有新聞包裹在 light-card 中
-            final_news_html = f"""
+            # 修正：使用 textwrap.dedent 移除外層縮排
+            final_news_html = textwrap.dedent(f"""
             <div class='light-card'>
                 <h3>📰 個股相關新聞</h3>
                 {news_html_content}
             </div>
-            """
+            """)
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:
@@ -827,5 +838,3 @@ if target:
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
-
-

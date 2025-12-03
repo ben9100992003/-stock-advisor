@@ -16,6 +16,7 @@ import textwrap
 # --- 0. 設定與金鑰 ---
 # 注意：請確認您的 FinMind 和 Gemini API Key 是否正確
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
+# 使用您提供的 API Key
 GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8" 
 
 # --- 1. 頁面設定 ---
@@ -112,7 +113,7 @@ st.markdown("""
     .pred-label { color: #aaa; font-size: 0.9rem; margin-bottom: 5px; }
     .pred-value { font-size: 1.8rem; font-weight: bold; }
     .pred-up { color: #43a047; } /* 綠色 */
-    .pred-down { color: #e53935; } /* 紅色 */ /* 注意：您提供的圖中壓力是紅色，支撐是綠色，這裡依照圖片邏輯 */
+    .pred-down { color: #e53935; } /* 紅色 */ 
 
     /* 強制卡片內文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
@@ -839,7 +840,15 @@ if target:
                 
                 fig_bt = go.Figure()
                 fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#FFD700', width=2)))
-                fig_bt.update_layout(title="資產成長曲線", template="plotly_white", height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='black'))
+                # --- [修改] 將圖表模板改為深色，並設定背景透明以融入卡片 ---
+                fig_bt.update_layout(
+                    title="資產成長曲線",
+                    template="plotly_dark", # 改為深色主題
+                    height=350,
+                    paper_bgcolor='rgba(0,0,0,0)', # 透明背景
+                    plot_bgcolor='rgba(0,0,0,0)', # 透明背景
+                    font=dict(color='white') # 字體改為白色
+                )
                 st.plotly_chart(fig_bt, use_container_width=True)
                 
                 if trades:

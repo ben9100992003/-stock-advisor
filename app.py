@@ -17,7 +17,7 @@ import io
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 # 使用您提供的 API Key
-GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8" 
+GEMINI_API_KEY = "AIzaSyCXWXZC2CFyCxlAegMNVdcwraEcqAh6Fp0" 
 
 # --- 1. 頁面設定 ---
 st.set_page_config(
@@ -352,8 +352,8 @@ def get_yahoo_stock_url(ticker):
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 嘗試列表：加入 001 版本以增加相容性
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-pro", "gemini-pro"]
+    # 嘗試列表：加入 001 版本與 Pro 以增加相容性
+    models_to_try = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
     
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
@@ -859,35 +859,32 @@ if target:
                 )
                 
                 # --- 復刻深色卡片 HTML (上方資訊) ---
-                # 使用 textwrap.dedent 移除縮排，解決代碼顯示問題
-                backtest_html = textwrap.dedent(f"""
-                <div class="ai-backtest-card">
-                    <div class="ai-header-row">
-                        <div class="ai-title-group">
-                            <div class="ai-icon-box">📊</div>
-                            <div class="ai-title-text">
-                                <h3>AI 大數據回測</h3>
-                                <p>Pattern Matching</p>
-                            </div>
-                        </div>
-                        <div class="ai-score-group">
-                            <div class="ai-score-val">{int(win_rate)}%</div>
-                            <div class="ai-score-label">上漲機率</div>
-                        </div>
-                    </div>
-                    
-                    <div class="ai-pred-row">
-                        <div class="ai-pred-box">
-                            <div class="pred-title">支撐預測</div>
-                            <div class="pred-num color-green">{recent_low:.0f}</div>
-                        </div>
-                        <div class="ai-pred-box">
-                            <div class="pred-title">壓力預測</div>
-                            <div class="pred-num color-red">{recent_high:.0f}</div>
-                        </div>
-                    </div>
-                </div>
-                """)
+                # 使用完全靠左對齊的字串，避免 markdown 縮排問題
+                backtest_html = f"""<div class="ai-backtest-card">
+<div class="ai-header-row">
+<div class="ai-title-group">
+<div class="ai-icon-box">📊</div>
+<div class="ai-title-text">
+<h3>AI 大數據回測</h3>
+<p>Pattern Matching</p>
+</div>
+</div>
+<div class="ai-score-group">
+<div class="ai-score-val">{int(win_rate)}%</div>
+<div class="ai-score-label">上漲機率</div>
+</div>
+</div>
+<div class="ai-pred-row">
+<div class="ai-pred-box">
+<div class="pred-title">支撐預測</div>
+<div class="pred-num color-green">{recent_low:.0f}</div>
+</div>
+<div class="ai-pred-box">
+<div class="pred-title">壓力預測</div>
+<div class="pred-num color-red">{recent_high:.0f}</div>
+</div>
+</div>
+</div>"""
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
                 # --- 獨立顯示圖表 (避免當機的關鍵：使用 staticPlot=True) ---

@@ -109,54 +109,70 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* 數據表格樣式 (修正為真正的表格) */
-    .quote-table {
+    /* 數據表格樣式 (Table) */
+    table.quote-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
+        table-layout: fixed; /* 固定佈局，確保欄位平均 */
+    }
+    table.quote-table td {
+        padding: 10px 5px;
+        border-bottom: 1px solid #eee;
+        vertical-align: middle;
         font-size: 1rem;
     }
-    .quote-table td {
-        padding: 8px 5px;
-        border-bottom: 1px solid #eee;
+    table.quote-table .label {
+        color: #666;
+        font-weight: 500;
+        float: left;
     }
-    .quote-table .label { color: #666; font-weight: 500; }
-    .quote-table .value { font-weight: 700; color: #000; text-align: right; }
-    .quote-table tr:last-child td { border-bottom: none; }
+    table.quote-table .value {
+        font-weight: 700;
+        color: #000;
+        float: right;
+    }
+    /* 最後一列不顯示底線 */
+    table.quote-table tr:last-child td {
+        border-bottom: none;
+    }
 
-    /* --- 3. K線選擇器 (改為亮白色背景以增加清晰度) --- */
+    /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
     .stRadio > div[role="radiogroup"] {
-        background-color: #ffffff !important; /* 改為白色背景 */
+        background-color: #ffffff !important; /* 白色背景 */
         border-radius: 30px !important; 
         padding: 8px 12px !important;
         display: flex !important; 
         flex-direction: row !important; 
-        gap: 5px !important;
-        overflow-x: auto !important;
-        white-space: nowrap !important;
-        flex-wrap: nowrap !important;
-        border: 1px solid #ddd; /* 淺灰色邊框 */
-        scrollbar-width: none;
+        gap: 8px !important;
+        overflow-x: auto !important; /* 核心：開啟水平滾動 */
+        white-space: nowrap !important; /* 核心：禁止換行 */
+        flex-wrap: nowrap !important; /* 核心：禁止 Flex 換行 */
+        border: 1px solid #ddd;
+        scrollbar-width: none; /* Firefox 隱藏捲軸 */
         width: 100%;
         align-items: center;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
     }
-    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
+    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important;
+        flex: 0 0 auto !important; /* 禁止壓縮按鈕 */
+        min-width: 60px !important; /* 設定最小寬度，強迫溢出 */
         background-color: transparent !important; 
         border: none !important;
         padding: 6px 14px !important; 
         border-radius: 20px !important;
         cursor: pointer; 
         transition: all 0.2s;
-        margin-right: 0px !important;
+        margin: 0 !important;
+        text-align: center;
     }
     
-    /* 未選中文字顏色 (改為深灰色) */
+    /* 文字樣式 */
     .stRadio div[role="radiogroup"] > label p { 
         color: #555 !important; font-weight: 600; font-size: 0.95rem; margin: 0; padding: 0;
+        white-space: nowrap !important;
     }
     
     /* 選中樣式 (紅底白字) */
@@ -194,6 +210,7 @@ st.markdown("""
     
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
     
+    /* 隱藏 Radio 預設圓點 */
     .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
     </style>
     """, unsafe_allow_html=True)
@@ -567,21 +584,25 @@ if target:
                     </div>
                 </div>
                 
-                <table class="quote-table" style="width:100%; margin-top:10px; border-collapse: collapse;">
+                <table class="quote-table">
                     <tr>
-                        <td style="border-bottom: 1px solid #eee; padding: 8px;">
-                            <span style="color:#666;">最高</span> <span class="text-up" style="font-weight:bold; float:right;">{latest_fast['High']:.2f}</span>
+                        <td style="border-right: 1px solid #eee;">
+                            <span class="label">最高</span>
+                            <span class="value text-up">{latest_fast['High']:.2f}</span>
                         </td>
-                        <td style="border-bottom: 1px solid #eee; padding: 8px; border-left: 1px solid #eee;">
-                            <span style="color:#666;">昨收</span> <span style="font-weight:bold; float:right;">{prev_close:.2f}</span>
+                        <td style="padding-left: 15px;">
+                            <span class="label">昨收</span>
+                            <span class="value">{prev_close:.2f}</span>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 8px;">
-                            <span style="color:#666;">最低</span> <span class="text-down" style="font-weight:bold; float:right;">{latest_fast['Low']:.2f}</span>
+                        <td style="border-right: 1px solid #eee;">
+                            <span class="label">最低</span>
+                            <span class="value text-down">{latest_fast['Low']:.2f}</span>
                         </td>
-                        <td style="padding: 8px; border-left: 1px solid #eee;">
-                            <span style="color:#666;">開盤</span> <span style="font-weight:bold; float:right;">{latest_fast['Open']:.2f}</span>
+                        <td style="padding-left: 15px;">
+                            <span class="label">開盤</span>
+                            <span class="value">{latest_fast['Open']:.2f}</span>
                         </td>
                     </tr>
                 </table>
@@ -592,6 +613,8 @@ if target:
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
+            # 移除了上方的 chart-container-box wrapper 以消除空白
+            
             # 左右滑動的按鈕 (亮白色風格，解決看不清楚問題)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
@@ -630,6 +653,7 @@ if target:
                 if not is_intraday and len(plot_df) > 60:
                     fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
 
+                # 減少邊距，去除圖表周圍的空白
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 

@@ -113,33 +113,28 @@ st.markdown("""
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 15px;
-        table-layout: fixed;
+        margin-top: 10px;
+        table-layout: fixed; /* 固定佈局，確保欄位平均 */
     }
     table.quote-table td {
-        padding: 12px 10px;
-        border-bottom: 1px solid #f0f0f0;
+        padding: 10px 5px;
+        border-bottom: 1px solid #eee;
         vertical-align: middle;
         font-size: 1rem;
     }
-    /* 第一列不要有上邊框，最後一列不要有下邊框 */
-    table.quote-table tr:last-child td {
-        border-bottom: none;
-    }
-    /* 左側欄位樣式 */
-    table.quote-table td:first-child {
-        border-right: 1px solid #f0f0f0;
-    }
-    
-    .qt-label {
+    table.quote-table .label {
         color: #666;
         font-weight: 500;
         float: left;
     }
-    .qt-value {
+    table.quote-table .value {
         font-weight: 700;
         color: #000;
         float: right;
+    }
+    /* 最後一列不顯示底線 */
+    table.quote-table tr:last-child td {
+        border-bottom: none;
     }
 
     /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
@@ -216,25 +211,10 @@ st.markdown("""
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
     
     /* 新聞樣式優化 */
-    .news-item { 
-        padding: 15px 0; 
-        border-bottom: 1px solid #f0f0f0; 
-        text-align: left;
-    }
+    .news-item { padding: 15px 0; border-bottom: 1px solid #eee; }
     .news-item:last-child { border-bottom: none; }
-    .news-item a { 
-        text-decoration: none; 
-        color: #0056b3 !important; 
-        font-weight: 700; 
-        font-size: 1.1rem; 
-        display: block;
-        margin-bottom: 5px;
-    }
-    .news-item a:hover { text-decoration: underline; }
-    .news-meta { 
-        font-size: 0.85rem !important; 
-        color: #666 !important; 
-    }
+    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; display: block; margin-bottom: 6px; }
+    .news-meta { font-size: 0.9rem !important; color: #666 !important; }
     
     /* 隱藏 Radio 預設圓點 */
     .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
@@ -612,23 +592,23 @@ if target:
                 
                 <table class="quote-table">
                     <tr>
-                        <td class="border-right">
-                            <span class="qt-label">最高</span>
-                            <span class="qt-value text-up">{latest_fast['High']:.2f}</span>
+                        <td style="border-right: 1px solid #eee;">
+                            <span class="label">最高</span>
+                            <span class="value text-up">{latest_fast['High']:.2f}</span>
                         </td>
                         <td style="padding-left: 15px;">
-                            <span class="qt-label">昨收</span>
-                            <span class="qt-value">{prev_close:.2f}</span>
+                            <span class="label">昨收</span>
+                            <span class="value">{prev_close:.2f}</span>
                         </td>
                     </tr>
                     <tr>
-                        <td class="border-right">
-                            <span class="qt-label">最低</span>
-                            <span class="qt-value text-down">{latest_fast['Low']:.2f}</span>
+                        <td style="border-right: 1px solid #eee;">
+                            <span class="label">最低</span>
+                            <span class="value text-down">{latest_fast['Low']:.2f}</span>
                         </td>
                         <td style="padding-left: 15px;">
-                            <span class="qt-label">開盤</span>
-                            <span class="qt-value">{latest_fast['Open']:.2f}</span>
+                            <span class="label">開盤</span>
+                            <span class="value">{latest_fast['Open']:.2f}</span>
                         </td>
                     </tr>
                 </table>
@@ -756,10 +736,10 @@ if target:
                 </div>
                 """
             
-            # 將所有新聞包裹在 light-card 中，並確保背景為白色
+            # 將所有新聞包裹在 light-card 中
             final_news_html = f"""
-            <div class='light-card' style='background-color: white !important; color: #333 !important;'>
-                <h3 style='color: #000 !important;'>📰 個股相關新聞</h3>
+            <div class='light-card'>
+                <h3>📰 個股相關新聞</h3>
                 {news_html_content}
             </div>
             """

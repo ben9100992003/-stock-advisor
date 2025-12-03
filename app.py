@@ -11,7 +11,6 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
-import textwrap
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -109,39 +108,55 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* 數據表格樣式 (Table) */
+    /* --- 數據表格樣式 (標準 HTML Table) --- */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
-        table-layout: fixed; /* 固定佈局，確保欄位平均 */
+        margin-top: 15px;
+        font-family: "Microsoft JhengHei", sans-serif;
     }
     table.quote-table td {
-        padding: 12px 8px; /* 增加一點間距 */
-        border-bottom: 1px solid #eee;
+        padding: 12px 10px;
+        border-bottom: 1px solid #e0e0e0;
         vertical-align: middle;
         font-size: 1rem;
+        width: 50%; /* 兩欄均分 */
     }
-    table.quote-table .label {
-        color: #666;
-        font-weight: 500;
-        float: left;
-    }
-    table.quote-table .value {
-        font-weight: 700;
-        color: #000;
-        float: right;
-    }
-    /* 表格中間的分隔線 */
-    .border-right {
-        border-right: 1px solid #eee;
-    }
-    /* 最後一列不顯示底線 */
     table.quote-table tr:last-child td {
         border-bottom: none;
     }
+    /* 表格內的標籤與數值 */
+    .q-label { color: #666; font-weight: 500; float: left; }
+    .q-value { color: #000; font-weight: 700; float: right; }
+    
+    /* 中間分隔線 */
+    .border-r { border-right: 1px solid #e0e0e0; }
 
-    /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
+    /* --- 新聞列表樣式 --- */
+    .news-container {
+        display: flex; flex-direction: column; gap: 15px;
+    }
+    .news-item {
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+    .news-item:last-child { border-bottom: none; }
+    
+    .news-title {
+        text-decoration: none;
+        color: #0d47a1 !important; /* 深藍色連結 */
+        font-weight: 700;
+        font-size: 1.15rem;
+        display: block;
+        margin-bottom: 5px;
+        line-height: 1.4;
+    }
+    .news-meta {
+        font-size: 0.9rem;
+        color: #555 !important; /* 深灰色日期來源 */
+    }
+
+    /* --- K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
     .stRadio > div[role="radiogroup"] {
         background-color: #ffffff !important; /* 白色背景 */
         border-radius: 30px !important; 
@@ -565,53 +580,53 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 使用 HTML Table 確保報價資訊整齊排列 ("表格化")
-            quote_html = textwrap.dedent(f"""
-            <div class="quote-card">
-                <div style="display:flex; justify-content:space-between; align-items:start;">
-                    <div>
-                        <div class="stock-tag">交易中</div>
-                        <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
-                            <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
-                                {name} <span style="font-size:1rem; color:#888;">{target}</span>
-                                <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="price-info-row">
-                    <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
-                    <div class="price-change-block {color_class}">
-                        <div>{arrow} {abs(change):.2f}</div>
-                        <div>{abs(pct):.2f}%</div>
-                    </div>
-                </div>
-                
-                <table class="quote-table">
-                    <tr>
-                        <td class="border-right">
-                            <span class="label">最高</span>
-                            <span class="value text-up">{latest_fast['High']:.2f}</span>
-                        </td>
-                        <td style="padding-left: 15px;">
-                            <span class="label">昨收</span>
-                            <span class="value">{prev_close:.2f}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="border-right">
-                            <span class="label">最低</span>
-                            <span class="value text-down">{latest_fast['Low']:.2f}</span>
-                        </td>
-                        <td style="padding-left: 15px;">
-                            <span class="label">開盤</span>
-                            <span class="value">{latest_fast['Open']:.2f}</span>
-                        </td>
-                    </tr>
-                </table>
+            # 重新設計的報價卡片 HTML (灰白底，去除縮排以修正顯示錯誤)
+            quote_html = f"""
+<div class="quote-card">
+    <div style="display:flex; justify-content:space-between; align-items:start;">
+        <div>
+            <div class="stock-tag">交易中</div>
+            <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
+                <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
+                    {name} <span style="font-size:1rem; color:#888;">{target}</span>
+                    <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
+                </a>
             </div>
-            """)
+        </div>
+    </div>
+    
+    <div class="price-info-row">
+        <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
+        <div class="price-change-block {color_class}">
+            <div>{arrow} {abs(change):.2f}</div>
+            <div>{abs(pct):.2f}%</div>
+        </div>
+    </div>
+    
+    <table class="quote-table">
+        <tr>
+            <td class="border-r">
+                <span class="q-label">最高</span>
+                <span class="q-value text-up">{latest_fast['High']:.2f}</span>
+            </td>
+            <td>
+                <span class="q-label">昨收</span>
+                <span class="q-value">{prev_close:.2f}</span>
+            </td>
+        </tr>
+        <tr>
+            <td class="border-r">
+                <span class="q-label">最低</span>
+                <span class="q-value text-down">{latest_fast['Low']:.2f}</span>
+            </td>
+            <td>
+                <span class="q-label">開盤</span>
+                <span class="q-value">{latest_fast['Open']:.2f}</span>
+            </td>
+        </tr>
+    </table>
+</div>
+"""
             st.markdown(quote_html, unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
@@ -658,7 +673,7 @@ if target:
                 # 減少邊距，去除圖表周圍的空白
                 fig.update_layout(
                     template="plotly_white",
-                    height=600, margin=dict(l=10, r=10, t=10, b=10), 
+                    height=600, margin=dict(l=10, r=10, t=0, b=10), # 將上方邊距 t 設為 0
                     legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
                     dragmode='pan', hovermode='x unified', 
                     xaxis=dict(rangeslider_visible=False), 
@@ -725,9 +740,15 @@ if target:
         with tab4:
             st.markdown("<div class='content-card'><h3>📰 個股相關新聞</h3>", unsafe_allow_html=True)
             news_list = get_google_news(target)
+            st.markdown("<div class='news-container'>", unsafe_allow_html=True)
             for news in news_list:
-                st.markdown(f"<div class='news-item'><a href='{news['link']}' target='_blank'>{news['title']}</a><div class='news-meta'>{news['pubDate']} | {news['source']}</div></div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class='news-item'>
+                    <a href='{news['link']}' target='_blank' class='news-title'>{news['title']}</a>
+                    <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("</div></div>", unsafe_allow_html=True)
         
         with tab5:
             st.markdown("<div class='ai-chat-box'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)

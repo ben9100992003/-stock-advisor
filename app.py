@@ -83,7 +83,7 @@ st.markdown("""
         position: relative; z-index: 1;
         color: #333 !important;
         width: 100%;
-        box-sizing: border-box; /* 防止 padding 擠壓寬度 */
+        box-sizing: border-box;
     }
     
     /* 優化卡片內文排版 */
@@ -574,29 +574,32 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    return f"""<div class="content-card">
-<h3>📊 {name} ({ticker}) 綜合分析報告</h3>
-<h4>1. 技術指標分析</h4>
-<div class="table-container">
-<table class="analysis-table">
-<tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
-<tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
-<tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
-</table>
-</div>
-<h4>2. 三大法人籌碼分析</h4>
-<div class="table-container">
-<table class="analysis-table">
-<thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
-<tbody>{inst_table_html}</tbody>
-</table>
-</div>
-<p><b>籌碼解讀：</b>{inst_desc}</p>
-<h4>3. 公司題材與願景</h4>
-<p>{theme_text}</p>
-<h4>4. 💡 進出場價格建議 ({action})</h4>
-<ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
-</div>"""
+    # 使用 textwrap.dedent 確保 HTML 字串無縮排
+    return textwrap.dedent(f"""
+    <div class="content-card">
+    <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
+    <h4>1. 技術指標分析</h4>
+    <div class="table-container">
+    <table class="analysis-table">
+    <tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
+    <tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
+    <tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
+    </table>
+    </div>
+    <h4>2. 三大法人籌碼分析</h4>
+    <div class="table-container">
+    <table class="analysis-table">
+    <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
+    <tbody>{inst_table_html}</tbody>
+    </table>
+    </div>
+    <p><b>籌碼解讀：</b>{inst_desc}</p>
+    <h4>3. 公司題材與願景</h4>
+    <p>{theme_text}</p>
+    <h4>4. 💡 進出場價格建議 ({action})</h4>
+    <ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
+    </div>
+    """).strip()
 
 # --- UI 介面 ---
 st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
@@ -623,7 +626,17 @@ if target_input:
     if resolved_ticker: target = resolved_ticker; name = resolved_name
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
 
-# --- AI 自動分析邏輯 ---
+# --- AI 自動分析邏輯 (確保 name 變數存在) ---
+# 確保在 AI 邏輯執行前 name 已經被定義
+if target and 'name' not in locals():
+    # 嘗試從 resolved_name 獲取，若無則從 STOCK_NAMES 或 yfinance 獲取
+    try:
+        temp_stock = yf.Ticker(target)
+        temp_info = temp_stock.info
+        name = STOCK_NAMES.get(target, temp_info.get('longName', target))
+    except:
+        name = target
+
 if 'last_target' not in st.session_state: st.session_state['last_target'] = None
 if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
 
@@ -631,7 +644,7 @@ if st.session_state['last_target'] != target:
     st.session_state['last_target'] = target
     st.session_state['ai_analysis'] = None
 
-if st.session_state['ai_analysis'] is None:
+if st.session_state['ai_analysis'] is None and target:
     try:
         temp_stock = yf.Ticker(target)
         temp_hist = temp_stock.history(period="5d")
@@ -645,9 +658,13 @@ if st.session_state['ai_analysis'] is None:
             請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
             語氣請專業、客觀且親切。
             """
-            with st.spinner(f"🤖 AI 正在分析 {name} 的最新數據，請稍候..."):
-                result = call_gemini_api(auto_prompt)
-                st.session_state['ai_analysis'] = result
+            # 這裡不使用 st.spinner 以免阻塞 UI，改為背景執行
+            # 在 Tab 5 顯示時會檢查並顯示結果
+            # 為了觸發執行，我們可以在這裡執行 API call，或者留到 Tab 5 再執行
+            # 為了使用者體驗，這裡先不執行，等到使用者點到相關頁面或直接執行
+            # 但為了符合 "自動呈現" 的需求，我們在這裡直接執行
+            result = call_gemini_api(auto_prompt)
+            st.session_state['ai_analysis'] = result
     except:
         st.session_state['ai_analysis'] = "AI 服務連線失敗，請稍後再試。"
 
@@ -692,26 +709,28 @@ if target:
             c_low = get_color(latest_fast['Low'], prev_close)
             c_open = get_color(latest_fast['Open'], prev_close)
             
-            quote_html = f"""<div class="quote-card">
-<div class="quote-header">
-<span class="stock-name"><a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a></span>
-<span class="stock-id">{target.replace('.TW','').replace('.TWO','')}</span>
-</div>
-<div class="price-row">
-<div class="main-price {color_class}">{latest_fast['Close']:.2f}</div>
-<div class="change-info {color_class}">
-<div>{arrow} {abs(change):.2f}</div>
-<div>{arrow} {abs(pct):.2f}%</div>
-</div>
-</div>
-<div><span class="market-tag">{market_tag}</span></div>
-<div class="detail-grid">
-<div class="detail-item"><span class="detail-label">最高</span><span class="detail-value {c_high}">{latest_fast['High']:.2f}</span></div>
-<div class="detail-item"><span class="detail-label">昨收</span><span class="detail-value text-flat">{prev_close:.2f}</span></div>
-<div class="detail-item"><span class="detail-label">最低</span><span class="detail-value {c_low}">{latest_fast['Low']:.2f}</span></div>
-<div class="detail-item"><span class="detail-label">開盤</span><span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span></div>
-</div>
-</div>"""
+            quote_html = textwrap.dedent(f"""
+            <div class="quote-card">
+                <div class="quote-header">
+                    <span class="stock-name"><a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a></span>
+                    <span class="stock-id">{target.replace('.TW','').replace('.TWO','')}</span>
+                </div>
+                <div class="price-row">
+                    <div class="main-price {color_class}">{latest_fast['Close']:.2f}</div>
+                    <div class="change-info {color_class}">
+                        <div>{arrow} {abs(change):.2f}</div>
+                        <div>{arrow} {abs(pct):.2f}%</div>
+                    </div>
+                </div>
+                <div><span class="market-tag">{market_tag}</span></div>
+                <div class="detail-grid">
+                    <div class="detail-item"><span class="detail-label">最高</span><span class="detail-value {c_high}">{latest_fast['High']:.2f}</span></div>
+                    <div class="detail-item"><span class="detail-label">昨收</span><span class="detail-value text-flat">{prev_close:.2f}</span></div>
+                    <div class="detail-item"><span class="detail-label">最低</span><span class="detail-value {c_low}">{latest_fast['Low']:.2f}</span></div>
+                    <div class="detail-item"><span class="detail-label">開盤</span><span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span></div>
+                </div>
+            </div>
+            """).strip()
             st.markdown(quote_html, unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
@@ -894,31 +913,34 @@ if target:
                     yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
                 )
                 
-                backtest_html = f"""<div class="ai-backtest-card">
-<div class="ai-header-row">
-<div class="ai-title-group">
-<div class="ai-icon-box">📊</div>
-<div class="ai-title-text">
-<h3>AI 大數據回測</h3>
-<p>Pattern Matching</p>
-</div>
-</div>
-<div class="ai-score-group">
-<div class="ai-score-val">{int(win_rate)}%</div>
-<div class="ai-score-label">上漲機率</div>
-</div>
-</div>
-<div class="ai-pred-row">
-<div class="ai-pred-box">
-<div class="pred-title">支撐預測</div>
-<div class="pred-num color-green">{recent_low:.0f}</div>
-</div>
-<div class="ai-pred-box">
-<div class="pred-title">壓力預測</div>
-<div class="pred-num color-red">{recent_high:.0f}</div>
-</div>
-</div>
-</div>"""
+                backtest_html = textwrap.dedent(f"""
+                <div class="ai-backtest-card">
+                    <div class="ai-header-row">
+                        <div class="ai-title-group">
+                            <div class="ai-icon-box">📊</div>
+                            <div class="ai-title-text">
+                                <h3>AI 大數據回測</h3>
+                                <p>Pattern Matching</p>
+                            </div>
+                        </div>
+                        <div class="ai-score-group">
+                            <div class="ai-score-val">{int(win_rate)}%</div>
+                            <div class="ai-score-label">上漲機率</div>
+                        </div>
+                    </div>
+                    
+                    <div class="ai-pred-row">
+                        <div class="ai-pred-box">
+                            <div class="pred-title">支撐預測</div>
+                            <div class="pred-num color-green">{recent_low:.0f}</div>
+                        </div>
+                        <div class="ai-pred-box">
+                            <div class="pred-title">壓力預測</div>
+                            <div class="pred-num color-red">{recent_high:.0f}</div>
+                        </div>
+                    </div>
+                </div>
+                """).strip()
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
                 st.markdown('<div style="margin-top: -25px; border-radius: 0 0 24px 24px; overflow: hidden; border: 1px solid #222; border-top: none;">', unsafe_allow_html=True)

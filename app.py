@@ -592,7 +592,6 @@ if st.session_state['last_target'] != target:
     st.session_state['ai_analysis'] = None
 
 # 如果 AI 分析結果是空的，則執行分析
-# 這裡不使用 st.spinner 避免在非 Tab 顯示時出錯，改用背景執行
 if st.session_state['ai_analysis'] is None:
     try:
         # 使用 yfinance 獲取最新基本數據用於 Prompt
@@ -806,9 +805,13 @@ if target:
             
             # 已在上方自動執行，這裡直接顯示結果
             if st.session_state['ai_analysis']:
-                # 檢查是否為錯誤訊息
-                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or st.session_state['ai_analysis'].startswith("分析暫時無法使用") or st.session_state['ai_analysis'].startswith("API 權限錯誤") or st.session_state['ai_analysis'].startswith("AI 連線逾時"):
+                # 檢查是否為錯誤訊息 (如果之前有錯誤，現在顯示並提供重試按鈕)
+                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or "錯誤" in st.session_state['ai_analysis']:
                      st.error(st.session_state['ai_analysis'])
+                     # 加入重試按鈕
+                     if st.button("🔄 重試自動分析", key="retry_ai"):
+                         st.session_state['ai_analysis'] = None
+                         st.rerun()
                 else:
                     st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
             else:
@@ -827,7 +830,7 @@ if target:
                     請用繁體中文回答，語氣專業且親切。
                     """
                     ai_response = call_gemini_api(prompt)
-                    if ai_response.startswith("API 權限錯誤") or ai_response.startswith("AI 回應錯誤") or ai_response.startswith("連線錯誤") or ai_response.startswith("AI 連線逾時"):
+                    if "錯誤" in ai_response or "無法使用" in ai_response:
                         st.error(ai_response)
                     else:
                         st.markdown(f"<div class='ai-msg-user'><span>👤 {user_query}</span></div><div class='ai-msg-bot'><span>🦖 {ai_response}</span></div>", unsafe_allow_html=True)
@@ -870,7 +873,8 @@ if target:
                     yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
                 )
                 
-                # --- 修正重點：使用完全靠左對齊的 HTML 字串，解決縮排問題 ---
+                # --- 復刻深色卡片 HTML (上方資訊) ---
+                # 使用完全靠左對齊的 HTML 字串，解決縮排問題
                 backtest_html = f"""<div class="ai-backtest-card">
 <div class="ai-header-row">
 <div class="ai-title-group">

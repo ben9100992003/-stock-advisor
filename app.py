@@ -352,8 +352,8 @@ def get_yahoo_stock_url(ticker):
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 嘗試列表：加入 001 版本與 Pro 以增加相容性
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
+    # 嘗試列表：優先使用 1.5-flash，若失敗則退回 gemini-pro (相容性較佳)
+    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
     
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
@@ -364,11 +364,10 @@ def call_gemini_api(prompt):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
             # 加入 timeout 設定
-            response = requests.post(url, headers=headers, json=data, timeout=15)
+            response = requests.post(url, headers=headers, json=data, timeout=20)
             if response.status_code == 200: 
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 404:
-                # 404 表示找不到該模型名稱，嘗試下一個
                 last_error = f"模型 {model} 未找到 (404)，嘗試下一個..."
                 continue 
             elif response.status_code == 403:

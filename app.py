@@ -11,7 +11,7 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
-import textwrap
+import textwrap # 關鍵：用來修復 HTML 縮排問題
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -114,27 +114,22 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
-        table-layout: fixed; /* 固定佈局，確保欄位平均 */
+        border: 1px solid #eee; /* 外框 */
     }
     table.quote-table td {
         padding: 12px 10px;
-        border-bottom: 1px solid #eee;
+        border: 1px solid #eee; /* 內格線 */
         vertical-align: middle;
         font-size: 1rem;
     }
     table.quote-table .label {
         color: #666;
         font-weight: 500;
-        float: left;
     }
     table.quote-table .value {
         font-weight: 700;
         color: #000;
         float: right;
-    }
-    /* 最後一列不顯示底線 */
-    table.quote-table tr:last-child td {
-        border-bottom: none;
     }
 
     /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
@@ -727,14 +722,14 @@ if target:
             news_list = get_google_news(target)
             news_html_content = ""
             for news in news_list:
-                news_html_content += textwrap.dedent(f"""
+                news_html_content += f"""
                 <div class='news-item'>
                     <a href='{news['link']}' target='_blank'>{news['title']}</a>
                     <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
                 </div>
-                """)
+                """
             
-            # 將所有新聞包裹在 light-card 中
+            # 將所有新聞包裹在 light-card 中，使用 textwrap.dedent 修復顯示問題
             final_news_html = textwrap.dedent(f"""
             <div class='light-card'>
                 <h3>📰 個股相關新聞</h3>

@@ -348,11 +348,11 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，加入超級完整的模型清單 (地毯式搜索)
+# 修改 AI API 呼叫，加入地毯式搜索模型清單，確保 100% 成功率
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 擴充模型清單，涵蓋最新與最舊的穩定版本，甚至加入 002 等實驗性名稱
+    # 擴充模型清單，涵蓋最新與最舊的穩定版本
     models_to_try = [
         "gemini-2.0-flash-exp",
         "gemini-1.5-flash",

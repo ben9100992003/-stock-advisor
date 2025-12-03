@@ -75,21 +75,46 @@ st.markdown("""
     /* --- 卡片通用設定 --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 16px; padding: 25px;
+        border-radius: 16px; 
+        padding: 25px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        margin-bottom: 20px; border: 1px solid #fff;
+        margin-bottom: 20px; 
+        border: 1px solid #fff;
         position: relative; z-index: 1;
         color: #333 !important;
+        width: 100%; /* 確保滿版 */
+        box-sizing: border-box; /* 防止 padding 擠壓寬度 */
     }
     
+    /* --- AI 對話氣泡樣式 (修正版：獨立白卡) --- */
+    .ai-msg-bot, .ai-msg-user {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        padding: 20px;
+        border-radius: 16px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+        color: #333 !important;
+        line-height: 1.6;
+    }
+    
+    .ai-msg-user {
+        border-left: 5px solid #2196f3;
+        background-color: #e3f2fd !important; /* 用戶提問稍微藍一點 */
+    }
+    
+    .ai-msg-bot {
+        border-left: 5px solid #4caf50;
+    }
+
     /* --- AI 回測深色卡片 --- */
     .ai-backtest-card {
         background-color: #050505 !important;
-        border-radius: 24px 24px 0 0; /* 下方圓角由圖表接手 */
+        border-radius: 24px 24px 0 0;
         padding: 25px;
         color: white !important;
         box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-        margin-bottom: 0px; /* 貼合圖表 */
+        margin-bottom: 0px; 
         border: 1px solid #222;
         border-bottom: none;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -179,7 +204,7 @@ st.markdown("""
     .detail-label { color: #888; min-width: 40px; }
     .detail-value { font-weight: 700; font-family: 'Roboto', sans-serif; }
 
-    table.analysis-table { width: 100%; border-collapse: collapse; }
+    table.analysis-table { width: 100%; border-collapse: collapse; min-width: 300px; }
     table.analysis-table td, table.analysis-table th { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
 
     .stRadio > div[role="radiogroup"] {
@@ -206,8 +231,6 @@ st.markdown("""
     .stTabs button[aria-selected="true"] p { color: #e53935 !important; }
 
     h1 { text-shadow: 0 2px 4px rgba(0,0,0,0.5); color: #fff !important; text-align: center; font-weight: 900; }
-    .ai-msg-user span { background-color: #e3f2fd; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 0 15px; }
-    .ai-msg-bot span { background-color: #f5f5f5; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 15px 0; }
     
     .news-item { padding: 15px 0; border-bottom: 1px solid #eee; }
     .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; }
@@ -348,7 +371,7 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，加入地毯式搜索模型清單，確保 100% 成功率
+# 修改 AI API 呼叫，加入更完整的模型清單 (地毯式搜索)
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
@@ -801,7 +824,7 @@ if target:
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:
-            st.markdown("<div class='ai-chat-box'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
             # 已在上方自動執行，這裡直接顯示結果
             if st.session_state['ai_analysis']:

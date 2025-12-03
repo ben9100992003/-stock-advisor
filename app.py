@@ -260,12 +260,13 @@ STOCK_NAMES = {
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "MSFT": "微軟"
 }
 
-# 產業類別中英對照表
+# 產業類別中英對照表 (擴充版)
 SECTOR_MAP = {
     "Technology": "科技", "Financial Services": "金融服務", "Healthcare": "醫療保健",
     "Consumer Cyclical": "非必需消費品", "Industrials": "工業", "Communication Services": "通訊服務",
     "Consumer Defensive": "必需消費品", "Energy": "能源", "Basic Materials": "原物料",
-    "Real Estate": "房地產", "Utilities": "公共事業", "Financials": "金融"
+    "Real Estate": "房地產", "Utilities": "公共事業", "Financials": "金融",
+    "Health Care": "醫療保健", "Information Technology": "資訊科技", "Materials": "原物料"
 }
 
 @st.cache_data(ttl=3600)
@@ -433,7 +434,6 @@ def call_gemini_api(prompt):
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_stock_summary_zh(summary_text):
-    # 改名函式以強制更新快取
     if not summary_text or summary_text == "暫無詳細說明。":
         return "暫無詳細說明。"
     
@@ -449,7 +449,6 @@ def get_stock_summary_zh(summary_text):
     """
     try:
         result = call_gemini_api(prompt)
-        # 簡單檢查回傳是否為錯誤訊息，若是則不快取英文原文
         if "錯誤" in result or "無法使用" in result:
             return summary_text 
         return result
@@ -589,7 +588,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     sector = SECTOR_MAP.get(sector_en, sector_en) # 使用對照表翻譯產業
     
     raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
-    summary = get_stock_summary_zh(raw_summary) # 使用新函式翻譯
+    summary = get_stock_summary_zh(raw_summary) # 使用翻譯後的內容
     
     theme_text = f"<b>{name}</b> 屬於 {sector} 產業。<br><br>{summary}"
     
@@ -656,8 +655,14 @@ target = "2330.TW"
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
 if target_input:
     resolved_ticker, resolved_name = resolve_ticker(target_input)
-    if resolved_ticker: target = resolved_ticker; name = resolved_name
+    if resolved_ticker: 
+        target = resolved_ticker
+        # 修正重點：優先使用內建的中文股名，若無才使用解析出的名稱
+        name = STOCK_NAMES.get(target, resolved_name)
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
+    
+# 如果沒搜尋，預設名稱
+if 'name' not in locals(): name = STOCK_NAMES.get(target, target)
 
 # --- AI 自動分析邏輯 ---
 if 'last_target' not in st.session_state: st.session_state['last_target'] = None
@@ -701,7 +706,9 @@ if target:
     try:
         stock = yf.Ticker(target)
         info = stock.info
-        if 'name' not in locals(): name = STOCK_NAMES.get(target, info.get('longName', target))
+        # 二次確認名稱
+        if 'name' not in locals() or name == target: 
+             name = STOCK_NAMES.get(target, info.get('longName', target))
         
         df_fast = stock.history(period="5d")
         if not df_fast.empty:
@@ -771,9 +778,12 @@ if target:
                 
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 
+                # K線圖設定中文 Hover
                 fig.add_trace(go.Candlestick(
                     x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], 
-                    name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047'
+                    name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047',
+                    text=["開盤: {:.2f}<br>最高: {:.2f}<br>最低: {:.2f}<br>收盤: {:.2f}".format(o,h,l,c) for o,h,l,c in zip(plot_df['Open'], plot_df['High'], plot_df['Low'], plot_df['Close'])],
+                    hoverinfo='text+x'
                 ), row=1, col=1)
                 
                 for ma, c in [('MA5','#2196f3'), ('MA10','#9c27b0'), ('MA20','#ff9800'), ('MA60','#795548')]:
@@ -941,7 +951,7 @@ if target:
 <div class="ai-icon-box">📊</div>
 <div class="ai-title-text">
 <h3>AI 大數據回測</h3>
-<p>Pattern Matching</p>
+<p>趨勢型態識別 (Trend Pattern)</p>
 </div>
 </div>
 <div class="ai-score-group">

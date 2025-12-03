@@ -859,7 +859,8 @@ if target:
                 )
                 
                 # --- 復刻深色卡片 HTML (上方資訊) ---
-                backtest_html = f"""
+                # 使用 textwrap.dedent 移除縮排，解決代碼顯示問題
+                backtest_html = textwrap.dedent(f"""
                 <div class="ai-backtest-card">
                     <div class="ai-header-row">
                         <div class="ai-title-group">
@@ -886,7 +887,7 @@ if target:
                         </div>
                     </div>
                 </div>
-                """
+                """)
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
                 # --- 獨立顯示圖表 (避免當機的關鍵：使用 staticPlot=True) ---

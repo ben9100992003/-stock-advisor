@@ -66,6 +66,9 @@ st.markdown("""
     .stApp { font-family: "Microsoft JhengHei", "sans-serif"; color: #333; }
     h1, h2, h3, h4, h5, h6 { color: #333; }
     
+    /* 去除頂部空白 */
+    .block-container { padding-top: 1rem; }
+    
     /* --- 卡片通用設定 (灰白色背景) --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
@@ -84,8 +87,8 @@ st.markdown("""
 
     /* --- 股票報價卡片 --- */
     .stock-tag {
-        display: inline-block; padding: 4px 12px; border-radius: 4px;
-        font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;
+        display: inline-block; padding: 2px 8px; border-radius: 4px;
+        font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;
         background-color: #fff3e0; color: #f57c00 !important; /* 交易中 橘色 */
     }
     
@@ -95,7 +98,7 @@ st.markdown("""
     }
     
     .price-info-row { 
-        display: flex; align-items: center; gap: 15px; margin-bottom: 15px;
+        display: flex; align-items: center; gap: 15px; margin-bottom: 10px;
         flex-wrap: nowrap !important;
     }
     
@@ -109,18 +112,19 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* 數據表格樣式 (HTML Table) */
+    /* 數據表格樣式 (Table) */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
+        margin-top: 5px;
         table-layout: fixed;
     }
     table.quote-table td {
-        padding: 12px 8px;
-        border-bottom: 1px solid #eee;
+        padding: 8px 5px;
+        border-bottom: 1px solid #f0f0f0;
         vertical-align: middle;
         font-size: 1rem;
+        line-height: 1.2;
     }
     table.quote-table .label {
         color: #666;
@@ -132,25 +136,23 @@ st.markdown("""
         color: #000;
         float: right;
     }
-    /* 最後一列不顯示底線 */
-    table.quote-table tr:last-child td {
-        border-bottom: none;
-    }
+    /* 中間分隔線 */
+    .border-right { border-right: 1px solid #f0f0f0; }
+    .pl-15 { padding-left: 15px !important; }
 
-    /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
-    /* 這裡使用 !important 強制覆蓋 Streamlit 預設樣式 */
+    /* --- K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
     .stRadio > div[role="radiogroup"] {
         background-color: #ffffff !important;
         border-radius: 30px !important; 
-        padding: 8px 12px !important;
+        padding: 6px 10px !important;
         display: flex !important; 
         flex-direction: row !important; 
-        gap: 8px !important;
+        gap: 5px !important;
         overflow-x: auto !important; /* 開啟水平滾動 */
         white-space: nowrap !important; /* 禁止換行 */
         flex-wrap: nowrap !important; /* 禁止 Flex 換行 */
         border: 1px solid #ddd;
-        scrollbar-width: none;
+        scrollbar-width: none; 
         width: 100%;
         align-items: center;
         -webkit-overflow-scrolling: touch;
@@ -158,25 +160,28 @@ st.markdown("""
     .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; /* 禁止壓縮 */
-        min-width: 60px !important;
+        flex: 0 0 auto !important;
+        min-width: 50px !important;
         background-color: transparent !important; 
         border: none !important;
-        padding: 6px 14px !important; 
+        padding: 5px 12px !important; 
         border-radius: 20px !important;
         cursor: pointer; 
+        transition: all 0.2s;
         margin: 0 !important;
         text-align: center;
     }
     
+    /* 未選中文字 */
     .stRadio div[role="radiogroup"] > label p { 
-        color: #555 !important; font-weight: 600; font-size: 0.95rem; margin: 0; padding: 0;
+        color: #555 !important; font-weight: 600; font-size: 0.9rem; margin: 0; padding: 0;
         white-space: nowrap !important;
     }
     
+    /* 選中樣式 */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #e53935 !important;
-        box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
+        box-shadow: 0 2px 5px rgba(229, 57, 53, 0.3);
     }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; font-weight: bold; }
 
@@ -559,7 +564,8 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 使用 HTML Table 確保報價資訊整齊排列 ("表格化")
+            # 使用 textwrap.dedent 確保 HTML 字串無縮排，修復顯示問題
+            # 並使用 table 標籤確保數據表格化對齊
             quote_html = textwrap.dedent(f"""
             <div class="quote-card">
                 <div style="display:flex; justify-content:space-between; align-items:start;">
@@ -584,21 +590,21 @@ if target:
                 
                 <table class="quote-table">
                     <tr>
-                        <td style="border-right: 1px solid #eee;">
+                        <td class="border-right">
                             <span class="label">最高</span>
                             <span class="value text-up">{latest_fast['High']:.2f}</span>
                         </td>
-                        <td style="padding-left: 15px;">
+                        <td class="pl-15">
                             <span class="label">昨收</span>
                             <span class="value">{prev_close:.2f}</span>
                         </td>
                     </tr>
                     <tr>
-                        <td style="border-right: 1px solid #eee;">
+                        <td class="border-right">
                             <span class="label">最低</span>
                             <span class="value text-down">{latest_fast['Low']:.2f}</span>
                         </td>
-                        <td style="padding-left: 15px;">
+                        <td class="pl-15">
                             <span class="label">開盤</span>
                             <span class="value">{latest_fast['Open']:.2f}</span>
                         </td>
@@ -611,9 +617,7 @@ if target:
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
-            # 移除所有不必要的空白與 wrapper
-            
-            # 左右滑動的按鈕 (亮白色風格，解決看不清楚問題)
+            # 左右滑動的按鈕 (白色背景 + 深色文字)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
             
@@ -651,7 +655,7 @@ if target:
                 if not is_intraday and len(plot_df) > 60:
                     fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
 
-                # 減少邊距，去除圖表周圍的空白
+                # 去除圖表空白與調整邊界
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
@@ -661,7 +665,7 @@ if target:
                     yaxis=dict(fixedrange=True),
                     yaxis2=dict(fixedrange=True),
                     yaxis3=dict(fixedrange=True),
-                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', # 修正背景顏色
+                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', 
                     font=dict(color='black')
                 )
                 
@@ -695,13 +699,13 @@ if target:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
                 
-                # 修復圖表重複參數錯誤並優化顯示
+                # 修復圖表錯誤：合併 xaxis 參數，避免重複
                 fig_inst.update_layout(
                     barmode='group', template="plotly_white", height=400,
                     paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', 
                     font=dict(color='black'), 
                     yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333', gridcolor='#e0e0e0'), 
-                    xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0') # 合併 xaxis 參數
+                    xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0') 
                 )
                 
                 st.markdown("<div class='content-card'>", unsafe_allow_html=True)
@@ -734,7 +738,6 @@ if target:
                 st.session_state['ai_analysis'] = None
             
             if st.session_state['ai_analysis'] is None:
-                # 預先顯示正在分析的 UI，避免畫面空白
                 st.info(f"正在為您分析 {name} 的各項數據，請稍候...")
                 try:
                     auto_prompt = f"""
@@ -745,7 +748,7 @@ if target:
                     """
                     result = call_gemini_api(auto_prompt)
                     st.session_state['ai_analysis'] = result
-                    st.rerun() # 重新執行以顯示結果
+                    st.rerun() 
                 except Exception as e:
                     st.error(f"AI 分析連線失敗，請稍後再試。({e})")
             

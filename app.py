@@ -11,7 +11,7 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
-import textwrap
+import textwrap # 關鍵：引入這個函式庫來處理縮排問題
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -71,8 +71,7 @@ st.markdown("""
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 16px; padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        margin-bottom: 10px; /* 減少下方空白 */
-        border: 1px solid #eee;
+        margin-bottom: 20px; border: 1px solid #eee;
         position: relative; z-index: 1;
         color: #333 !important;
     }
@@ -110,16 +109,16 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* --- 數據表格樣式 (Quotes Table) --- */
+    /* 數據表格樣式 (標準 Table) */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
-        /* 不再使用外框線，保持乾淨 */
+        table-layout: fixed; /* 固定佈局，確保欄位平均 */
     }
     table.quote-table td {
         padding: 12px 10px;
-        border-bottom: 1px solid #f0f0f0; /* 淺色分隔線 */
+        border-bottom: 1px solid #eee;
         vertical-align: middle;
         font-size: 1rem;
     }
@@ -154,7 +153,6 @@ st.markdown("""
         width: 100%;
         align-items: center;
         -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
-        margin-bottom: 10px;
     }
     .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
     
@@ -218,9 +216,6 @@ st.markdown("""
     
     /* 隱藏 Radio 預設圓點 */
     .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
-    
-    /* 隱藏預設的 element-container 空白 */
-    div[data-testid="stVerticalBlock"] > div:has(div.fixed-spacer) { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -570,7 +565,7 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 使用 HTML Table 確保報價資訊整齊排列 ("表格化")
+            # 使用 textwrap.dedent 確保 HTML 表格被正確渲染 (不顯示原始碼)
             quote_html = textwrap.dedent(f"""
             <div class="quote-card">
                 <div style="display:flex; justify-content:space-between; align-items:start;">
@@ -657,8 +652,6 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-                # 不強制限制 X 軸範圍，允許用戶左右滑動 (Pan)
-                # 設定預設顯示範圍為最後 60 筆，但允許滑動查看更多
                 if not is_intraday and len(plot_df) > 60:
                     fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
 
@@ -668,7 +661,7 @@ if target:
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
                     legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
                     dragmode='pan', hovermode='x unified', 
-                    xaxis=dict(rangeslider_visible=False, fixedrange=False), # X軸可滑動
+                    xaxis=dict(rangeslider_visible=False), 
                     yaxis=dict(fixedrange=True),
                     yaxis2=dict(fixedrange=True),
                     yaxis3=dict(fixedrange=True),
@@ -706,7 +699,7 @@ if target:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
                 
-                # 修正圖表間距，移除空白
+                # 修復圖表重複參數錯誤並優化顯示
                 fig_inst.update_layout(
                     barmode='group', template="plotly_white", height=400,
                     margin=dict(t=0, b=10, l=10, r=10), # 移除上方空白

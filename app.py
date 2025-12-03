@@ -66,7 +66,7 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6 { color: #333; }
     
     /* --- 1. 卡片通用設定 (灰白色背景) --- */
-    .quote-card, .content-card, .kd-card, .market-summary-box, .chart-container-box, .ai-chat-box, .light-card {
+    .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 16px; padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -76,7 +76,7 @@ st.markdown("""
     }
     
     /* 強制卡片內文字顏色 */
-    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .chart-container-box *, .ai-chat-box *, .light-card * {
+    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
         text-shadow: none !important;
         color: #333; 
     }
@@ -89,11 +89,25 @@ st.markdown("""
     }
     
     .price-large {
-        font-size: 3.5rem !important; font-weight: 700; line-height: 1.1; margin: 5px 0;
+        font-size: 3.5rem !important; font-weight: 700; line-height: 1.1; margin: 0;
     }
     
-    .price-info-row { display: flex; align-items: baseline; gap: 15px; margin-bottom: 15px; }
-    .price-change-block { font-size: 1.1rem; font-weight: 600; }
+    /* 價格與漲跌幅的排版：左邊大數字，右邊垂直堆疊的小數字 */
+    .price-info-row { 
+        display: flex; 
+        align-items: center; 
+        gap: 15px; 
+        margin-bottom: 15px; 
+    }
+    
+    .price-change-block { 
+        display: flex;
+        flex-direction: column; /* 垂直堆疊 */
+        justify-content: center;
+        font-size: 1.1rem; 
+        font-weight: 600; 
+        line-height: 1.4;
+    }
     
     /* 紅漲綠跌定義 */
     .text-up { color: #e53935 !important; } /* 紅色 */
@@ -113,8 +127,12 @@ st.markdown("""
     .stRadio > div[role="radiogroup"] {
         background-color: rgba(30, 30, 30, 0.85); /* 深色背景 */
         border-radius: 30px; padding: 8px 12px;
-        display: flex; flex-direction: row; gap: 5px;
-        overflow-x: auto; white-space: nowrap; /* 左右滑動 */
+        display: flex; 
+        flex-direction: row; 
+        gap: 5px;
+        overflow-x: auto; /* 允許水平滑動 */
+        white-space: nowrap; /* 禁止換行 */
+        flex-wrap: nowrap !important; /* 強制不換行 */
         border: 1px solid #555;
         scrollbar-width: none; /* Firefox 隱藏捲軸 */
     }
@@ -523,7 +541,8 @@ if target:
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
-            st.markdown('<div class="chart-container-box">', unsafe_allow_html=True)
+            # 移除了 chart-container-box 的 wrapper，解決上方多一條的問題
+            
             # 左右滑動的按鈕 (深色膠囊)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
@@ -571,7 +590,7 @@ if target:
                     yaxis=dict(fixedrange=True),
                     yaxis2=dict(fixedrange=True),
                     yaxis3=dict(fixedrange=True),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='rgba(255,255,255,0.95)', # 設置白色背景使其獨立成卡片
                     font=dict(color='black')
                 )
                 
@@ -581,7 +600,6 @@ if target:
                     fig.update_yaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
                 
                 st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
-            st.markdown('</div>', unsafe_allow_html=True)
             
             kd_color_style = "text-up" if latest['K'] > latest['D'] else "text-down"
             kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"

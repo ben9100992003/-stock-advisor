@@ -395,42 +395,30 @@ def get_yahoo_stock_url(ticker):
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    models_to_try = [
-        "gemini-1.5-flash", 
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
-        "gemini-pro",
-        "gemini-1.0-pro"
-    ]
-    
+    # 修正：移除多模型重試邏輯，直接使用目前最穩定的模型
+    # 這樣可以顯示真實的錯誤代碼 (如 403, 429) 而不是被舊模型的 404 掩蓋
+    model = "gemini-1.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
     
-    last_error = ""
-    
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=20)
-            if response.status_code == 200: 
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-            elif response.status_code == 404:
-                last_error = f"模型 {model} 未找到 (404)，嘗試下一個..."
-                continue 
-            elif response.status_code == 403:
-                last_error = f"API 權限錯誤 (403): Key 無法存取 {model}。"
-                continue
-            else:
-                last_error = f"AI 回應錯誤: {response.status_code} - {response.text}"
-                continue
-        except requests.exceptions.Timeout:
-            last_error = "AI 連線逾時。"
-            continue
-        except Exception as e: 
-            last_error = f"連線錯誤: {e}"
-            continue
-
-    return f"AI 服務暫時無法使用。最後錯誤: {last_error}"
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=20)
+        if response.status_code == 200: 
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # 嘗試解析詳細錯誤訊息
+            try:
+                error_body = response.json()
+                error_msg = error_body.get('error', {}).get('message', response.text)
+                status = error_body.get('error', {}).get('status', response.status_code)
+                return f"⚠️ AI 服務錯誤 ({status}): {error_msg}"
+            except:
+                return f"⚠️ AI 服務錯誤 ({response.status_code}): {response.text}"
+    except requests.exceptions.Timeout:
+        return "⚠️ AI 連線逾時，請檢查網路狀況。"
+    except Exception as e: 
+        return f"⚠️ 連線失敗: {str(e)}"
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_stock_summary_zh(summary_text):

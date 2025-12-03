@@ -35,7 +35,6 @@ def get_base64_of_bin_file(bin_file):
     except: return ""
 
 def set_png_as_page_bg(png_file):
-    # 如果找不到圖片，使用預設漸層背景
     if not os.path.exists(png_file): 
         st.markdown("""
         <style>
@@ -56,7 +55,6 @@ def set_png_as_page_bg(png_file):
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
-    /* 背景深色遮罩，讓文字更清晰 */
     .stApp::before {{
         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 0;
@@ -77,9 +75,9 @@ st.markdown("""
     /* --- 卡片通用設定 (灰白色背景) --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 16px; padding: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        margin-bottom: 20px; border: 1px solid #eee;
+        border-radius: 16px; padding: 25px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        margin-bottom: 20px; border: 1px solid #fff;
         position: relative; z-index: 1;
         color: #333 !important;
     }
@@ -90,62 +88,55 @@ st.markdown("""
         color: #333; 
     }
 
-    /* --- 股票報價卡片 --- */
-    .stock-tag {
-        display: inline-block; padding: 4px 12px; border-radius: 4px;
-        font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;
-        background-color: #fff3e0; color: #f57c00 !important; /* 交易中 橘色 */
-    }
-    
-    .price-large {
-        font-size: 3.5rem !important; font-weight: 700; line-height: 1.1; margin: 0;
-        white-space: nowrap; /* 防止價格換行 */
-    }
-    
-    .price-info-row { 
-        display: flex; align-items: center; gap: 15px; margin-bottom: 15px;
-        flex-wrap: nowrap !important;
-    }
-    
-    .price-change-block { 
-        display: flex; flex-direction: column; justify-content: center;
-        font-size: 1.1rem; font-weight: 600; line-height: 1.4; min-width: 80px;
-    }
-    
-    /* 紅漲綠跌定義 */
+    /* --- 紅漲綠跌定義 --- */
     .text-up { color: #e53935 !important; }
     .text-down { color: #43a047 !important; }
-    .text-flat { color: #757575 !important; }
+    .text-flat { color: #333 !important; }
+    .text-gray { color: #888 !important; }
 
-    /* 數據表格樣式 (Table) */
-    table.quote-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-        table-layout: fixed; /* 固定佈局，確保欄位平均 */
+    /* --- 報價卡片特定樣式 (仿圖片風格) --- */
+    .quote-header {
+        display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px;
     }
-    table.quote-table td {
-        padding: 10px 5px;
-        border-bottom: 1px solid #eee;
-        vertical-align: middle;
-        font-size: 1rem;
+    .stock-name { font-size: 1.8rem; font-weight: 900; color: #222; }
+    .stock-id { font-size: 1.2rem; color: #888; font-weight: 500; }
+    
+    .price-row {
+        display: flex; align-items: center; gap: 15px; margin-bottom: 15px;
     }
-    table.quote-table .label {
+    .main-price {
+        font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px;
+    }
+    .change-info {
+        display: flex; flex-direction: column; justify-content: center;
+        font-size: 1.1rem; font-weight: 600; line-height: 1.4;
+    }
+    
+    .market-tag {
+        display: inline-block;
+        padding: 3px 12px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
         color: #666;
-        font-weight: 500;
-        float: left;
-    }
-    table.quote-table .value {
-        font-weight: 700;
-        color: #000;
-        float: right;
-    }
-    /* 最後一列不顯示底線 */
-    table.quote-table tr:last-child td {
-        border-bottom: none;
+        font-size: 0.9rem;
+        background-color: #f9f9f9;
+        margin-bottom: 20px;
     }
 
-    /* --- K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 20px;
+        row-gap: 8px;
+        font-size: 1.1rem;
+    }
+    .detail-item {
+        display: flex; justify-content: flex-start; align-items: center; gap: 10px;
+    }
+    .detail-label { color: #888; min-width: 40px; }
+    .detail-value { font-weight: 700; font-family: 'Roboto', sans-serif; }
+
+    /* --- K線選擇器 --- */
     .stRadio > div[role="radiogroup"] {
         background-color: #ffffff !important;
         border-radius: 30px !important; 
@@ -197,7 +188,6 @@ st.markdown("""
         background-color: #fff !important; color: #333 !important;
         border-color: #ccc !important;
     }
-    
     .stButton button {
         border-radius: 12px; height: 100%; width: 100%;
         padding: 0.5rem 0; background-color: #fff;
@@ -222,7 +212,6 @@ st.markdown("""
     .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; display: block; margin-bottom: 6px; }
     .news-meta { font-size: 0.9rem !important; color: #666 !important; }
     
-    /* 隱藏 Radio 預設圓點 */
     .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
     </style>
     """, unsafe_allow_html=True)
@@ -448,7 +437,6 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         color_total = 'text-up' if total > 0 else 'text-down'
         inst_desc = f"法人單日合計 <b class='{color_total}'>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
         
-        # 修正：移除縮排
         inst_table_html = f"""
 <tr>
     <td>{last['Date']}</td>
@@ -479,7 +467,6 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    # 修正：使用 textwrap.dedent 處理多行字串縮排
     return textwrap.dedent(f"""
     <div class="content-card">
         <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
@@ -548,7 +535,6 @@ if target_input:
 
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
-    # 修正：移除多行字串的縮排
     with t1:
         tw = analyze_market_index("^TWII")
         if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
@@ -571,56 +557,66 @@ if target:
             change = latest_fast['Close'] - prev_close
             pct = (change / prev_close) * 100
             
-            # 漲是紅 (#e53935), 跌是綠 (#43a047)
+            # 定義顏色：台股紅漲綠跌
             color_class = "text-up" if change >= 0 else "text-down"
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 修正：這裡是最容易出錯的地方。使用 textwrap.dedent 並確保 HTML 標籤靠左
+            # 判斷市場別
+            market_tag = "上市"
+            if ".TWO" in target: market_tag = "上櫃"
+            elif ".TW" not in target: market_tag = "美股"
+
+            # 判斷詳細數據顏色 (相對於昨收)
+            def get_color(val, ref):
+                if val > ref: return "text-up"
+                elif val < ref: return "text-down"
+                else: return "text-flat"
+            
+            c_high = get_color(latest_fast['High'], prev_close)
+            c_low = get_color(latest_fast['Low'], prev_close)
+            c_open = get_color(latest_fast['Open'], prev_close)
+            
+            # 重製為仿圖片風格的 HTML
             quote_html = textwrap.dedent(f"""
             <div class="quote-card">
-                <div style="display:flex; justify-content:space-between; align-items:start;">
-                    <div>
-                        <div class="stock-tag">交易中</div>
-                        <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
-                            <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
-                                {name} <span style="font-size:1rem; color:#888;">{target}</span>
-                                <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
-                            </a>
-                        </div>
-                    </div>
+                <div class="quote-header">
+                    <span class="stock-name">
+                        <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a>
+                    </span>
+                    <span class="stock-id">{target.replace('.TW','').replace('.TWO','')}</span>
                 </div>
                 
-                <div class="price-info-row">
-                    <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
-                    <div class="price-change-block {color_class}">
+                <div class="price-row">
+                    <div class="main-price {color_class}">{latest_fast['Close']:.2f}</div>
+                    <div class="change-info {color_class}">
                         <div>{arrow} {abs(change):.2f}</div>
-                        <div>{abs(pct):.2f}%</div>
+                        <div>{arrow} {abs(pct):.2f}%</div>
                     </div>
                 </div>
+
+                <div>
+                    <span class="market-tag">{market_tag}</span>
+                </div>
                 
-                <table class="quote-table">
-                    <tr>
-                        <td style="border-right: 1px solid #eee;">
-                            <span class="label">最高</span>
-                            <span class="value text-up">{latest_fast['High']:.2f}</span>
-                        </td>
-                        <td style="padding-left: 15px;">
-                            <span class="label">昨收</span>
-                            <span class="value">{prev_close:.2f}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="border-right: 1px solid #eee;">
-                            <span class="label">最低</span>
-                            <span class="value text-down">{latest_fast['Low']:.2f}</span>
-                        </td>
-                        <td style="padding-left: 15px;">
-                            <span class="label">開盤</span>
-                            <span class="value">{latest_fast['Open']:.2f}</span>
-                        </td>
-                    </tr>
-                </table>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">最高</span>
+                        <span class="detail-value {c_high}">{latest_fast['High']:.2f}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">昨收</span>
+                        <span class="detail-value text-flat">{prev_close:.2f}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">最低</span>
+                        <span class="detail-value {c_low}">{latest_fast['Low']:.2f}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">開盤</span>
+                        <span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span>
+                    </div>
+                </div>
             </div>
             """)
             st.markdown(quote_html, unsafe_allow_html=True)

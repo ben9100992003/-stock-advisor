@@ -16,7 +16,7 @@ import textwrap
 # --- 0. 設定與金鑰 ---
 # 注意：請確認您的 FinMind 和 Gemini API Key 是否正確
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 如果出現 403 錯誤，通常代表 API Key 無效，請更換為您自己的有效 Key
+# 已更新為您提供的 API Key
 GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8" 
 
 # --- 1. 頁面設定 ---
@@ -637,15 +637,19 @@ if target:
                     xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0', fixedrange=False)
                 )
                 
-                st.markdown("<div class='content-card'>", unsafe_allow_html=True)
+                # Chart 獨立顯示 (自帶白色背景)
                 st.plotly_chart(fig_inst, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True})
                 
+                # 表格包在 content-card 內，確保有白色背景
                 table_html = "<div style='overflow-x: auto;'><table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
                 for _, row in inst_df.sort_values('Date', ascending=False).head(10).iterrows():
                     table_html += f"<tr><td>{row['Date']}</td><td class='{'text-up' if row['Foreign']>0 else 'text-down'}'>{row['Foreign']:,}</td><td class='{'text-up' if row['Trust']>0 else 'text-down'}'>{row['Trust']:,}</td><td class='{'text-up' if row['Dealer']>0 else 'text-down'}'>{row['Dealer']:,}</td></tr>"
                 table_html += "</tbody></table></div>"
-                st.markdown(table_html, unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+                
+                # 使用字串格式化確保包覆完整
+                final_table_html = f"<div class='content-card'><h3>📊 詳細數據</h3>{table_html}</div>"
+                st.markdown(final_table_html, unsafe_allow_html=True)
+
             else: st.info("無法人籌碼資料")
 
         with tab4:

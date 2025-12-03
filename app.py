@@ -12,6 +12,7 @@ from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
 import textwrap
+import io # 新增：用於處理圖片資料流
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -155,7 +156,10 @@ st.markdown("""
         margin-top: 0px; 
         border-radius: 0 0 20px 20px; 
         overflow: hidden; 
-        height: 180px; /* 固定高度避免跳動 */
+        /* height: 180px;  移除固定高度，讓圖片自適應 */
+    }
+    .chart-container img {
+        display: block; /* 消除圖片底部可能的空白 */
     }
 
     /* 強制卡片內文字顏色 */
@@ -377,7 +381,8 @@ def call_gemini_api(prompt):
         if response.status_code == 200: 
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         elif response.status_code == 403:
-            return f"API 權限錯誤 (403): 請確認您的 API Key 是否支援 {model} 模型。"
+            # 優化錯誤訊息
+            return f"API 權限錯誤 (403): 您的 API Key 無法存取 {model} 模型。請檢查您的 Google Cloud 專案設定和 API Key 權限。"
         else:
             return f"AI 回應錯誤: {response.status_code} - {response.text}"
     except Exception as e: 
@@ -793,7 +798,7 @@ if target:
             # 已在上方自動執行，這裡直接顯示結果
             if st.session_state['ai_analysis']:
                 # 檢查是否為錯誤訊息
-                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or st.session_state['ai_analysis'].startswith("分析暫時無法使用"):
+                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or st.session_state['ai_analysis'].startswith("分析暫時無法使用") or st.session_state['ai_analysis'].startswith("API 權限錯誤"):
                      st.error(st.session_state['ai_analysis'])
                 else:
                     st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
@@ -813,7 +818,10 @@ if target:
                     請用繁體中文回答，語氣專業且親切。
                     """
                     ai_response = call_gemini_api(prompt)
-                    st.markdown(f"<div class='ai-msg-user'><span>👤 {user_query}</span></div><div class='ai-msg-bot'><span>🦖 {ai_response}</span></div>", unsafe_allow_html=True)
+                    if ai_response.startswith("API 權限錯誤") or ai_response.startswith("AI 回應錯誤") or ai_response.startswith("連線錯誤"):
+                        st.error(ai_response)
+                    else:
+                        st.markdown(f"<div class='ai-msg-user'><span>👤 {user_query}</span></div><div class='ai-msg-bot'><span>🦖 {ai_response}</span></div>", unsafe_allow_html=True)
             
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -852,7 +860,10 @@ if target:
                     )
                     
                     # 使用 staticPlot: True 避免大量 JS 運算導致前端卡頓
-                    chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False, 'staticPlot': True})
+                    # 改為產生靜態圖片以避免當機
+                    img_bytes = fig_bt.to_image(format="png", width=800, height=250, scale=2)
+                    img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                    chart_html = f'<img src="data:image/png;base64,{img_base64}" style="width:100%; height:auto; border-radius: 0 0 20px 20px;">'
 
                     # --- 復刻深色卡片 HTML ---
                     backtest_html = f"""

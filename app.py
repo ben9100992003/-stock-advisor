@@ -72,21 +72,28 @@ st.markdown("""
     .stApp { font-family: "Microsoft JhengHei", "sans-serif"; color: #333; }
     h1, h2, h3, h4, h5, h6 { color: #333; }
     
-    /* --- 卡片通用設定 (白底) --- */
+    /* --- 卡片通用設定 --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 16px; 
-        padding: 20px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        padding: 25px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         margin-bottom: 20px; 
         border: 1px solid #fff;
         position: relative; z-index: 1;
         color: #333 !important;
         width: 100%;
-        box-sizing: border-box;
+        box-sizing: border-box; /* 防止 padding 擠壓寬度 */
     }
     
-    /* --- AI 對話訊息樣式 --- */
+    /* 優化卡片內文排版 */
+    .content-card p {
+        line-height: 1.8;
+        text-align: justify;
+        margin-bottom: 12px;
+    }
+
+    /* --- AI 對話氣泡樣式 --- */
     .ai-msg-bot, .ai-msg-user, .ai-msg-error, .ai-msg-info {
         background-color: rgba(255, 255, 255, 0.98) !important;
         padding: 20px;
@@ -99,25 +106,10 @@ st.markdown("""
         font-size: 1rem;
     }
     
-    .ai-msg-user {
-        border-left: 6px solid #2196f3;
-        background-color: #f8fbff !important;
-    }
-    
-    .ai-msg-bot {
-        border-left: 6px solid #4caf50;
-    }
-
-    .ai-msg-error {
-        border-left: 6px solid #f44336;
-        background-color: #fff5f5 !important;
-        color: #d32f2f !important;
-    }
-
-    .ai-msg-info {
-        border-left: 6px solid #ff9800;
-        background-color: #fff8e1 !important;
-    }
+    .ai-msg-user { border-left: 6px solid #2196f3; background-color: #f8fbff !important; }
+    .ai-msg-bot { border-left: 6px solid #4caf50; }
+    .ai-msg-error { border-left: 6px solid #f44336; background-color: #fff5f5 !important; color: #d32f2f !important; }
+    .ai-msg-info { border-left: 6px solid #ff9800; background-color: #fff8e1 !important; }
 
     /* --- AI 回測深色卡片 --- */
     .ai-backtest-card {
@@ -136,7 +128,7 @@ st.markdown("""
     .ai-header-row {
         display: flex; justify-content: space-between; align-items: flex-start;
         margin-bottom: 25px;
-        flex-wrap: wrap; /* 允許換行避免擠壓 */
+        flex-wrap: wrap; 
         gap: 15px;
     }
     
@@ -180,7 +172,7 @@ st.markdown("""
     }
     .ai-pred-box {
         flex: 1;
-        min-width: 140px; /* 防止過度擠壓 */
+        min-width: 140px; 
         background: #11141c;
         border-radius: 16px;
         padding: 15px 20px;
@@ -206,11 +198,16 @@ st.markdown("""
     .stock-name { font-size: 1.8rem; font-weight: 900; color: #222; }
     .stock-id { font-size: 1.2rem; color: #888; font-weight: 500; }
     .price-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
-    .main-price { font-size: 3.5rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
-    
+    .main-price { font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
+    .change-info { display: flex; flex-direction: column; justify-content: center; font-size: 1.1rem; font-weight: 600; line-height: 1.4; }
+    .market-tag {
+        display: inline-block; padding: 3px 12px; border: 1px solid #ddd;
+        border-radius: 20px; color: #666; font-size: 0.9rem;
+        background-color: #f9f9f9; margin-bottom: 20px;
+    }
     .detail-grid {
         display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* 自動適應寬度，防止擠壓 */
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
         column-gap: 20px; row-gap: 10px; font-size: 1.1rem;
     }
     .detail-item { display: flex; justify-content: flex-start; align-items: center; gap: 8px; }
@@ -219,7 +216,7 @@ st.markdown("""
 
     /* 表格優化 */
     .table-container { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
-    table.analysis-table { width: 100%; min-width: 500px; border-collapse: collapse; } /* 設最小寬度讓手機可滑動 */
+    table.analysis-table { width: 100%; min-width: 500px; border-collapse: collapse; } 
     table.analysis-table td, table.analysis-table th { padding: 10px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
 
     .stRadio > div[role="radiogroup"] {
@@ -432,6 +429,30 @@ def call_gemini_api(prompt):
 
     return f"AI 服務暫時無法使用。所有模型嘗試失敗。最後錯誤: {last_error}"
 
+# --- 新增：AI 翻譯與摘要快取函式 ---
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_ai_translated_summary(summary_text):
+    if not summary_text or summary_text == "暫無詳細說明。":
+        return "暫無詳細說明。"
+    
+    prompt = f"""
+    請將以下公司介紹翻譯成流暢、完整的繁體中文。
+    重點：
+    1. 保留所有關鍵資訊，不要刪減。
+    2. 語氣專業。
+    3. 如果原文已經是中文，請潤飾得更通順。
+    
+    原文：
+    {summary_text}
+    """
+    try:
+        result = call_gemini_api(prompt)
+        if "錯誤" in result or "無法使用" in result:
+            return summary_text # 失敗時回傳原文
+        return result
+    except:
+        return summary_text
+
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
     df['MA10'] = df['Close'].rolling(10).mean()
@@ -530,8 +551,12 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 </tr>"""
 
     sector = info.get('sector', '科技')
-    summary = info.get('longBusinessSummary', '暫無詳細說明。')[:150] + "..."
-    theme_text = f"<b>{name}</b> 屬於 {sector} 產業。{summary}"
+    raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
+    
+    # 呼叫 AI 翻譯與摘要
+    summary = get_ai_translated_summary(raw_summary)
+    
+    theme_text = f"<b>{name}</b> 屬於 {sector} 產業。<br><br>{summary}"
     
     support = ma10 if price > ma10 else ma20
     resistance = ma5 if price < ma5 else price * 1.05
@@ -572,24 +597,6 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 <h4>4. 💡 進出場價格建議 ({action})</h4>
 <ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
 </div>"""
-
-def analyze_market_index(ticker_symbol):
-    try:
-        stock = yf.Ticker(ticker_symbol)
-        df = stock.history(period="6mo")
-        if df.empty: return None
-        df = calculate_indicators(df)
-        latest = df.iloc[-1]
-        price = latest['Close']
-        ma20 = latest['MA20']
-        k, d = latest['K'], latest['D']
-        change = price - df['Close'].iloc[-2]
-        
-        status = "多頭強勢" if price > ma20 and k > d else "多頭回檔" if price > ma20 else "空方修正"
-        color = "#e53935" if k > d else "#f57c00" if price > ma20 else "#43a047"
-        comment = f"KD({k:.1f}/{d:.1f})。市場氣氛：{status}。"
-        return {"price": price, "change": change, "status": status, "color": color, "comment": comment}
-    except: return None
 
 # --- UI 介面 ---
 st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
@@ -823,7 +830,7 @@ if target:
         
         with tab5:
             # 標題區塊
-            st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3></div>", unsafe_allow_html=True)
+            st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
             # AI 分析結果顯示區 (強制白卡)
             if st.session_state['ai_analysis']:

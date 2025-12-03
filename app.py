@@ -14,7 +14,6 @@ import json
 import textwrap
 
 # --- 0. 設定與金鑰 ---
-# 注意：請確認您的 FinMind 和 Gemini API Key 是否正確
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
 # 使用您提供的 API Key
 GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8" 
@@ -64,7 +63,7 @@ def set_png_as_page_bg(png_file):
     """.format(bin_str)
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# 請確保您的目錄下有這張圖片，或更換為有效的圖片路徑
+# 請確保您的目錄下有這張圖片
 set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
@@ -85,59 +84,79 @@ st.markdown("""
     
     /* --- AI 回測深色卡片 (仿圖風格) --- */
     .ai-backtest-card {
-        background-color: #000000 !important; /* 全黑背景 */
-        border-radius: 20px;
-        padding: 30px;
+        background-color: #050505 !important; /* 極深黑背景 */
+        border-radius: 24px;
+        padding: 25px;
         color: white !important;
-        box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.6);
         margin-bottom: 20px;
-        border: 1px solid #333;
-        font-family: 'Segoe UI', sans-serif;
+        border: 1px solid #222;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        overflow: hidden; /* 確保內容不溢出 */
     }
     
     .ai-header-row {
         display: flex; justify-content: space-between; align-items: flex-start;
-        margin-bottom: 30px;
+        margin-bottom: 25px;
     }
     
     .ai-title-group { display: flex; gap: 15px; align-items: center; }
+    
     .ai-icon-box {
-        width: 50px; height: 50px;
+        width: 48px; height: 48px;
         background: #0066ff;
-        border-radius: 12px;
+        border-radius: 14px;
         display: flex; align-items: center; justify-content: center;
         font-size: 24px; color: white;
+        box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
     }
-    .ai-title-text h3 { color: white !important; margin: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.5px; }
-    .ai-title-text p { color: #888 !important; margin: 0; font-size: 0.9rem; margin-top: 2px; }
+    
+    .ai-title-text h3 { 
+        color: white !important; margin: 0; 
+        font-size: 1.3rem; font-weight: 700; letter-spacing: 0.5px; 
+    }
+    .ai-title-text p { 
+        color: #888 !important; margin: 0; 
+        font-size: 0.85rem; margin-top: 2px; font-weight: 500; 
+    }
     
     .ai-score-group { text-align: right; }
     .ai-score-val { 
-        font-size: 3rem; font-weight: 700; 
+        font-size: 2.8rem; font-weight: 800; 
         background: linear-gradient(to right, #4facfe, #00f2fe);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         line-height: 1;
+        font-family: 'Arial', sans-serif;
     }
-    .ai-score-label { color: #888; font-size: 0.9rem; margin-top: 5px; letter-spacing: 1px; }
+    .ai-score-label { 
+        color: #888; font-size: 0.8rem; 
+        margin-top: 5px; letter-spacing: 1px; text-transform: uppercase; 
+    }
     
     .ai-pred-row {
-        display: flex; gap: 20px; margin-bottom: 20px;
+        display: flex; gap: 15px; margin-bottom: 10px;
     }
     .ai-pred-box {
         flex: 1;
         background: #11141c;
         border-radius: 16px;
-        padding: 20px;
+        padding: 15px 20px;
         border: 1px solid #222;
+        display: flex; flex-direction: column;
     }
-    .pred-title { color: #888; font-size: 1rem; margin-bottom: 10px; }
-    .pred-num { font-size: 2rem; font-weight: 700; letter-spacing: 1px; }
-    .color-green { color: #4ade80; }
-    .color-red { color: #f87171; }
+    .pred-title { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
+    .pred-num { font-size: 1.8rem; font-weight: 700; letter-spacing: 0.5px; font-family: 'Roboto Mono', monospace;}
+    .color-green { color: #4ade80 !important; }
+    .color-red { color: #f87171 !important; }
     
-    /* Plotly 圖表容器 */
-    .chart-container { margin-top: 10px; border-radius: 12px; overflow: hidden; }
+    /* Plotly 圖表容器修正 */
+    .chart-container { 
+        margin-top: 0px; 
+        border-radius: 0 0 20px 20px; 
+        overflow: hidden; 
+        height: 180px; /* 固定高度避免跳動 */
+    }
 
     /* 強制卡片內文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
@@ -342,35 +361,27 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，加入 fallback 機制嘗試不同模型
+# 修改 AI API 呼叫，強制使用 gemini-1.5-flash
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 定義模型優先順序：先試最新 Flash，失敗則試 Pro
-    models_to_try = ["gemini-1.5-flash", "gemini-1.0-pro"]
+    # 強制使用 gemini-1.5-flash，不使用 fallback，確保符合要求
+    model = "gemini-1.5-flash"
     
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
     
-    last_error = ""
-    
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200: 
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-            elif response.status_code == 403 or response.status_code == 404:
-                last_error = f"模型 {model} 權限不足或未找到，嘗試下一個..."
-                continue # 嘗試下一個模型
-            else:
-                last_error = f"AI 回應錯誤: {response.status_code} - {response.text}"
-                continue
-        except Exception as e: 
-            last_error = f"連線錯誤: {e}"
-            continue
-
-    return f"AI 服務暫時無法使用。最後錯誤: {last_error}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200: 
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        elif response.status_code == 403:
+            return f"API 權限錯誤 (403): 請確認您的 API Key 是否支援 {model} 模型。"
+        else:
+            return f"AI 回應錯誤: {response.status_code} - {response.text}"
+    except Exception as e: 
+        return f"連線錯誤: {e}"
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
@@ -691,10 +702,6 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-                # --- 核心修正：移除 rangebreaks ---
-                # 因為 data_period 已設為 '1d'，資料本身就只包含當日，不需要再隱藏非交易時段。
-                # 這樣可以避免因資料缺漏導致的顯示問題。
-
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
@@ -818,80 +825,87 @@ if target:
             
             if st.button("開始回測"):
                 backtest_df = stock.history(period="1y", interval="1d")
-                backtest_df = calculate_indicators(backtest_df)
-                res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
                 
-                # 計算支撐與壓力 (簡單模擬)
-                recent_high = backtest_df['High'].tail(20).max()
-                recent_low = backtest_df['Low'].tail(20).min()
-                
-                # --- 圖表改為深色透明，並移除背景格線 ---
-                fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
-                fig_bt.update_layout(
-                    template="plotly_dark",
-                    height=250, # 配合卡片高度
-                    paper_bgcolor='rgba(0,0,0,0)', # 完全透明
-                    plot_bgcolor='rgba(0,0,0,0)',  # 完全透明
-                    font=dict(color='#aaa'),
-                    margin=dict(l=0, r=0, t=10, b=10),
-                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False), # 隱藏X軸所有元素
-                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False), # 隱藏Y軸所有元素
-                )
-                chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False, 'staticPlot': True}) # staticPlot 禁止互動，避免當機
+                # 簡單的錯誤處理防止當機
+                if backtest_df.empty:
+                    st.error("無法取得回測資料")
+                else:
+                    backtest_df = calculate_indicators(backtest_df)
+                    res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
+                    
+                    # 計算支撐與壓力 (簡單模擬)
+                    recent_high = backtest_df['High'].tail(20).max()
+                    recent_low = backtest_df['Low'].tail(20).min()
+                    
+                    # --- 圖表改為深色透明，並移除背景格線，簡化配置防止崩潰 ---
+                    fig_bt = go.Figure()
+                    fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
+                    fig_bt.update_layout(
+                        template="plotly_dark",
+                        height=180, 
+                        margin=dict(l=0, r=0, t=10, b=0),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        showlegend=False,
+                        xaxis=dict(visible=False), 
+                        yaxis=dict(visible=False),
+                    )
+                    
+                    # 使用 staticPlot: True 避免大量 JS 運算導致前端卡頓
+                    chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False, 'staticPlot': True})
 
-                # --- 復刻深色卡片 HTML (維持不變) ---
-                backtest_html = f"""
-                <div class="ai-backtest-card">
-                    <div class="ai-header-row">
-                        <div class="ai-title-group">
-                            <div class="ai-icon-box">💻</div>
-                            <div class="ai-title-text">
-                                <h3>AI 大數據回測</h3>
-                                <p>Pattern Matching</p>
+                    # --- 復刻深色卡片 HTML ---
+                    backtest_html = f"""
+                    <div class="ai-backtest-card">
+                        <div class="ai-header-row">
+                            <div class="ai-title-group">
+                                <div class="ai-icon-box">📊</div>
+                                <div class="ai-title-text">
+                                    <h3>AI 大數據回測</h3>
+                                    <p>Pattern Matching</p>
+                                </div>
+                            </div>
+                            <div class="ai-score-group">
+                                <div class="ai-score-val">{int(win_rate)}%</div>
+                                <div class="ai-score-label">上漲機率</div>
                             </div>
                         </div>
-                        <div class="ai-score-group">
-                            <div class="ai-score-val">{int(win_rate)}%</div>
-                            <div class="ai-score-label">上漲機率</div>
+                        
+                        <div class="ai-pred-row">
+                            <div class="ai-pred-box">
+                                <div class="pred-title">支撐預測</div>
+                                <div class="pred-num color-green">{recent_low:.0f}</div>
+                            </div>
+                            <div class="ai-pred-box">
+                                <div class="pred-title">壓力預測</div>
+                                <div class="pred-num color-red">{recent_high:.0f}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-container">
+                            {chart_html}
                         </div>
                     </div>
+                    """
+                    st.markdown(backtest_html, unsafe_allow_html=True)
                     
-                    <div class="ai-pred-row">
-                        <div class="ai-pred-box">
-                            <div class="pred-title">支撐預測</div>
-                            <div class="pred-num color-green">{recent_low:.0f}</div>
-                        </div>
-                        <div class="ai-pred-box">
-                            <div class="pred-title">壓力預測</div>
-                            <div class="pred-num color-red">{recent_high:.0f}</div>
-                        </div>
+                    # 文字報告
+                    color_ret = "text-up" if return_rate > 0 else "text-down"
+                    st.markdown(f"""
+                    <div class="market-summary-box" style="margin-bottom: 20px;">
+                        <div style="font-size: 1.2rem;">最終資產: <b>{int(final_assets):,}</b> 元</div>
+                        <div style="font-size: 1.5rem;">報酬率: <b class="{color_ret}">{return_rate:.2f}%</b></div>
+                        <div>總交易次數: {len(trades)} 次</div>
                     </div>
+                    """, unsafe_allow_html=True)
                     
-                    <div class="chart-container">
-                        {chart_html}
-                    </div>
-                </div>
-                """
-                st.markdown(backtest_html, unsafe_allow_html=True)
-                
-                # 文字報告
-                color_ret = "text-up" if return_rate > 0 else "text-down"
-                st.markdown(f"""
-                <div class="market-summary-box" style="margin-bottom: 20px;">
-                    <div style="font-size: 1.2rem;">最終資產: <b>{int(final_assets):,}</b> 元</div>
-                    <div style="font-size: 1.5rem;">報酬率: <b class="{color_ret}">{return_rate:.2f}%</b></div>
-                    <div>總交易次數: {len(trades)} 次</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if trades:
-                    st.write("📝 近期交易明細：")
-                    trades_df = pd.DataFrame(trades)
-                    trades_df['日期'] = pd.to_datetime(trades_df['日期']).dt.strftime('%Y-%m-%d')
-                    st.dataframe(trades_df, use_container_width=True)
-                else:
-                    st.info("此期間無觸發交易訊號。")
+                    if trades:
+                        st.write("📝 近期交易明細：")
+                        trades_df = pd.DataFrame(trades)
+                        trades_df['日期'] = pd.to_datetime(trades_df['日期']).dt.strftime('%Y-%m-%d')
+                        st.dataframe(trades_df, use_container_width=True)
+                    else:
+                        st.info("此期間無觸發交易訊號。")
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")

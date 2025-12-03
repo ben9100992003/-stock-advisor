@@ -11,6 +11,7 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
+import textwrap # 新增這個庫來處理縮排問題
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -543,37 +544,37 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 重新設計的報價卡片 HTML (灰白底，去除縮排以修正顯示錯誤)
-            quote_html = f"""
-<div class="quote-card">
-    <div style="display:flex; justify-content:space-between; align-items:start;">
-        <div>
-            <div class="stock-tag">交易中</div>
-            <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
-                <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
-                    {name} <span style="font-size:1rem; color:#888;">{target}</span>
-                    <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
-                </a>
+            # 使用 textwrap.dedent 來確保 HTML 字串沒有多餘的縮排，解決代碼區塊顯示問題
+            quote_html = textwrap.dedent(f"""
+            <div class="quote-card">
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div>
+                        <div class="stock-tag">交易中</div>
+                        <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
+                            <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
+                                {name} <span style="font-size:1rem; color:#888;">{target}</span>
+                                <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="price-info-row">
+                    <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
+                    <div class="price-change-block {color_class}">
+                        <div>{arrow} {abs(change):.2f}</div>
+                        <div>{abs(pct):.2f}%</div>
+                    </div>
+                </div>
+                
+                <div class="stats-table">
+                    <div class="stats-item"><span class="stats-label">最高</span><span class="stats-value text-up">{latest_fast['High']:.2f}</span></div>
+                    <div class="stats-item"><span class="stats-label">昨收</span><span class="stats-value">{prev_close:.2f}</span></div>
+                    <div class="stats-item"><span class="stats-label">最低</span><span class="stats-value text-down">{latest_fast['Low']:.2f}</span></div>
+                    <div class="stats-item"><span class="stats-label">開盤</span><span class="stats-value">{latest_fast['Open']:.2f}</span></div>
+                </div>
             </div>
-        </div>
-    </div>
-    
-    <div class="price-info-row">
-        <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
-        <div class="price-change-block {color_class}">
-            <div>{arrow} {abs(change):.2f}</div>
-            <div>{abs(pct):.2f}%</div>
-        </div>
-    </div>
-    
-    <div class="stats-table">
-        <div class="stats-item"><span class="stats-label">最高</span><span class="stats-value text-up">{latest_fast['High']:.2f}</span></div>
-        <div class="stats-item"><span class="stats-label">昨收</span><span class="stats-value">{prev_close:.2f}</span></div>
-        <div class="stats-item"><span class="stats-label">最低</span><span class="stats-value text-down">{latest_fast['Low']:.2f}</span></div>
-        <div class="stats-item"><span class="stats-label">開盤</span><span class="stats-value">{latest_fast['Open']:.2f}</span></div>
-    </div>
-</div>
-"""
+            """)
             st.markdown(quote_html, unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
@@ -659,11 +660,14 @@ if target:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#2196f3'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
+                
+                # 修復圖表重複參數錯誤並優化顯示
                 fig_inst.update_layout(
-                    barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"),
-                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', # 修正背景顏色
-                    font=dict(color='black'), yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333'), # 修正線條顯示
-                    xaxis=dict(showgrid=True, gridcolor='#e0e0e0')
+                    barmode='group', template="plotly_white", height=400,
+                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', 
+                    font=dict(color='black'), 
+                    yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333', gridcolor='#e0e0e0'), 
+                    xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0') # 合併 xaxis 參數
                 )
                 
                 st.markdown("<div class='content-card'>", unsafe_allow_html=True)

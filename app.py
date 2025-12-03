@@ -161,6 +161,11 @@ st.markdown("""
     .chart-container img {
         display: block; /* 消除圖片底部可能的空白 */
     }
+    
+    /* 強制 Plotly HTML 容器樣式 (當靜態圖失敗時使用) */
+    .plotly-html-container {
+        width: 100%; height: 250px; border-radius: 0 0 20px 20px; overflow: hidden;
+    }
 
     /* 強制卡片內文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
@@ -365,7 +370,7 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，強制使用 gemini-1.5-flash
+# 修改 AI API 呼叫，強制使用 gemini-1.5-flash，並加入 timeout 避免卡住
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
@@ -377,7 +382,8 @@ def call_gemini_api(prompt):
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
     try:
-        response = requests.post(url, headers=headers, json=data)
+        # 加入 timeout 設定，避免請求無限期掛起
+        response = requests.post(url, headers=headers, json=data, timeout=15)
         if response.status_code == 200: 
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         elif response.status_code == 403:
@@ -385,6 +391,8 @@ def call_gemini_api(prompt):
             return f"API 權限錯誤 (403): 您的 API Key 無法存取 {model} 模型。請檢查您的 Google Cloud 專案設定和 API Key 權限。"
         else:
             return f"AI 回應錯誤: {response.status_code} - {response.text}"
+    except requests.exceptions.Timeout:
+        return "AI 連線逾時，請稍後再試。"
     except Exception as e: 
         return f"連線錯誤: {e}"
 
@@ -798,7 +806,7 @@ if target:
             # 已在上方自動執行，這裡直接顯示結果
             if st.session_state['ai_analysis']:
                 # 檢查是否為錯誤訊息
-                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or st.session_state['ai_analysis'].startswith("分析暫時無法使用") or st.session_state['ai_analysis'].startswith("API 權限錯誤"):
+                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or st.session_state['ai_analysis'].startswith("分析暫時無法使用") or st.session_state['ai_analysis'].startswith("API 權限錯誤") or st.session_state['ai_analysis'].startswith("AI 連線逾時"):
                      st.error(st.session_state['ai_analysis'])
                 else:
                     st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
@@ -818,7 +826,7 @@ if target:
                     請用繁體中文回答，語氣專業且親切。
                     """
                     ai_response = call_gemini_api(prompt)
-                    if ai_response.startswith("API 權限錯誤") or ai_response.startswith("AI 回應錯誤") or ai_response.startswith("連線錯誤"):
+                    if ai_response.startswith("API 權限錯誤") or ai_response.startswith("AI 回應錯誤") or ai_response.startswith("連線錯誤") or ai_response.startswith("AI 連線逾時"):
                         st.error(ai_response)
                     else:
                         st.markdown(f"<div class='ai-msg-user'><span>👤 {user_query}</span></div><div class='ai-msg-bot'><span>🦖 {ai_response}</span></div>", unsafe_allow_html=True)
@@ -845,7 +853,7 @@ if target:
                     recent_high = backtest_df['High'].tail(20).max()
                     recent_low = backtest_df['Low'].tail(20).min()
                     
-                    # --- 圖表改為深色透明，並移除背景格線，簡化配置防止崩潰 ---
+                    # --- 圖表改為深色透明，並移除背景格線 ---
                     fig_bt = go.Figure()
                     fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
                     fig_bt.update_layout(
@@ -859,11 +867,20 @@ if target:
                         yaxis=dict(visible=False),
                     )
                     
-                    # 使用 staticPlot: True 避免大量 JS 運算導致前端卡頓
-                    # 改為產生靜態圖片以避免當機
-                    img_bytes = fig_bt.to_image(format="png", width=800, height=250, scale=2)
-                    img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                    chart_html = f'<img src="data:image/png;base64,{img_base64}" style="width:100%; height:auto; border-radius: 0 0 20px 20px;">'
+                    # 嘗試產生靜態圖片以避免前端卡頓，如果失敗則回退到輕量級互動圖表
+                    chart_html = ""
+                    try:
+                        # 嘗試使用 to_image (需要後端支援，如 kaleido)
+                        img_bytes = fig_bt.to_image(format="png", width=800, height=250, scale=2)
+                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                        chart_html = f'<img src="data:image/png;base64,{img_base64}" style="width:100%; height:auto; border-radius: 0 0 20px 20px;">'
+                    except Exception as e:
+                        # 如果產生靜態圖失敗 (例如缺少套件)，回退到輕量級互動圖表，並強制靜態化以防卡頓
+                        fig_bt.update_layout(dragmode=False, hovermode=False)
+                        # 將圖表轉為 HTML，並強制靜態化
+                        chart_html = fig_bt.to_html(full_html=False, config={'staticPlot': True, 'displayModeBar': False})
+                        # 調整容器樣式以適應 HTML 輸出
+                        chart_html = f'<div class="plotly-html-container">{chart_html}</div>'
 
                     # --- 復刻深色卡片 HTML ---
                     backtest_html = f"""

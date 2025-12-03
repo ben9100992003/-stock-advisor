@@ -354,11 +354,9 @@ def call_gemini_api(prompt):
     
     # 擴充模型清單，涵蓋最新與最舊的穩定版本
     models_to_try = [
-        "gemini-2.0-flash-exp",   # 最新實驗版
         "gemini-1.5-flash",       # 標準 Flash
         "gemini-1.5-flash-latest",# Flash 最新
         "gemini-1.5-pro",         # Pro 版本
-        "gemini-1.0-pro",         # 舊版 Pro (備援)
         "gemini-pro"              # 最通用名稱
     ]
     
@@ -861,38 +859,36 @@ if target:
                     plot_bgcolor='#050505',  # 配合深色卡片背景
                     showlegend=False,
                     xaxis=dict(visible=False), 
-                    yaxis=dict(visible=False),
+                    # 修正重點：稍微顯示格線，讓圖表有意義
+                    yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
                 )
                 
-                # --- 修正重點：使用 textwrap.dedent().strip() 並靠左對齊 ---
-                backtest_html = textwrap.dedent(f"""
-                <div class="ai-backtest-card">
-                    <div class="ai-header-row">
-                        <div class="ai-title-group">
-                            <div class="ai-icon-box">📊</div>
-                            <div class="ai-title-text">
-                                <h3>AI 大數據回測</h3>
-                                <p>Pattern Matching</p>
-                            </div>
-                        </div>
-                        <div class="ai-score-group">
-                            <div class="ai-score-val">{int(win_rate)}%</div>
-                            <div class="ai-score-label">上漲機率</div>
-                        </div>
-                    </div>
-                    
-                    <div class="ai-pred-row">
-                        <div class="ai-pred-box">
-                            <div class="pred-title">支撐預測</div>
-                            <div class="pred-num color-green">{recent_low:.0f}</div>
-                        </div>
-                        <div class="ai-pred-box">
-                            <div class="pred-title">壓力預測</div>
-                            <div class="pred-num color-red">{recent_high:.0f}</div>
-                        </div>
-                    </div>
-                </div>
-                """).strip()
+                # --- 修正重點：使用完全靠左對齊的 HTML 字串，解決縮排問題 ---
+                backtest_html = f"""<div class="ai-backtest-card">
+<div class="ai-header-row">
+<div class="ai-title-group">
+<div class="ai-icon-box">📊</div>
+<div class="ai-title-text">
+<h3>AI 大數據回測</h3>
+<p>Pattern Matching</p>
+</div>
+</div>
+<div class="ai-score-group">
+<div class="ai-score-val">{int(win_rate)}%</div>
+<div class="ai-score-label">上漲機率</div>
+</div>
+</div>
+<div class="ai-pred-row">
+<div class="ai-pred-box">
+<div class="pred-title">支撐預測</div>
+<div class="pred-num color-green">{recent_low:.0f}</div>
+</div>
+<div class="ai-pred-box">
+<div class="pred-title">壓力預測</div>
+<div class="pred-num color-red">{recent_high:.0f}</div>
+</div>
+</div>
+</div>"""
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
                 # --- 獨立顯示圖表 (避免當機的關鍵：使用 staticPlot=True) ---

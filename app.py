@@ -71,7 +71,8 @@ st.markdown("""
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 16px; padding: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        margin-bottom: 20px; border: 1px solid #eee;
+        margin-bottom: 10px; /* 減少下方空白 */
+        border: 1px solid #eee;
         position: relative; z-index: 1;
         color: #333 !important;
     }
@@ -109,27 +110,32 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* 數據表格樣式 (標準 Table) */
+    /* --- 數據表格樣式 (Quotes Table) --- */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
-        border: 1px solid #eee; /* 外框 */
+        /* 不再使用外框線，保持乾淨 */
     }
     table.quote-table td {
         padding: 12px 10px;
-        border: 1px solid #eee; /* 內格線 */
+        border-bottom: 1px solid #f0f0f0; /* 淺色分隔線 */
         vertical-align: middle;
         font-size: 1rem;
     }
     table.quote-table .label {
         color: #666;
         font-weight: 500;
+        float: left;
     }
     table.quote-table .value {
         font-weight: 700;
         color: #000;
         float: right;
+    }
+    /* 最後一列不顯示底線 */
+    table.quote-table tr:last-child td {
+        border-bottom: none;
     }
 
     /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
@@ -148,6 +154,7 @@ st.markdown("""
         width: 100%;
         align-items: center;
         -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
+        margin-bottom: 10px;
     }
     .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
     
@@ -211,6 +218,9 @@ st.markdown("""
     
     /* 隱藏 Radio 預設圓點 */
     .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
+    
+    /* 隱藏預設的 element-container 空白 */
+    div[data-testid="stVerticalBlock"] > div:has(div.fixed-spacer) { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -585,7 +595,7 @@ if target:
                 
                 <table class="quote-table">
                     <tr>
-                        <td style="border-right: 1px solid #eee;">
+                        <td style="border-right: 1px solid #f0f0f0;">
                             <span class="label">最高</span>
                             <span class="value text-up">{latest_fast['High']:.2f}</span>
                         </td>
@@ -595,7 +605,7 @@ if target:
                         </td>
                     </tr>
                     <tr>
-                        <td style="border-right: 1px solid #eee;">
+                        <td style="border-right: 1px solid #f0f0f0;">
                             <span class="label">最低</span>
                             <span class="value text-down">{latest_fast['Low']:.2f}</span>
                         </td>
@@ -647,6 +657,8 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
+                # 不強制限制 X 軸範圍，允許用戶左右滑動 (Pan)
+                # 設定預設顯示範圍為最後 60 筆，但允許滑動查看更多
                 if not is_intraday and len(plot_df) > 60:
                     fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
 
@@ -656,7 +668,7 @@ if target:
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
                     legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
                     dragmode='pan', hovermode='x unified', 
-                    xaxis=dict(rangeslider_visible=False), 
+                    xaxis=dict(rangeslider_visible=False, fixedrange=False), # X軸可滑動
                     yaxis=dict(fixedrange=True),
                     yaxis2=dict(fixedrange=True),
                     yaxis3=dict(fixedrange=True),
@@ -694,7 +706,7 @@ if target:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
                 
-                # 修復圖表重複參數錯誤並優化顯示
+                # 修正圖表間距，移除空白
                 fig_inst.update_layout(
                     barmode='group', template="plotly_white", height=400,
                     margin=dict(t=0, b=10, l=10, r=10), # 移除上方空白

@@ -72,39 +72,51 @@ st.markdown("""
     .stApp { font-family: "Microsoft JhengHei", "sans-serif"; color: #333; }
     h1, h2, h3, h4, h5, h6 { color: #333; }
     
-    /* --- 卡片通用設定 --- */
+    /* --- 卡片通用設定 (白底) --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
         background-color: rgba(255, 255, 255, 0.95) !important;
         border-radius: 16px; 
-        padding: 25px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        padding: 20px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         margin-bottom: 20px; 
         border: 1px solid #fff;
         position: relative; z-index: 1;
         color: #333 !important;
-        width: 100%; /* 確保滿版 */
-        box-sizing: border-box; /* 防止 padding 擠壓寬度 */
+        width: 100%;
+        box-sizing: border-box;
     }
     
-    /* --- AI 對話氣泡樣式 (修正版：獨立白卡) --- */
-    .ai-msg-bot, .ai-msg-user {
-        background-color: rgba(255, 255, 255, 0.95) !important;
+    /* --- AI 對話訊息樣式 --- */
+    .ai-msg-bot, .ai-msg-user, .ai-msg-error, .ai-msg-info {
+        background-color: rgba(255, 255, 255, 0.98) !important;
         padding: 20px;
         border-radius: 16px;
         margin-bottom: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        border: 1px solid #eee;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid #f0f0f0;
         color: #333 !important;
         line-height: 1.6;
+        font-size: 1rem;
     }
     
     .ai-msg-user {
-        border-left: 5px solid #2196f3;
-        background-color: #e3f2fd !important; /* 用戶提問稍微藍一點 */
+        border-left: 6px solid #2196f3;
+        background-color: #f8fbff !important;
     }
     
     .ai-msg-bot {
-        border-left: 5px solid #4caf50;
+        border-left: 6px solid #4caf50;
+    }
+
+    .ai-msg-error {
+        border-left: 6px solid #f44336;
+        background-color: #fff5f5 !important;
+        color: #d32f2f !important;
+    }
+
+    .ai-msg-info {
+        border-left: 6px solid #ff9800;
+        background-color: #fff8e1 !important;
     }
 
     /* --- AI 回測深色卡片 --- */
@@ -124,6 +136,8 @@ st.markdown("""
     .ai-header-row {
         display: flex; justify-content: space-between; align-items: flex-start;
         margin-bottom: 25px;
+        flex-wrap: wrap; /* 允許換行避免擠壓 */
+        gap: 15px;
     }
     
     .ai-title-group { display: flex; gap: 15px; align-items: center; }
@@ -135,6 +149,7 @@ st.markdown("""
         display: flex; align-items: center; justify-content: center;
         font-size: 24px; color: white;
         box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+        flex-shrink: 0;
     }
     
     .ai-title-text h3 { 
@@ -146,7 +161,7 @@ st.markdown("""
         font-size: 0.85rem; margin-top: 2px; font-weight: 500; 
     }
     
-    .ai-score-group { text-align: right; }
+    .ai-score-group { text-align: right; flex-grow: 1; }
     .ai-score-val { 
         font-size: 2.8rem; font-weight: 800; 
         background: linear-gradient(to right, #4facfe, #00f2fe);
@@ -161,10 +176,11 @@ st.markdown("""
     }
     
     .ai-pred-row {
-        display: flex; gap: 15px; margin-bottom: 10px;
+        display: flex; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;
     }
     .ai-pred-box {
         flex: 1;
+        min-width: 140px; /* 防止過度擠壓 */
         background: #11141c;
         border-radius: 16px;
         padding: 15px 20px;
@@ -176,7 +192,7 @@ st.markdown("""
     .color-green { color: #4ade80 !important; }
     .color-red { color: #f87171 !important; }
     
-    /* 修正元件顏色 */
+    /* 修正文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
         text-shadow: none !important;
         color: #333; 
@@ -185,27 +201,26 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #333 !important; }
     
-    .quote-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+    /* 報價卡片佈局優化 */
+    .quote-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
     .stock-name { font-size: 1.8rem; font-weight: 900; color: #222; }
     .stock-id { font-size: 1.2rem; color: #888; font-weight: 500; }
-    .price-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
-    .main-price { font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
-    .change-info { display: flex; flex-direction: column; justify-content: center; font-size: 1.1rem; font-weight: 600; line-height: 1.4; }
-    .market-tag {
-        display: inline-block; padding: 3px 12px; border: 1px solid #ddd;
-        border-radius: 20px; color: #666; font-size: 0.9rem;
-        background-color: #f9f9f9; margin-bottom: 20px;
-    }
+    .price-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+    .main-price { font-size: 3.5rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
+    
     .detail-grid {
-        display: grid; grid-template-columns: 1fr 1fr;
-        column-gap: 20px; row-gap: 8px; font-size: 1.1rem;
+        display: grid; 
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* 自動適應寬度，防止擠壓 */
+        column-gap: 20px; row-gap: 10px; font-size: 1.1rem;
     }
-    .detail-item { display: flex; justify-content: flex-start; align-items: center; gap: 10px; }
+    .detail-item { display: flex; justify-content: flex-start; align-items: center; gap: 8px; }
     .detail-label { color: #888; min-width: 40px; }
     .detail-value { font-weight: 700; font-family: 'Roboto', sans-serif; }
 
-    table.analysis-table { width: 100%; border-collapse: collapse; min-width: 300px; }
-    table.analysis-table td, table.analysis-table th { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
+    /* 表格優化 */
+    .table-container { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+    table.analysis-table { width: 100%; min-width: 500px; border-collapse: collapse; } /* 設最小寬度讓手機可滑動 */
+    table.analysis-table td, table.analysis-table th { padding: 10px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
 
     .stRadio > div[role="radiogroup"] {
         background-color: #ffffff !important; border-radius: 30px !important; 
@@ -226,7 +241,7 @@ st.markdown("""
 
     .stTextInput input, .stSelectbox div[data-baseweb="select"] > div { background-color: #fff !important; color: #333 !important; }
     .stButton button { background-color: #fff; color: #333; border: 1px solid #ccc; font-weight: bold; }
-    .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; }
+    .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.8); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; }
     .stTabs button[aria-selected="true"] { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .stTabs button[aria-selected="true"] p { color: #e53935 !important; }
 
@@ -371,11 +386,9 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，加入更完整的模型清單 (地毯式搜索)
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 擴充模型清單，涵蓋最新與最舊的穩定版本
     models_to_try = [
         "gemini-2.0-flash-exp",
         "gemini-1.5-flash",
@@ -398,7 +411,6 @@ def call_gemini_api(prompt):
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
-            # 加入 timeout 設定
             response = requests.post(url, headers=headers, json=data, timeout=20)
             if response.status_code == 200: 
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
@@ -449,7 +461,6 @@ def run_backtest(df, strategy_type, initial_capital=100000):
     df['Total_Assets'] = initial_capital
     trades = []
     
-    # 計算勝率用的變數
     winning_trades = 0
     total_completed_trades = 0
     entry_price = 0
@@ -471,7 +482,6 @@ def run_backtest(df, strategy_type, initial_capital=100000):
                 revenue = position * price
                 capital += revenue
                 
-                # 計算是否獲利
                 if price > entry_price:
                     winning_trades += 1
                 total_completed_trades += 1
@@ -510,7 +520,6 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         color_total = 'text-up' if total > 0 else 'text-down'
         inst_desc = f"法人單日合計 <b class='{color_total}'>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
         
-        # 絕對靠左，無縮排
         inst_table_html = f"""
 <tr>
     <td>{last['Date']}</td>
@@ -540,20 +549,23 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    # 使用 f-string 直接靠左撰寫，不使用 dedent 以避免邊緣情況
     return f"""<div class="content-card">
 <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
 <h4>1. 技術指標分析</h4>
+<div class="table-container">
 <table class="analysis-table">
 <tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
 <tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
 <tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
 </table>
+</div>
 <h4>2. 三大法人籌碼分析</h4>
+<div class="table-container">
 <table class="analysis-table">
 <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
 <tbody>{inst_table_html}</tbody>
 </table>
+</div>
 <p><b>籌碼解讀：</b>{inst_desc}</p>
 <h4>3. 公司題材與願景</h4>
 <p>{theme_text}</p>
@@ -585,14 +597,13 @@ st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉
 with st.spinner("載入數據..."):
     hot_tw, hot_us = get_market_hot_stocks()
 
-# 修改為 3 欄，搜尋 | 快選 | 重新整理
 c_search, c_hot, c_btn = st.columns([2.5, 1.2, 0.5])
 with c_search:
     target_input = st.text_input("🔍 搜尋代號/名稱 (如: 4903, 2330, NVDA)", value="2330")
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 with c_btn:
-    st.write("") # 排版用，讓按鈕垂直對齊
+    st.write("")
     st.write("") 
     if st.button("🔄", help="重新整理數據"):
         st.cache_data.clear()
@@ -605,19 +616,16 @@ if target_input:
     if resolved_ticker: target = resolved_ticker; name = resolved_name
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
 
-# --- 觸發 AI 自動分析的邏輯 (放在主流程中) ---
+# --- AI 自動分析邏輯 ---
 if 'last_target' not in st.session_state: st.session_state['last_target'] = None
 if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
 
-# 如果目標股票改變，或者尚未分析過，就清空並準備分析
 if st.session_state['last_target'] != target:
     st.session_state['last_target'] = target
     st.session_state['ai_analysis'] = None
 
-# 如果 AI 分析結果是空的，則執行分析
 if st.session_state['ai_analysis'] is None:
     try:
-        # 使用 yfinance 獲取最新基本數據用於 Prompt
         temp_stock = yf.Ticker(target)
         temp_hist = temp_stock.history(period="5d")
         if not temp_hist.empty:
@@ -630,13 +638,11 @@ if st.session_state['ai_analysis'] is None:
             請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
             語氣請專業、客觀且親切。
             """
-            # 加入 Spinner 顯示 AI 正在分析中
             with st.spinner(f"🤖 AI 正在分析 {name} 的最新數據，請稍候..."):
                 result = call_gemini_api(auto_prompt)
                 st.session_state['ai_analysis'] = result
-            # 這裡不使用 rerun，讓它在下一次互動或切換 Tab 時自然顯示
     except:
-        st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
+        st.session_state['ai_analysis'] = "AI 服務連線失敗，請稍後再試。"
 
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
@@ -662,7 +668,6 @@ if target:
             change = latest_fast['Close'] - prev_close
             pct = (change / prev_close) * 100
             
-            # 定義顏色：台股紅漲綠跌
             color_class = "text-up" if change >= 0 else "text-down"
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
@@ -680,7 +685,6 @@ if target:
             c_low = get_color(latest_fast['Low'], prev_close)
             c_open = get_color(latest_fast['Open'], prev_close)
             
-            # 直接靠左撰寫，避免 st.markdown 縮排誤判
             quote_html = f"""<div class="quote-card">
 <div class="quote-header">
 <span class="stock-name"><a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a></span>
@@ -712,7 +716,6 @@ if target:
             interval = interval_map[period_label]
             is_intraday = interval in ["1m", "5m", "15m", "30m", "60m"]
             
-            # 修正：分時線強制抓 1 天 (當日)，日線以上抓較長區間
             data_period = "1d" if is_intraday else ("2y" if interval == "1d" else "5y")
             
             df = stock.history(period=data_period, interval=interval)
@@ -791,16 +794,13 @@ if target:
                     xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0', fixedrange=False)
                 )
                 
-                # Chart 獨立顯示 (自帶白色背景)
                 st.plotly_chart(fig_inst, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True})
                 
-                # 表格包在 content-card 內，確保有白色背景
-                table_html = "<div style='overflow-x: auto;'><table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
+                table_html = "<div class='table-container'><table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
                 for _, row in inst_df.sort_values('Date', ascending=False).head(10).iterrows():
                     table_html += f"<tr><td>{row['Date']}</td><td class='{'text-up' if row['Foreign']>0 else 'text-down'}'>{row['Foreign']:,}</td><td class='{'text-up' if row['Trust']>0 else 'text-down'}'>{row['Trust']:,}</td><td class='{'text-up' if row['Dealer']>0 else 'text-down'}'>{row['Dealer']:,}</td></tr>"
                 table_html += "</tbody></table></div>"
                 
-                # 使用字串格式化確保包覆完整
                 final_table_html = f"<div class='content-card'><h3>📊 詳細數據</h3>{table_html}</div>"
                 st.markdown(final_table_html, unsafe_allow_html=True)
 
@@ -810,13 +810,11 @@ if target:
             news_list = get_google_news(target)
             news_html_content = ""
             for news in news_list:
-                # 絕對靠左，無縮排
                 news_html_content += f"""<div class='news-item'>
 <a href='{news['link']}' target='_blank'>{news['title']}</a>
 <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
 </div>"""
             
-            # 絕對靠左，無縮排
             final_news_html = f"""<div class='light-card'>
 <h3>📰 個股相關新聞</h3>
 {news_html_content}
@@ -824,24 +822,23 @@ if target:
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:
-            st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
+            # 標題區塊
+            st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3></div>", unsafe_allow_html=True)
             
-            # 已在上方自動執行，這裡直接顯示結果
+            # AI 分析結果顯示區 (強制白卡)
             if st.session_state['ai_analysis']:
-                # 檢查是否為錯誤訊息 (如果之前有錯誤，現在顯示並提供重試按鈕)
-                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or "錯誤" in st.session_state['ai_analysis']:
-                     st.error(st.session_state['ai_analysis'])
-                     # 加入重試按鈕
+                if "錯誤" in st.session_state['ai_analysis'] or "無法使用" in st.session_state['ai_analysis']:
+                     st.markdown(f"<div class='ai-msg-error'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
                      if st.button("🔄 重試自動分析", key="retry_ai"):
                          st.session_state['ai_analysis'] = None
                          st.rerun()
                 else:
                     st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
             else:
-                st.info("AI 正在分析中，請稍候...")
+                st.markdown(f"<div class='ai-msg-info'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
 
-            st.markdown("<p style='margin-top:15px; border-top:1px solid #ccc; padding-top:10px;'>💬 還有其他問題嗎？歡迎隨時提問：</p>", unsafe_allow_html=True)
-            
+            # 對話區塊
+            st.markdown("<div class='content-card'><h4>💬 還有其他問題嗎？歡迎隨時提問：</h4>", unsafe_allow_html=True)
             user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
             if user_query:
                 with st.spinner("AI 正在思考您的問題..."):
@@ -854,50 +851,42 @@ if target:
                     """
                     ai_response = call_gemini_api(prompt)
                     if "錯誤" in ai_response or "無法使用" in ai_response:
-                        st.error(ai_response)
+                        st.markdown(f"<div class='ai-msg-error'>❌ {ai_response}</div>", unsafe_allow_html=True)
                     else:
-                        st.markdown(f"<div class='ai-msg-user'><span>👤 {user_query}</span></div><div class='ai-msg-bot'><span>🦖 {ai_response}</span></div>", unsafe_allow_html=True)
-            
+                        st.markdown(f"<div class='ai-msg-user'>👤 {user_query}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='ai-msg-bot'>🦖 {ai_response}</div>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tab6:
             st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測 (初始資金: 500,000)</p></div>", unsafe_allow_html=True)
             
-            # --- 固定參數與自動回測 ---
             initial_capital = 500000
             strategy = "KD 策略 (黃金交叉)"
             
-            # 直接執行回測
             backtest_df = stock.history(period="1y", interval="1d")
             
-            # 簡單的錯誤處理防止當機
             if backtest_df.empty:
                 st.error("無法取得回測資料")
             else:
                 backtest_df = calculate_indicators(backtest_df)
                 res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
                 
-                # 計算支撐與壓力 (簡單模擬)
                 recent_high = backtest_df['High'].tail(20).max()
                 recent_low = backtest_df['Low'].tail(20).min()
                 
-                # --- 圖表改為深色透明，並移除背景格線 ---
                 fig_bt = go.Figure()
                 fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
                 fig_bt.update_layout(
                     template="plotly_dark",
                     height=200, 
                     margin=dict(l=0, r=0, t=10, b=0),
-                    paper_bgcolor='#050505', # 配合深色卡片背景
-                    plot_bgcolor='#050505',  # 配合深色卡片背景
+                    paper_bgcolor='#050505',
+                    plot_bgcolor='#050505',
                     showlegend=False,
                     xaxis=dict(visible=False), 
-                    # 修正重點：稍微顯示格線，讓圖表有意義
                     yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
                 )
                 
-                # --- 復刻深色卡片 HTML (上方資訊) ---
-                # 使用完全靠左對齊的 HTML 字串，解決縮排問題
                 backtest_html = f"""<div class="ai-backtest-card">
 <div class="ai-header-row">
 <div class="ai-title-group">
@@ -925,13 +914,10 @@ if target:
 </div>"""
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
-                # --- 獨立顯示圖表 (避免當機的關鍵：使用 staticPlot=True) ---
-                # 將圖表放在卡片下方，透過 CSS 調整 margin 讓它看起來像是在卡片內
                 st.markdown('<div style="margin-top: -25px; border-radius: 0 0 24px 24px; overflow: hidden; border: 1px solid #222; border-top: none;">', unsafe_allow_html=True)
                 st.plotly_chart(fig_bt, use_container_width=True, config={'staticPlot': True, 'displayModeBar': False})
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                # 文字報告
                 color_ret = "text-up" if return_rate > 0 else "text-down"
                 st.markdown(f"""
                 <div class="market-summary-box" style="margin-bottom: 20px; margin-top: 20px;">

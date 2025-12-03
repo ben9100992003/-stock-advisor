@@ -567,14 +567,22 @@ if target:
                     </div>
                 </div>
                 
-                <table class="quote-table">
+                <table class="quote-table" style="width:100%; margin-top:10px; border-collapse: collapse;">
                     <tr>
-                        <td><span class="label">最高</span> <span class="value text-up" style="float:right;">{latest_fast['High']:.2f}</span></td>
-                        <td style="border-left: 1px solid #eee; padding-left: 15px;"><span class="label">昨收</span> <span class="value" style="float:right;">{prev_close:.2f}</span></td>
+                        <td style="border-bottom: 1px solid #eee; padding: 8px;">
+                            <span style="color:#666;">最高</span> <span class="text-up" style="font-weight:bold; float:right;">{latest_fast['High']:.2f}</span>
+                        </td>
+                        <td style="border-bottom: 1px solid #eee; padding: 8px; border-left: 1px solid #eee;">
+                            <span style="color:#666;">昨收</span> <span style="font-weight:bold; float:right;">{prev_close:.2f}</span>
+                        </td>
                     </tr>
                     <tr>
-                        <td><span class="label">最低</span> <span class="value text-down" style="float:right;">{latest_fast['Low']:.2f}</span></td>
-                        <td style="border-left: 1px solid #eee; padding-left: 15px;"><span class="label">開盤</span> <span class="value" style="float:right;">{latest_fast['Open']:.2f}</span></td>
+                        <td style="padding: 8px;">
+                            <span style="color:#666;">最低</span> <span class="text-down" style="font-weight:bold; float:right;">{latest_fast['Low']:.2f}</span>
+                        </td>
+                        <td style="padding: 8px; border-left: 1px solid #eee;">
+                            <span style="color:#666;">開盤</span> <span style="font-weight:bold; float:right;">{latest_fast['Open']:.2f}</span>
+                        </td>
                     </tr>
                 </table>
             </div>

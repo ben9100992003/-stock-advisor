@@ -11,7 +11,7 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
-import textwrap # 關鍵：引入這個函式庫來處理縮排問題
+import textwrap
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -727,20 +727,20 @@ if target:
             news_list = get_google_news(target)
             news_html_content = ""
             for news in news_list:
-                news_html_content += f"""
+                news_html_content += textwrap.dedent(f"""
                 <div class='news-item'>
                     <a href='{news['link']}' target='_blank'>{news['title']}</a>
                     <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
                 </div>
-                """
+                """)
             
             # 將所有新聞包裹在 light-card 中
-            final_news_html = f"""
+            final_news_html = textwrap.dedent(f"""
             <div class='light-card'>
                 <h3>📰 個股相關新聞</h3>
                 {news_html_content}
             </div>
-            """
+            """)
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:

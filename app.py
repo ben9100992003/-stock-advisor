@@ -93,7 +93,7 @@ st.markdown("""
         white-space: nowrap; /* 防止價格換行 */
     }
     
-    /* 價格與漲跌幅的排版：左邊大數字，右邊垂直堆疊的小數字 */
+    /* 價格與漲跌幅的排版 */
     .price-info-row { 
         display: flex; 
         align-items: center; 
@@ -109,7 +109,7 @@ st.markdown("""
         font-size: 1.1rem; 
         font-weight: 600; 
         line-height: 1.4;
-        min-width: 80px; /* 確保有足夠空間顯示漲跌 */
+        min-width: 80px;
     }
     
     /* 紅漲綠跌定義 */
@@ -128,24 +128,24 @@ st.markdown("""
 
     /* --- 3. K線選擇器 (深色半透明 + 強制左右滑動) --- */
     .stRadio > div[role="radiogroup"] {
-        background-color: rgba(30, 30, 30, 0.85) !important; /* 深色背景 */
+        background-color: rgba(30, 30, 30, 0.85) !important;
         border-radius: 30px !important; 
         padding: 8px 12px !important;
         display: flex !important; 
         flex-direction: row !important; 
         gap: 5px !important;
-        overflow-x: auto !important; /* 允許水平滑動 */
-        white-space: nowrap !important; /* 禁止換行 */
-        flex-wrap: nowrap !important; /* 強制不換行 */
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        flex-wrap: nowrap !important;
         border: 1px solid #555;
-        scrollbar-width: none; /* Firefox 隱藏捲軸 */
+        scrollbar-width: none;
         width: 100%;
         align-items: center;
     }
-    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
+    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; /* 不壓縮 */
+        flex: 0 0 auto !important;
         background-color: transparent !important; 
         border: none !important;
         padding: 6px 14px !important; 
@@ -155,18 +155,12 @@ st.markdown("""
         margin-right: 0px !important;
     }
     
-    /* 未選中文字顏色 (白) */
     .stRadio div[role="radiogroup"] > label p { 
-        color: #e0e0e0 !important; 
-        font-weight: 500; 
-        font-size: 0.95rem; 
-        margin: 0; 
-        padding: 0;
+        color: #e0e0e0 !important; font-weight: 500; font-size: 0.95rem; margin: 0; padding: 0;
     }
     
-    /* 選中樣式 (紅底白字) */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #e53935 !important; /* 紅色高亮 */
+        background-color: #e53935 !important;
         box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
     }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; font-weight: bold; }
@@ -181,37 +175,25 @@ st.markdown("""
         border-color: #ccc !important;
     }
     
-    /* 調整按鈕樣式 */
     .stButton button {
-        border-radius: 12px;
-        height: 100%;
-        width: 100%;
-        padding: 0.5rem 0;
-        background-color: #fff;
-        border: 1px solid #ccc;
-        color: #333;
-        font-weight: bold;
+        border-radius: 12px; height: 100%; width: 100%;
+        padding: 0.5rem 0; background-color: #fff;
+        border: 1px solid #ccc; color: #333; font-weight: bold;
     }
     
-    /* 分頁 Tab 樣式 (淺色) */
     .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; white-space: nowrap; }
     .stTabs button { border-radius: 8px; flex: 0 0 auto; background: transparent; border: none; }
     .stTabs button[aria-selected="true"] { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .stTabs button p { color: #555 !important; font-weight: 600; }
     .stTabs button[aria-selected="true"] p { color: #e53935 !important; }
 
-    /* 標題與 AI 對話 */
     h1 { text-shadow: 0 2px 4px rgba(0,0,0,0.5); color: #fff !important; text-align: center; font-weight: 900; }
     .ai-msg-user span { background-color: #e3f2fd; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 0 15px; border: 1px solid #bbdefb; }
     .ai-msg-bot span { background-color: #f5f5f5; color: #333 !important; padding: 10px 15px; border-radius: 15px 15px 15px 0; border: 1px solid #e0e0e0; }
     
-    /* 修正 Plotly 背景 */
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
     
-    /* 隱藏 Radio 選擇器預設的圓點 */
-    .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p {
-        display: block;
-    }
+    .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -644,7 +626,7 @@ if target:
                     yaxis=dict(fixedrange=True),
                     yaxis2=dict(fixedrange=True),
                     yaxis3=dict(fixedrange=True),
-                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='rgba(255,255,255,0.95)', # 設置白色背景使其獨立成卡片
+                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', # 修正背景顏色
                     font=dict(color='black')
                 )
                 
@@ -679,8 +661,9 @@ if target:
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
                 fig_inst.update_layout(
                     barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='black'), yaxis=dict(fixedrange=True)
+                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', # 修正背景顏色
+                    font=dict(color='black'), yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333'), # 修正線條顯示
+                    xaxis=dict(showgrid=True, gridcolor='#e0e0e0')
                 )
                 
                 st.markdown("<div class='content-card'>", unsafe_allow_html=True)

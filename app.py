@@ -109,15 +109,15 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* 數據表格樣式 (Table) */
+    /* 數據表格樣式 (HTML Table) */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
-        table-layout: fixed; /* 固定佈局，確保欄位平均 */
+        table-layout: fixed;
     }
     table.quote-table td {
-        padding: 10px 5px;
+        padding: 12px 8px;
         border-bottom: 1px solid #eee;
         vertical-align: middle;
         font-size: 1rem;
@@ -138,44 +138,42 @@ st.markdown("""
     }
 
     /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
+    /* 這裡使用 !important 強制覆蓋 Streamlit 預設樣式 */
     .stRadio > div[role="radiogroup"] {
-        background-color: #ffffff !important; /* 白色背景 */
+        background-color: #ffffff !important;
         border-radius: 30px !important; 
         padding: 8px 12px !important;
         display: flex !important; 
         flex-direction: row !important; 
         gap: 8px !important;
-        overflow-x: auto !important; /* 核心：開啟水平滾動 */
-        white-space: nowrap !important; /* 核心：禁止換行 */
-        flex-wrap: nowrap !important; /* 核心：禁止 Flex 換行 */
+        overflow-x: auto !important; /* 開啟水平滾動 */
+        white-space: nowrap !important; /* 禁止換行 */
+        flex-wrap: nowrap !important; /* 禁止 Flex 換行 */
         border: 1px solid #ddd;
-        scrollbar-width: none; /* Firefox 隱藏捲軸 */
+        scrollbar-width: none;
         width: 100%;
         align-items: center;
-        -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
+        -webkit-overflow-scrolling: touch;
     }
-    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
+    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; /* 禁止壓縮按鈕 */
-        min-width: 60px !important; /* 設定最小寬度，強迫溢出 */
+        flex: 0 0 auto !important; /* 禁止壓縮 */
+        min-width: 60px !important;
         background-color: transparent !important; 
         border: none !important;
         padding: 6px 14px !important; 
         border-radius: 20px !important;
         cursor: pointer; 
-        transition: all 0.2s;
         margin: 0 !important;
         text-align: center;
     }
     
-    /* 文字樣式 */
     .stRadio div[role="radiogroup"] > label p { 
         color: #555 !important; font-weight: 600; font-size: 0.95rem; margin: 0; padding: 0;
         white-space: nowrap !important;
     }
     
-    /* 選中樣式 (紅底白字) */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #e53935 !important;
         box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
@@ -613,7 +611,7 @@ if target:
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
-            # 移除了上方的 chart-container-box wrapper 以消除空白
+            # 移除所有不必要的空白與 wrapper
             
             # 左右滑動的按鈕 (亮白色風格，解決看不清楚問題)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}

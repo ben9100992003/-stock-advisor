@@ -16,7 +16,6 @@ import textwrap
 # --- 0. 設定與金鑰 ---
 # 注意：請確認您的 FinMind 和 Gemini API Key 是否正確
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 已更新為您提供的 API Key
 GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8" 
 
 # --- 1. 頁面設定 ---
@@ -291,23 +290,35 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，更換為通用模型以避免 403 錯誤
+# 修改 AI API 呼叫，加入 fallback 機制嘗試不同模型
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 更改為通用模型 gemini-1.5-flash
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # 定義模型優先順序：先試最新 Flash，失敗則試 Pro
+    models_to_try = ["gemini-1.5-flash", "gemini-1.0-pro"]
+    
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200: 
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        elif response.status_code == 403:
-            return "AI 回應錯誤: 403 (權限不足)。請檢查您的 API Key 是否正確，或是否有該模型的使用權限。"
-        else: 
-            return f"AI 回應錯誤: {response.status_code} - {response.text}"
-    except Exception as e: return f"連線錯誤: {e}"
+    
+    last_error = ""
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200: 
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            elif response.status_code == 403 or response.status_code == 404:
+                last_error = f"模型 {model} 權限不足或未找到，嘗試下一個..."
+                continue # 嘗試下一個模型
+            else:
+                last_error = f"AI 回應錯誤: {response.status_code} - {response.text}"
+                continue
+        except Exception as e: 
+            last_error = f"連線錯誤: {e}"
+            continue
+
+    return f"AI 服務暫時無法使用。最後錯誤: {last_error}"
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
@@ -561,10 +572,11 @@ if target:
                 df = calculate_indicators(df)
                 latest = df.iloc[-1]
                 
+                # --- [修正] 移除原本只取單日的限制，顯示完整5日資料，解決縮小時空白問題 ---
                 plot_df = df.copy()
-                if is_intraday:
-                    last_date = df.index[-1].date()
-                    plot_df = df[df.index.date == last_date]
+                
+                # 若為分時K線，不鎖定單日，而是顯示完整 fetch 下來的區間 (通常為5天)
+                # 原本代碼: if is_intraday: last_date=... plot_df=... (已移除)
                 
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 
@@ -581,9 +593,9 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-                if not is_intraday and len(plot_df) > 60:
-                    fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
-
+                # 不強制設定 range，讓 Plotly 自動適應完整數據範圍
+                # if not is_intraday and len(plot_df) > 60: ... (這部分可以保留給日線，但分時線我們希望看到完整5日)
+                
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
@@ -597,6 +609,17 @@ if target:
                     font=dict(color='black')
                 )
                 
+                # --- [修正] 嘗試隱藏非交易時段，讓圖表更連續 (針對分時線) ---
+                if is_intraday:
+                    # 隱藏每天收盤到隔天開盤的空檔 (大約下午1:30到早上9:00)
+                    # 注意：這裡使用簡單的 hour pattern，可能需要根據實際市場微調
+                    fig.update_xaxes(
+                        rangebreaks=[
+                            dict(bounds=["sat", "mon"]), # 隱藏週末
+                            dict(bounds=[13.5, 9], pattern="hour"), # 隱藏 13:30 ~ 09:00 (數值需依資料時區而定，yfinance通常為本地時間)
+                        ]
+                    )
+
                 grid_color = "#e0e0e0"
                 for row in [1, 2, 3]:
                     fig.update_xaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)

@@ -11,6 +11,7 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
+import textwrap
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -67,10 +68,10 @@ st.markdown("""
     
     /* --- 卡片通用設定 (灰白色背景) --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 16px; padding: 20px;
+        background-color: rgba(255, 255, 255, 0.98) !important;
+        border-radius: 16px; padding: 15px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        margin-bottom: 20px; border: 1px solid #eee;
+        margin-bottom: 15px; border: 1px solid #eee;
         position: relative; z-index: 1;
         color: #333 !important;
     }
@@ -83,24 +84,24 @@ st.markdown("""
 
     /* --- 股票報價卡片 --- */
     .stock-tag {
-        display: inline-block; padding: 4px 12px; border-radius: 4px;
-        font-size: 0.85rem; font-weight: bold; margin-bottom: 8px;
+        display: inline-block; padding: 2px 8px; border-radius: 4px;
+        font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;
         background-color: #fff3e0; color: #f57c00 !important; /* 交易中 橘色 */
     }
     
     .price-large {
-        font-size: 3.5rem !important; font-weight: 700; line-height: 1.1; margin: 0;
-        white-space: nowrap; /* 防止價格換行 */
+        font-size: 3rem !important; font-weight: 700; line-height: 1; margin: 0;
+        white-space: nowrap;
     }
     
     .price-info-row { 
-        display: flex; align-items: center; gap: 15px; margin-bottom: 15px;
+        display: flex; align-items: flex-end; gap: 10px; margin-bottom: 10px;
         flex-wrap: nowrap !important;
     }
     
     .price-change-block { 
         display: flex; flex-direction: column; justify-content: center;
-        font-size: 1.1rem; font-weight: 600; line-height: 1.4; min-width: 80px;
+        font-size: 1rem; font-weight: 600; line-height: 1.3; min-width: 70px;
     }
     
     /* 紅漲綠跌定義 */
@@ -108,96 +109,104 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* --- 數據表格樣式 (標準 HTML Table) --- */
+    /* 數據表格樣式 (Table) */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 15px;
-        font-family: "Microsoft JhengHei", sans-serif;
+        margin-top: 5px;
+        table-layout: fixed;
     }
     table.quote-table td {
-        padding: 12px 10px;
-        border-bottom: 1px solid #e0e0e0;
+        padding: 8px 4px;
+        border-bottom: 1px solid #f0f0f0;
         vertical-align: middle;
-        font-size: 1rem;
-        width: 50%; /* 兩欄均分 */
+        font-size: 0.95rem;
     }
+    table.quote-table .label {
+        color: #666;
+        font-weight: 500;
+        float: left;
+    }
+    table.quote-table .value {
+        font-weight: 700;
+        color: #000;
+        float: right;
+    }
+    /* 最後一列不顯示底線 */
     table.quote-table tr:last-child td {
         border-bottom: none;
     }
-    /* 表格內的標籤與數值 */
-    .q-label { color: #666; font-weight: 500; float: left; }
-    .q-value { color: #000; font-weight: 700; float: right; }
-    
-    /* 中間分隔線 */
-    .border-r { border-right: 1px solid #e0e0e0; }
 
-    /* --- 新聞列表樣式 --- */
+    /* --- 新聞列表優化 --- */
     .news-container {
-        display: flex; flex-direction: column; gap: 15px;
+        display: flex; flex-direction: column; gap: 10px;
     }
     .news-item {
-        padding-bottom: 15px;
+        padding: 12px;
         border-bottom: 1px solid #eee;
+        background-color: #fff;
+        border-radius: 8px;
+        transition: background-color 0.2s;
     }
     .news-item:last-child { border-bottom: none; }
+    .news-item:hover { background-color: #f9f9f9; }
     
-    .news-title {
-        text-decoration: none;
-        color: #0d47a1 !important; /* 深藍色連結 */
-        font-weight: 700;
-        font-size: 1.15rem;
+    .news-item a { 
+        text-decoration: none; 
+        color: #1a73e8 !important; 
+        font-weight: 700; 
+        font-size: 1.1rem; 
         display: block;
-        margin-bottom: 5px;
+        margin-bottom: 4px;
         line-height: 1.4;
     }
-    .news-meta {
-        font-size: 0.9rem;
-        color: #555 !important; /* 深灰色日期來源 */
+    .news-meta { 
+        font-size: 0.85rem !important; 
+        color: #888 !important; 
+        display: flex;
+        justify-content: space-between;
     }
 
-    /* --- K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
+    /* --- 3. K線選擇器 (強制左右滑動 & 膠囊樣式) --- */
     .stRadio > div[role="radiogroup"] {
-        background-color: #ffffff !important; /* 白色背景 */
+        background-color: #ffffff !important;
         border-radius: 30px !important; 
-        padding: 8px 12px !important;
+        padding: 6px 10px !important;
         display: flex !important; 
         flex-direction: row !important; 
-        gap: 8px !important;
-        overflow-x: auto !important; /* 核心：開啟水平滾動 */
-        white-space: nowrap !important; /* 核心：禁止換行 */
-        flex-wrap: nowrap !important; /* 核心：禁止 Flex 換行 */
+        gap: 5px !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        flex-wrap: nowrap !important;
         border: 1px solid #ddd;
-        scrollbar-width: none; /* Firefox 隱藏捲軸 */
+        scrollbar-width: none;
         width: 100%;
         align-items: center;
-        -webkit-overflow-scrolling: touch; /* iOS 滑動優化 */
+        -webkit-overflow-scrolling: touch;
+        margin-bottom: 0px !important; /* 減少下方空白 */
     }
-    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
+    .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; /* 禁止壓縮按鈕 */
-        min-width: 60px !important; /* 設定最小寬度，強迫溢出 */
+        flex: 0 0 auto !important;
+        min-width: 55px !important;
         background-color: transparent !important; 
         border: none !important;
-        padding: 6px 14px !important; 
+        padding: 6px 12px !important; 
         border-radius: 20px !important;
         cursor: pointer; 
-        transition: all 0.2s;
         margin: 0 !important;
         text-align: center;
     }
     
-    /* 文字樣式 */
     .stRadio div[role="radiogroup"] > label p { 
-        color: #555 !important; font-weight: 600; font-size: 0.95rem; margin: 0; padding: 0;
+        color: #555 !important; font-weight: 600; font-size: 0.9rem; margin: 0; padding: 0;
         white-space: nowrap !important;
     }
     
-    /* 選中樣式 (紅底白字) */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
         background-color: #e53935 !important;
-        box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
+        box-shadow: 0 2px 5px rgba(229, 57, 53, 0.3);
     }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; font-weight: bold; }
 
@@ -580,58 +589,61 @@ if target:
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
             
-            # 重新設計的報價卡片 HTML (灰白底，去除縮排以修正顯示錯誤)
-            quote_html = f"""
-<div class="quote-card">
-    <div style="display:flex; justify-content:space-between; align-items:start;">
-        <div>
-            <div class="stock-tag">交易中</div>
-            <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
-                <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
-                    {name} <span style="font-size:1rem; color:#888;">{target}</span>
-                    <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
-                </a>
+            # 使用 HTML Table 確保報價資訊整齊排列 ("表格化")
+            # 使用 textwrap.dedent 移除縮排，解決代碼區塊顯示問題
+            quote_html = textwrap.dedent(f"""
+            <div class="quote-card">
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div>
+                        <div class="stock-tag">交易中</div>
+                        <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
+                            <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
+                                {name} <span style="font-size:1rem; color:#888;">{target}</span>
+                                <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="price-info-row">
+                    <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
+                    <div class="price-change-block {color_class}">
+                        <div>{arrow} {abs(change):.2f}</div>
+                        <div>{abs(pct):.2f}%</div>
+                    </div>
+                </div>
+                
+                <table class="quote-table">
+                    <tr>
+                        <td style="border-right: 1px solid #f0f0f0;">
+                            <span class="label">最高</span>
+                            <span class="value text-up">{latest_fast['High']:.2f}</span>
+                        </td>
+                        <td style="padding-left: 15px;">
+                            <span class="label">昨收</span>
+                            <span class="value">{prev_close:.2f}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="border-right: 1px solid #f0f0f0;">
+                            <span class="label">最低</span>
+                            <span class="value text-down">{latest_fast['Low']:.2f}</span>
+                        </td>
+                        <td style="padding-left: 15px;">
+                            <span class="label">開盤</span>
+                            <span class="value">{latest_fast['Open']:.2f}</span>
+                        </td>
+                    </tr>
+                </table>
             </div>
-        </div>
-    </div>
-    
-    <div class="price-info-row">
-        <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
-        <div class="price-change-block {color_class}">
-            <div>{arrow} {abs(change):.2f}</div>
-            <div>{abs(pct):.2f}%</div>
-        </div>
-    </div>
-    
-    <table class="quote-table">
-        <tr>
-            <td class="border-r">
-                <span class="q-label">最高</span>
-                <span class="q-value text-up">{latest_fast['High']:.2f}</span>
-            </td>
-            <td>
-                <span class="q-label">昨收</span>
-                <span class="q-value">{prev_close:.2f}</span>
-            </td>
-        </tr>
-        <tr>
-            <td class="border-r">
-                <span class="q-label">最低</span>
-                <span class="q-value text-down">{latest_fast['Low']:.2f}</span>
-            </td>
-            <td>
-                <span class="q-label">開盤</span>
-                <span class="q-value">{latest_fast['Open']:.2f}</span>
-            </td>
-        </tr>
-    </table>
-</div>
-"""
+            """)
             st.markdown(quote_html, unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
+            # 移除了上方的 chart-container-box wrapper 以消除空白
+            
             # 左右滑動的按鈕 (亮白色風格，解決看不清楚問題)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
@@ -673,7 +685,7 @@ if target:
                 # 減少邊距，去除圖表周圍的空白
                 fig.update_layout(
                     template="plotly_white",
-                    height=600, margin=dict(l=10, r=10, t=0, b=10), # 將上方邊距 t 設為 0
+                    height=600, margin=dict(l=10, r=10, t=0, b=10), # t=0 移除上方空白
                     legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
                     dragmode='pan', hovermode='x unified', 
                     xaxis=dict(rangeslider_visible=False), 
@@ -738,14 +750,16 @@ if target:
             else: st.info("無法人籌碼資料")
 
         with tab4:
-            st.markdown("<div class='content-card'><h3>📰 個股相關新聞</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='content-card'><h3>📰 個股相關新聞</h3><div class='news-container'>", unsafe_allow_html=True)
             news_list = get_google_news(target)
-            st.markdown("<div class='news-container'>", unsafe_allow_html=True)
             for news in news_list:
                 st.markdown(f"""
                 <div class='news-item'>
-                    <a href='{news['link']}' target='_blank' class='news-title'>{news['title']}</a>
-                    <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
+                    <a href='{news['link']}' target='_blank'>{news['title']}</a>
+                    <div class='news-meta'>
+                        <span>{news['source']}</span>
+                        <span>{news['pubDate']}</span>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown("</div></div>", unsafe_allow_html=True)

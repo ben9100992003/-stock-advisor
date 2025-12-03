@@ -90,6 +90,7 @@ st.markdown("""
     
     .price-large {
         font-size: 3.5rem !important; font-weight: 700; line-height: 1.1; margin: 0;
+        white-space: nowrap; /* 防止價格換行 */
     }
     
     /* 價格與漲跌幅的排版：左邊大數字，右邊垂直堆疊的小數字 */
@@ -97,7 +98,8 @@ st.markdown("""
         display: flex; 
         align-items: center; 
         gap: 15px; 
-        margin-bottom: 15px; 
+        margin-bottom: 15px;
+        flex-wrap: nowrap !important; /* 強制不換行 */
     }
     
     .price-change-block { 
@@ -107,6 +109,7 @@ st.markdown("""
         font-size: 1.1rem; 
         font-weight: 600; 
         line-height: 1.4;
+        min-width: 80px; /* 確保有足夠空間顯示漲跌 */
     }
     
     /* 紅漲綠跌定義 */
@@ -123,30 +126,43 @@ st.markdown("""
     .stats-label { color: #666 !important; }
     .stats-value { font-weight: 600; color: #000 !important; }
 
-    /* --- 3. K線選擇器 (深色半透明 + 左右滑動) --- */
+    /* --- 3. K線選擇器 (深色半透明 + 強制左右滑動) --- */
     .stRadio > div[role="radiogroup"] {
-        background-color: rgba(30, 30, 30, 0.85); /* 深色背景 */
-        border-radius: 30px; padding: 8px 12px;
-        display: flex; 
-        flex-direction: row; 
-        gap: 5px;
-        overflow-x: auto; /* 允許水平滑動 */
-        white-space: nowrap; /* 禁止換行 */
+        background-color: rgba(30, 30, 30, 0.85) !important; /* 深色背景 */
+        border-radius: 30px !important; 
+        padding: 8px 12px !important;
+        display: flex !important; 
+        flex-direction: row !important; 
+        gap: 5px !important;
+        overflow-x: auto !important; /* 允許水平滑動 */
+        white-space: nowrap !important; /* 禁止換行 */
         flex-wrap: nowrap !important; /* 強制不換行 */
         border: 1px solid #555;
         scrollbar-width: none; /* Firefox 隱藏捲軸 */
+        width: 100%;
+        align-items: center;
     }
     .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; /* Chrome 隱藏捲軸 */ }
     
     .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto; /* 不壓縮 */
-        background-color: transparent; border: none;
-        padding: 6px 14px; border-radius: 20px;
-        cursor: pointer; transition: all 0.2s;
+        flex: 0 0 auto !important; /* 不壓縮 */
+        background-color: transparent !important; 
+        border: none !important;
+        padding: 6px 14px !important; 
+        border-radius: 20px !important;
+        cursor: pointer; 
+        transition: all 0.2s;
+        margin-right: 0px !important;
     }
     
     /* 未選中文字顏色 (白) */
-    .stRadio div[role="radiogroup"] > label p { color: #e0e0e0 !important; font-weight: 500; font-size: 0.95rem; margin: 0; }
+    .stRadio div[role="radiogroup"] > label p { 
+        color: #e0e0e0 !important; 
+        font-weight: 500; 
+        font-size: 0.95rem; 
+        margin: 0; 
+        padding: 0;
+    }
     
     /* 選中樣式 (紅底白字) */
     .stRadio div[role="radiogroup"] > label[data-checked="true"] {
@@ -165,6 +181,18 @@ st.markdown("""
         border-color: #ccc !important;
     }
     
+    /* 調整按鈕樣式 */
+    .stButton button {
+        border-radius: 12px;
+        height: 100%;
+        width: 100%;
+        padding: 0.5rem 0;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        color: #333;
+        font-weight: bold;
+    }
+    
     /* 分頁 Tab 樣式 (淺色) */
     .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; white-space: nowrap; }
     .stTabs button { border-radius: 8px; flex: 0 0 auto; background: transparent; border: none; }
@@ -179,6 +207,11 @@ st.markdown("""
     
     /* 修正 Plotly 背景 */
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
+    
+    /* 隱藏 Radio 選擇器預設的圓點 */
+    .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p {
+        display: block;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -306,6 +339,15 @@ def get_google_news(ticker):
             })
         return news_list
     except: return []
+
+# 產生 Yahoo 股市連結
+def get_yahoo_stock_url(ticker):
+    if ".TW" in ticker:
+        return f"https://tw.stock.yahoo.com/quote/{ticker.replace('.TW', '')}"
+    elif ".TWO" in ticker:
+        return f"https://tw.stock.yahoo.com/quote/{ticker.replace('.TWO', '')}"
+    else:
+        return f"https://finance.yahoo.com/quote/{ticker}"
 
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
@@ -470,11 +512,18 @@ st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉
 with st.spinner("載入數據..."):
     hot_tw, hot_us = get_market_hot_stocks()
 
-c_search, c_hot = st.columns([3, 1])
+# 修改為 3 欄，搜尋 | 快選 | 重新整理
+c_search, c_hot, c_btn = st.columns([2.5, 1.2, 0.5])
 with c_search:
     target_input = st.text_input("🔍 搜尋代號/名稱 (如: 4903, 2330, NVDA)", value="2330")
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
+with c_btn:
+    st.write("") # 排版用，讓按鈕垂直對齊
+    st.write("") 
+    if st.button("🔄", help="重新整理數據"):
+        st.cache_data.clear()
+        st.rerun()
 
 target = "2330.TW" 
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
@@ -510,39 +559,44 @@ if target:
             # 漲是紅 (#e53935), 跌是綠 (#43a047)
             color_class = "text-up" if change >= 0 else "text-down"
             arrow = "▲" if change >= 0 else "▼"
+            yahoo_url = get_yahoo_stock_url(target)
             
-            # 重新設計的報價卡片 HTML (灰白底，仿圖片)
-            st.markdown(f"""
-            <div class="quote-card">
-                <div style="display:flex; justify-content:space-between;">
-                    <div>
-                        <div class="stock-tag">交易中</div>
-                        <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">{name} <span style="font-size:1rem; color:#888;">{target}</span></div>
-                    </div>
-                </div>
-                
-                <div class="price-info-row">
-                    <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
-                    <div class="price-change-block {color_class}">
-                        <div>{arrow} {abs(change):.2f}</div>
-                        <div>{abs(pct):.2f}%</div>
-                    </div>
-                </div>
-                
-                <div class="stats-table">
-                    <div class="stats-item"><span class="stats-label">最高</span><span class="stats-value text-up">{latest_fast['High']:.2f}</span></div>
-                    <div class="stats-item"><span class="stats-label">昨收</span><span class="stats-value">{prev_close:.2f}</span></div>
-                    <div class="stats-item"><span class="stats-label">最低</span><span class="stats-value text-down">{latest_fast['Low']:.2f}</span></div>
-                    <div class="stats-item"><span class="stats-label">開盤</span><span class="stats-value">{latest_fast['Open']:.2f}</span></div>
-                </div>
+            # 重新設計的報價卡片 HTML (灰白底，去除縮排以修正顯示錯誤)
+            quote_html = f"""
+<div class="quote-card">
+    <div style="display:flex; justify-content:space-between; align-items:start;">
+        <div>
+            <div class="stock-tag">交易中</div>
+            <div class="stock-title" style="font-size:1.5rem; font-weight:bold;">
+                <a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:5px;">
+                    {name} <span style="font-size:1rem; color:#888;">{target}</span>
+                    <span style="font-size:0.8rem; background:#eee; padding:2px 6px; border-radius:4px; color:#555;">Yahoo 🔗</span>
+                </a>
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+    </div>
+    
+    <div class="price-info-row">
+        <div class="price-large {color_class}">{latest_fast['Close']:.2f}</div>
+        <div class="price-change-block {color_class}">
+            <div>{arrow} {abs(change):.2f}</div>
+            <div>{abs(pct):.2f}%</div>
+        </div>
+    </div>
+    
+    <div class="stats-table">
+        <div class="stats-item"><span class="stats-label">最高</span><span class="stats-value text-up">{latest_fast['High']:.2f}</span></div>
+        <div class="stats-item"><span class="stats-label">昨收</span><span class="stats-value">{prev_close:.2f}</span></div>
+        <div class="stats-item"><span class="stats-label">最低</span><span class="stats-value text-down">{latest_fast['Low']:.2f}</span></div>
+        <div class="stats-item"><span class="stats-label">開盤</span><span class="stats-value">{latest_fast['Open']:.2f}</span></div>
+    </div>
+</div>
+"""
+            st.markdown(quote_html, unsafe_allow_html=True)
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
-            # 移除了 chart-container-box 的 wrapper，解決上方多一條的問題
-            
             # 左右滑動的按鈕 (深色膠囊)
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")

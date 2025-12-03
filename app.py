@@ -260,6 +260,14 @@ STOCK_NAMES = {
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "MSFT": "微軟"
 }
 
+# 產業類別中英對照表
+SECTOR_MAP = {
+    "Technology": "科技", "Financial Services": "金融服務", "Healthcare": "醫療保健",
+    "Consumer Cyclical": "非必需消費品", "Industrials": "工業", "Communication Services": "通訊服務",
+    "Consumer Defensive": "必需消費品", "Energy": "能源", "Basic Materials": "原物料",
+    "Real Estate": "房地產", "Utilities": "公共事業", "Financials": "金融"
+}
+
 @st.cache_data(ttl=3600)
 def get_market_hot_stocks():
     hot_tw = ["2330", "2317", "2603", "2609", "3231", "2454", "2382", "2303", "2615", "3231"]
@@ -424,22 +432,24 @@ def call_gemini_api(prompt):
     return f"AI 服務暫時無法使用。最後錯誤: {last_error}"
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def get_ai_translated_summary(summary_text):
+def get_stock_summary_zh(summary_text):
+    # 改名函式以強制更新快取
     if not summary_text or summary_text == "暫無詳細說明。":
         return "暫無詳細說明。"
     
     prompt = f"""
     請將以下公司介紹翻譯成流暢、完整的繁體中文。
     重點：
-    1. 保留所有關鍵資訊，不要刪減。
-    2. 語氣專業。
-    3. 如果原文已經是中文，請潤飾得更通順。
+    1. 必須使用繁體中文，不要出現英文簡介。
+    2. 保留所有關鍵資訊，不要刪減。
+    3. 語氣專業。
     
     原文：
     {summary_text}
     """
     try:
         result = call_gemini_api(prompt)
+        # 簡單檢查回傳是否為錯誤訊息，若是則不快取英文原文
         if "錯誤" in result or "無法使用" in result:
             return summary_text 
         return result
@@ -575,9 +585,11 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     <td class="{'text-up' if total>0 else 'text-down'}"><b>{total:,}</b></td>
 </tr>"""
 
-    sector = info.get('sector', '科技')
+    sector_en = info.get('sector', '科技')
+    sector = SECTOR_MAP.get(sector_en, sector_en) # 使用對照表翻譯產業
+    
     raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
-    summary = get_ai_translated_summary(raw_summary)
+    summary = get_stock_summary_zh(raw_summary) # 使用新函式翻譯
     
     theme_text = f"<b>{name}</b> 屬於 {sector} 產業。<br><br>{summary}"
     

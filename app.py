@@ -15,8 +15,8 @@ import textwrap
 import io 
 
 # --- 0. 設定與金鑰 ---
+# 注意：為了資訊安全，建議未來將 API Key 移至環境變數或是 streamlit secrets 中
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 使用您提供的 API Key
 GEMINI_API_KEY = "AIzaSyCXWXZC2CFyCxlAegMNVdcwraEcqAh6Fp0" 
 
 # --- 1. 頁面設定 ---
@@ -459,6 +459,38 @@ def calculate_indicators(df):
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
     return df
+
+# --- 補上遺失的大盤分析函式 ---
+def analyze_market_index(ticker):
+    try:
+        data = yf.Ticker(ticker).history(period="5d")
+        if data.empty: return None
+        
+        latest = data.iloc[-1]
+        prev = data.iloc[-2]
+        change = latest['Close'] - prev['Close']
+        pct = (change / prev['Close']) * 100
+        
+        # 台股紅漲綠跌邏輯
+        color = "#e53935" if change > 0 else "#43a047"
+        
+        status = "強勢整理"
+        if pct > 1: status = "多頭強勢"
+        elif pct < -1: status = "空頭賣壓"
+        elif pct > 0: status = "偏多震盪"
+        else: status = "偏空震盪"
+        
+        comment = f"漲跌幅 {pct:.2f}%"
+        
+        return {
+            "price": latest['Close'],
+            "change": change,
+            "color": color,
+            "status": status,
+            "comment": comment
+        }
+    except:
+        return None
 
 # --- 回測邏輯 ---
 def run_backtest(df, strategy_type, initial_capital=100000):

@@ -56,6 +56,7 @@ def set_png_as_page_bg(png_file):
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
+    /* 背景深色遮罩 */
     .stApp::before {{
         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0, 0, 0, 0.6); pointer-events: none; z-index: 0;
@@ -72,12 +73,12 @@ st.markdown("""
     .stApp { font-family: "Microsoft JhengHei", "sans-serif"; color: #333; }
     h1, h2, h3, h4, h5, h6 { color: #333; }
     
-    /* --- 卡片通用設定 --- */
+    /* --- 卡片通用設定 (白底) --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
-        background-color: rgba(255, 255, 255, 0.95) !important;
+        background-color: rgba(255, 255, 255, 0.98) !important; /* 提高不透明度 */
         border-radius: 16px; 
         padding: 25px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         margin-bottom: 20px; 
         border: 1px solid #fff;
         position: relative; z-index: 1;
@@ -86,30 +87,31 @@ st.markdown("""
         box-sizing: border-box;
     }
     
-    /* 優化卡片內文排版 */
-    .content-card p {
-        line-height: 1.8;
-        text-align: justify;
-        margin-bottom: 12px;
+    /* 強制卡片內文字顏色 */
+    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
+        color: #333 !important; 
+        text-shadow: none !important;
     }
 
-    /* --- AI 對話氣泡樣式 --- */
-    .ai-msg-bot, .ai-msg-user, .ai-msg-error, .ai-msg-info {
-        background-color: rgba(255, 255, 255, 0.98) !important;
+    /* --- AI 對話專用樣式 --- */
+    .ai-msg-box {
+        background-color: #fff !important;
+        border-radius: 12px;
         padding: 20px;
-        border-radius: 16px;
         margin-bottom: 15px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid #f0f0f0;
-        color: #333 !important;
-        line-height: 1.6;
-        font-size: 1rem;
+        border-left: 5px solid #4caf50;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
+    .ai-msg-box h4 { margin-top: 0; color: #2e7d32 !important; }
     
-    .ai-msg-user { border-left: 6px solid #2196f3; background-color: #f8fbff !important; }
-    .ai-msg-bot { border-left: 6px solid #4caf50; }
-    .ai-msg-error { border-left: 6px solid #f44336; background-color: #fff5f5 !important; color: #d32f2f !important; }
-    .ai-msg-info { border-left: 6px solid #ff9800; background-color: #fff8e1 !important; }
+    .ai-user-box {
+        background-color: #e3f2fd !important;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 5px solid #2196f3;
+        color: #0d47a1 !important;
+    }
 
     /* --- AI 回測深色卡片 --- */
     .ai-backtest-card {
@@ -125,11 +127,17 @@ st.markdown("""
         overflow: hidden;
     }
     
+    /* 回測卡片內的文字強制白色 */
+    .ai-backtest-card * { color: white !important; }
+    .ai-backtest-card .color-green { color: #4ade80 !important; }
+    .ai-backtest-card .color-red { color: #f87171 !important; }
+    .ai-backtest-card .ai-title-text p { color: #888 !important; }
+    .ai-backtest-card .ai-score-label { color: #888 !important; }
+    .ai-backtest-card .pred-title { color: #888 !important; }
+
     .ai-header-row {
         display: flex; justify-content: space-between; align-items: flex-start;
-        margin-bottom: 25px;
-        flex-wrap: wrap; 
-        gap: 15px;
+        margin-bottom: 25px; flex-wrap: wrap; gap: 15px;
     }
     
     .ai-title-group { display: flex; gap: 15px; align-items: center; }
@@ -139,103 +147,60 @@ st.markdown("""
         background: #0066ff;
         border-radius: 14px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 24px; color: white;
+        font-size: 24px; color: white !important;
         box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
         flex-shrink: 0;
     }
     
-    .ai-title-text h3 { 
-        color: white !important; margin: 0; 
-        font-size: 1.3rem; font-weight: 700; letter-spacing: 0.5px; 
-    }
-    .ai-title-text p { 
-        color: #888 !important; margin: 0; 
-        font-size: 0.85rem; margin-top: 2px; font-weight: 500; 
-    }
+    .ai-title-text h3 { font-size: 1.3rem; font-weight: 700; margin: 0; }
     
-    .ai-score-group { text-align: right; flex-grow: 1; }
     .ai-score-val { 
         font-size: 2.8rem; font-weight: 800; 
         background: linear-gradient(to right, #4facfe, #00f2fe);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        color: #4facfe !important; /* Fallback color */
         line-height: 1;
-        font-family: 'Arial', sans-serif;
-    }
-    .ai-score-label { 
-        color: #888; font-size: 0.8rem; 
-        margin-top: 5px; letter-spacing: 1px; text-transform: uppercase; 
     }
     
-    .ai-pred-row {
-        display: flex; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;
-    }
+    .ai-pred-row { display: flex; gap: 15px; margin-bottom: 10px; flex-wrap: wrap; }
     .ai-pred-box {
-        flex: 1;
-        min-width: 140px; 
-        background: #11141c;
-        border-radius: 16px;
-        padding: 15px 20px;
-        border: 1px solid #222;
-        display: flex; flex-direction: column;
+        flex: 1; min-width: 140px; 
+        background: #11141c; border-radius: 16px; padding: 15px 20px;
+        border: 1px solid #222; display: flex; flex-direction: column;
     }
-    .pred-title { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
-    .pred-num { font-size: 1.8rem; font-weight: 700; letter-spacing: 0.5px; font-family: 'Roboto Mono', monospace;}
-    .color-green { color: #4ade80 !important; }
-    .color-red { color: #f87171 !important; }
+    .pred-num { font-size: 1.8rem; font-weight: 700; font-family: monospace; }
     
-    /* 修正文字顏色 */
-    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
-        text-shadow: none !important;
-        color: #333; 
-    }
+    /* 紅漲綠跌定義 */
     .text-up { color: #e53935 !important; }
     .text-down { color: #43a047 !important; }
     .text-flat { color: #333 !important; }
     
-    /* 報價卡片佈局優化 */
+    /* 報價卡片 */
     .quote-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
-    .stock-name { font-size: 1.8rem; font-weight: 900; color: #222; }
-    .stock-id { font-size: 1.2rem; color: #888; font-weight: 500; }
+    .stock-name { font-size: 1.8rem; font-weight: 900; }
+    .stock-id { font-size: 1.2rem; color: #888 !important; font-weight: 500; }
     .price-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
     .main-price { font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
     .change-info { display: flex; flex-direction: column; justify-content: center; font-size: 1.1rem; font-weight: 600; line-height: 1.4; }
     .market-tag {
         display: inline-block; padding: 3px 12px; border: 1px solid #ddd;
-        border-radius: 20px; color: #666; font-size: 0.9rem;
+        border-radius: 20px; color: #666 !important; font-size: 0.9rem;
         background-color: #f9f9f9; margin-bottom: 20px;
     }
     .detail-grid {
-        display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); 
         column-gap: 20px; row-gap: 10px; font-size: 1.1rem;
     }
-    .detail-item { display: flex; justify-content: flex-start; align-items: center; gap: 8px; }
-    .detail-label { color: #888; min-width: 40px; }
-    .detail-value { font-weight: 700; font-family: 'Roboto', sans-serif; }
+    .detail-label { color: #888 !important; }
+    .detail-value { font-weight: 700; }
 
-    /* 表格優化 */
-    .table-container { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+    /* 表格 */
+    .table-container { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; margin-bottom: 15px; }
     table.analysis-table { width: 100%; min-width: 500px; border-collapse: collapse; } 
-    table.analysis-table td, table.analysis-table th { padding: 10px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
+    table.analysis-table td, table.analysis-table th { padding: 12px 8px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
 
-    .stRadio > div[role="radiogroup"] {
-        background-color: #ffffff !important; border-radius: 30px !important; 
-        padding: 8px 12px !important; display: flex !important; flex-direction: row !important; 
-        gap: 8px !important; overflow-x: auto !important; white-space: nowrap !important;
-        border: 1px solid #ddd; scrollbar-width: none; width: 100%; align-items: center;
-    }
-    .stRadio div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; min-width: 60px !important; background-color: transparent !important; 
-        border: none !important; padding: 6px 14px !important; border-radius: 20px !important;
-        cursor: pointer; margin: 0 !important; text-align: center;
-    }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #e53935 !important; box-shadow: 0 2px 6px rgba(229, 57, 53, 0.4);
-    }
-    .stRadio div[role="radiogroup"] > label p { color: #555 !important; font-weight: 600; margin: 0; }
-    .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #fff !important; }
-
+    /* 元件修正 */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] > div { background-color: #fff !important; color: #333 !important; }
     .stButton button { background-color: #fff; color: #333; border: 1px solid #ccc; font-weight: bold; }
     .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.8); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; }
@@ -429,7 +394,6 @@ def call_gemini_api(prompt):
 
     return f"AI 服務暫時無法使用。所有模型嘗試失敗。最後錯誤: {last_error}"
 
-# --- 新增：AI 翻譯與摘要快取函式 ---
 @st.cache_data(ttl=86400, show_spinner=False)
 def get_ai_translated_summary(summary_text):
     if not summary_text or summary_text == "暫無詳細說明。":
@@ -448,7 +412,7 @@ def get_ai_translated_summary(summary_text):
     try:
         result = call_gemini_api(prompt)
         if "錯誤" in result or "無法使用" in result:
-            return summary_text # 失敗時回傳原文
+            return summary_text 
         return result
     except:
         return summary_text
@@ -552,8 +516,6 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 
     sector = info.get('sector', '科技')
     raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
-    
-    # 呼叫 AI 翻譯與摘要
     summary = get_ai_translated_summary(raw_summary)
     
     theme_text = f"<b>{name}</b> 屬於 {sector} 產業。<br><br>{summary}"
@@ -574,32 +536,31 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    # 使用 textwrap.dedent 確保 HTML 字串無縮排
+    # 使用 textwrap.dedent 並確保 div 在最左側
     return textwrap.dedent(f"""
-    <div class="content-card">
-    <h3>📊 {name} ({ticker}) 綜合分析報告</h3>
-    <h4>1. 技術指標分析</h4>
-    <div class="table-container">
-    <table class="analysis-table">
-    <tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
-    <tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
-    <tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
-    </table>
-    </div>
-    <h4>2. 三大法人籌碼分析</h4>
-    <div class="table-container">
-    <table class="analysis-table">
-    <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
-    <tbody>{inst_table_html}</tbody>
-    </table>
-    </div>
-    <p><b>籌碼解讀：</b>{inst_desc}</p>
-    <h4>3. 公司題材與願景</h4>
-    <p>{theme_text}</p>
-    <h4>4. 💡 進出場價格建議 ({action})</h4>
-    <ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
-    </div>
-    """).strip()
+<div class="content-card">
+<h3>📊 {name} ({ticker}) 綜合分析報告</h3>
+<h4>1. 技術指標分析</h4>
+<div class="table-container">
+<table class="analysis-table">
+<tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
+<tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
+<tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
+</table>
+</div>
+<h4>2. 三大法人籌碼分析</h4>
+<div class="table-container">
+<table class="analysis-table">
+<thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
+<tbody>{inst_table_html}</tbody>
+</table>
+</div>
+<p><b>籌碼解讀：</b>{inst_desc}</p>
+<h4>3. 公司題材與願景</h4>
+<p>{theme_text}</p>
+<h4>4. 💡 進出場價格建議 ({action})</h4>
+<ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
+</div>""").strip()
 
 # --- UI 介面 ---
 st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
@@ -607,7 +568,7 @@ st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉
 with st.spinner("載入數據..."):
     hot_tw, hot_us = get_market_hot_stocks()
 
-c_search, c_hot, c_btn = st.columns([2.5, 1.2, 0.5])
+c_search, c_hot, c_btn = st.columns([3, 1.5, 0.5]) # 調整比例避免擠壓
 with c_search:
     target_input = st.text_input("🔍 搜尋代號/名稱 (如: 4903, 2330, NVDA)", value="2330")
 with c_hot:
@@ -626,10 +587,8 @@ if target_input:
     if resolved_ticker: target = resolved_ticker; name = resolved_name
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
 
-# --- AI 自動分析邏輯 (確保 name 變數存在) ---
-# 確保在 AI 邏輯執行前 name 已經被定義
+# --- AI 自動分析邏輯 ---
 if target and 'name' not in locals():
-    # 嘗試從 resolved_name 獲取，若無則從 STOCK_NAMES 或 yfinance 獲取
     try:
         temp_stock = yf.Ticker(target)
         temp_info = temp_stock.info
@@ -658,11 +617,6 @@ if st.session_state['ai_analysis'] is None and target:
             請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
             語氣請專業、客觀且親切。
             """
-            # 這裡不使用 st.spinner 以免阻塞 UI，改為背景執行
-            # 在 Tab 5 顯示時會檢查並顯示結果
-            # 為了觸發執行，我們可以在這裡執行 API call，或者留到 Tab 5 再執行
-            # 為了使用者體驗，這裡先不執行，等到使用者點到相關頁面或直接執行
-            # 但為了符合 "自動呈現" 的需求，我們在這裡直接執行
             result = call_gemini_api(auto_prompt)
             st.session_state['ai_analysis'] = result
     except:
@@ -848,22 +802,25 @@ if target:
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:
-            # 標題區塊
             st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
-            # AI 分析結果顯示區 (強制白卡)
             if st.session_state['ai_analysis']:
                 if "錯誤" in st.session_state['ai_analysis'] or "無法使用" in st.session_state['ai_analysis']:
-                     st.markdown(f"<div class='ai-msg-error'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
+                     st.markdown(f"<div class='content-card' style='border-left: 5px solid #f44336; background: #fff5f5;'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
                      if st.button("🔄 重試自動分析", key="retry_ai"):
                          st.session_state['ai_analysis'] = None
                          st.rerun()
                 else:
-                    st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
+                    # 使用獨立的 content-card 顯示 AI 報告，確保背景為白色
+                    st.markdown(f"""
+                    <div class='content-card ai-msg-box'>
+                        <h4>🦖 {name} 自動分析報告：</h4>
+                        <div style='color: #333;'>{st.session_state['ai_analysis']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
-                st.markdown(f"<div class='ai-msg-info'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='content-card' style='background: #fff8e1; border-left: 5px solid #ff9800;'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
 
-            # 對話區塊
             st.markdown("<div class='content-card'><h4>💬 還有其他問題嗎？歡迎隨時提問：</h4>", unsafe_allow_html=True)
             user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
             if user_query:
@@ -877,10 +834,10 @@ if target:
                     """
                     ai_response = call_gemini_api(prompt)
                     if "錯誤" in ai_response or "無法使用" in ai_response:
-                        st.markdown(f"<div class='ai-msg-error'>❌ {ai_response}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='content-card' style='background: #fff5f5; border-left: 5px solid #f44336;'>❌ {ai_response}</div>", unsafe_allow_html=True)
                     else:
-                        st.markdown(f"<div class='ai-msg-user'>👤 {user_query}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='ai-msg-bot'>🦖 {ai_response}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='content-card ai-user-box'>👤 {user_query}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='content-card ai-msg-box'>🦖 {ai_response}</div>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tab6:

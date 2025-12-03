@@ -348,16 +348,18 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
-# 修改 AI API 呼叫，加入更完整的模型清單以確保可用性
+# 修改 AI API 呼叫，加入更完整的模型清單 (地毯式搜索)
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 更新模型清單，確保使用存在的模型
+    # 擴充模型清單，涵蓋最新與最舊的穩定版本
     models_to_try = [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-001", 
-        "gemini-1.5-pro",
-        "gemini-1.5-pro-001"
+        "gemini-2.0-flash-exp",   # 最新實驗版
+        "gemini-1.5-flash",       # 標準 Flash
+        "gemini-1.5-flash-latest",# Flash 最新
+        "gemini-1.5-pro",         # Pro 版本
+        "gemini-1.0-pro",         # 舊版 Pro (備援)
+        "gemini-pro"              # 最通用名稱
     ]
     
     headers = {'Content-Type': 'application/json'}

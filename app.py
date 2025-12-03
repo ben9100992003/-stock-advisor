@@ -583,10 +583,11 @@ if st.session_state['ai_analysis'] is None:
             請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
             語氣請專業、客觀且親切。
             """
-            result = call_gemini_api(auto_prompt)
-            st.session_state['ai_analysis'] = result
+            # 加入 Spinner 顯示 AI 正在分析中
+            with st.spinner(f"🤖 AI 正在分析 {name} 的最新數據，請稍候..."):
+                result = call_gemini_api(auto_prompt)
+                st.session_state['ai_analysis'] = result
             # 這裡不使用 rerun，讓它在下一次互動或切換 Tab 時自然顯示
-            # 或者如果希望立即看到，可以 rerun，但可能會閃爍
     except:
         st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
 
@@ -664,8 +665,8 @@ if target:
             interval = interval_map[period_label]
             is_intraday = interval in ["1m", "5m", "15m", "30m", "60m"]
             
-            # 修正：分時線強制抓 5 天，日線抓 2 年
-            data_period = "5d" if is_intraday else ("2y" if interval == "1d" else "5y")
+            # 修正：分時線強制抓 1 天 (當日)，日線以上抓較長區間
+            data_period = "1d" if is_intraday else ("2y" if interval == "1d" else "5y")
             
             df = stock.history(period=data_period, interval=interval)
             
@@ -690,27 +691,9 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-                # --- 核心修正 ---
-                if is_intraday:
-                    # 1. 強制隱藏非交易時段，讓資料連續
-                    # 隱藏 13:30 ~ 09:00 (小時) 及 週末
-                    fig.update_xaxes(
-                        rangebreaks=[
-                            dict(bounds=[13.5, 9], pattern="hour"), 
-                            dict(bounds=["sat", "mon"])
-                        ]
-                    )
-                    
-                    # 2. 預設只顯示「最後一天 (當日)」
-                    # 透過設定 x-axis range 達成。
-                    last_day_date = plot_df.index[-1].date()
-                    # 抓取最後一天的資料範圍作為預設 range
-                    today_data = plot_df[plot_df.index.date == last_day_date]
-                    if not today_data.empty:
-                        start_time = today_data.index[0]
-                        end_time = today_data.index[-1]
-                        # 稍微加一點 buffer
-                        fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
+                # --- 核心修正：移除 rangebreaks ---
+                # 因為 data_period 已設為 '1d'，資料本身就只包含當日，不需要再隱藏非交易時段。
+                # 這樣可以避免因資料缺漏導致的顯示問題。
 
                 fig.update_layout(
                     template="plotly_white",
@@ -802,7 +785,11 @@ if target:
             
             # 已在上方自動執行，這裡直接顯示結果
             if st.session_state['ai_analysis']:
-                st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
+                # 檢查是否為錯誤訊息
+                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or st.session_state['ai_analysis'].startswith("分析暫時無法使用"):
+                     st.error(st.session_state['ai_analysis'])
+                else:
+                    st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
             else:
                 st.info("AI 正在分析中，請稍候...")
 
@@ -838,22 +825,22 @@ if target:
                 recent_high = backtest_df['High'].tail(20).max()
                 recent_low = backtest_df['Low'].tail(20).min()
                 
-                # --- 圖表改為深色透明 ---
+                # --- 圖表改為深色透明，並移除背景格線 ---
                 fig_bt = go.Figure()
                 fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
                 fig_bt.update_layout(
                     template="plotly_dark",
                     height=250, # 配合卡片高度
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)', # 完全透明
+                    plot_bgcolor='rgba(0,0,0,0)',  # 完全透明
                     font=dict(color='#aaa'),
                     margin=dict(l=0, r=0, t=10, b=10),
-                    xaxis=dict(showgrid=False),
-                    yaxis=dict(showgrid=True, gridcolor='#333'),
+                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False), # 隱藏X軸所有元素
+                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False), # 隱藏Y軸所有元素
                 )
-                chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False})
+                chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False, 'staticPlot': True}) # staticPlot 禁止互動，避免當機
 
-                # --- 復刻深色卡片 HTML ---
+                # --- 復刻深色卡片 HTML (維持不變) ---
                 backtest_html = f"""
                 <div class="ai-backtest-card">
                     <div class="ai-header-row">

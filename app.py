@@ -11,7 +11,7 @@ import requests
 from FinMind.data import DataLoader
 import xml.etree.ElementTree as ET
 import json
-import textwrap # 關鍵：用來修復 HTML 縮排問題
+import textwrap
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
@@ -109,24 +109,34 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #757575 !important; }
 
-    /* 數據表格樣式 (標準 Table) */
+    /* 數據表格樣式 (Table) */
     table.quote-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
-        border: 1px solid #eee; /* 外框 */
+        margin-top: 15px;
+        table-layout: fixed;
     }
     table.quote-table td {
         padding: 12px 10px;
-        border: 1px solid #eee; /* 內格線 */
+        border-bottom: 1px solid #f0f0f0;
         vertical-align: middle;
         font-size: 1rem;
     }
-    table.quote-table .label {
+    /* 第一列不要有上邊框，最後一列不要有下邊框 */
+    table.quote-table tr:last-child td {
+        border-bottom: none;
+    }
+    /* 左側欄位樣式 */
+    table.quote-table td:first-child {
+        border-right: 1px solid #f0f0f0;
+    }
+    
+    .qt-label {
         color: #666;
         font-weight: 500;
+        float: left;
     }
-    table.quote-table .value {
+    .qt-value {
         font-weight: 700;
         color: #000;
         float: right;
@@ -205,9 +215,26 @@ st.markdown("""
     
     .js-plotly-plot .plotly .main-svg { background: transparent !important; }
     
-    .news-item { padding: 12px 0; border-bottom: 1px solid #eee; }
-    .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
-    .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
+    /* 新聞樣式優化 */
+    .news-item { 
+        padding: 15px 0; 
+        border-bottom: 1px solid #f0f0f0; 
+        text-align: left;
+    }
+    .news-item:last-child { border-bottom: none; }
+    .news-item a { 
+        text-decoration: none; 
+        color: #0056b3 !important; 
+        font-weight: 700; 
+        font-size: 1.1rem; 
+        display: block;
+        margin-bottom: 5px;
+    }
+    .news-item a:hover { text-decoration: underline; }
+    .news-meta { 
+        font-size: 0.85rem !important; 
+        color: #666 !important; 
+    }
     
     /* 隱藏 Radio 預設圓點 */
     .stRadio div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] > p { display: block; }
@@ -585,23 +612,23 @@ if target:
                 
                 <table class="quote-table">
                     <tr>
-                        <td style="border-right: 1px solid #f0f0f0;">
-                            <span class="label">最高</span>
-                            <span class="value text-up">{latest_fast['High']:.2f}</span>
+                        <td class="border-right">
+                            <span class="qt-label">最高</span>
+                            <span class="qt-value text-up">{latest_fast['High']:.2f}</span>
                         </td>
                         <td style="padding-left: 15px;">
-                            <span class="label">昨收</span>
-                            <span class="value">{prev_close:.2f}</span>
+                            <span class="qt-label">昨收</span>
+                            <span class="qt-value">{prev_close:.2f}</span>
                         </td>
                     </tr>
                     <tr>
-                        <td style="border-right: 1px solid #f0f0f0;">
-                            <span class="label">最低</span>
-                            <span class="value text-down">{latest_fast['Low']:.2f}</span>
+                        <td class="border-right">
+                            <span class="qt-label">最低</span>
+                            <span class="qt-value text-down">{latest_fast['Low']:.2f}</span>
                         </td>
                         <td style="padding-left: 15px;">
-                            <span class="label">開盤</span>
-                            <span class="value">{latest_fast['Open']:.2f}</span>
+                            <span class="qt-label">開盤</span>
+                            <span class="qt-value">{latest_fast['Open']:.2f}</span>
                         </td>
                     </tr>
                 </table>
@@ -729,13 +756,13 @@ if target:
                 </div>
                 """
             
-            # 將所有新聞包裹在 light-card 中，使用 textwrap.dedent 修復顯示問題
-            final_news_html = textwrap.dedent(f"""
-            <div class='light-card'>
-                <h3>📰 個股相關新聞</h3>
+            # 將所有新聞包裹在 light-card 中，並確保背景為白色
+            final_news_html = f"""
+            <div class='light-card' style='background-color: white !important; color: #333 !important;'>
+                <h3 style='color: #000 !important;'>📰 個股相關新聞</h3>
                 {news_html_content}
             </div>
-            """)
+            """
             st.markdown(final_news_html, unsafe_allow_html=True)
         
         with tab5:

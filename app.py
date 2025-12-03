@@ -19,7 +19,7 @@ GEMINI_API_KEY = "AIzaSyB6Y_RNa5ZXdBjy_qIwxDULlD69Nv9PUp8"
 # --- 1. 頁面設定 ---
 st.set_page_config(page_title="武吉拉 Wujila", page_icon="🦖", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. CSS 樣式 (深色透明風格 + 灰白卡片支援) ---
+# --- 2. CSS 樣式 (全灰白風格) ---
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -31,7 +31,7 @@ def set_png_as_page_bg(png_file):
     if not os.path.exists(png_file): 
         st.markdown("""
         <style>
-        .stApp { background: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364); }
+        .stApp { background: linear-gradient(to bottom right, #f0f2f6, #e0e5ec); }
         </style>
         """, unsafe_allow_html=True)
         return
@@ -48,9 +48,10 @@ def set_png_as_page_bg(png_file):
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
+    /* 背景遮罩 (淺色化) */
     .stApp::before {{
         content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.7); pointer-events: none; z-index: 0;
+        background: rgba(255, 255, 255, 0.4); pointer-events: none; z-index: 0;
     }}
     </style>
     """.format(bin_str)
@@ -60,96 +61,88 @@ set_png_as_page_bg('Gemini_Generated_Image_enh52venh52venh5.png')
 
 st.markdown("""
     <style>
-    .stApp { color: #e0e0e0; font-family: "Microsoft JhengHei", "sans-serif"; }
-    h1, h2, h3, h4, h5, h6, p, li, span, div { color: #e0e0e0; }
+    /* 全局設定：強制深色文字 */
+    .stApp { color: #333333; font-family: "Microsoft JhengHei", "sans-serif"; }
+    h1, h2, h3, h4, h5, h6, p, li, span, div { color: #333333; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* --- 深色透明卡片 (預設) --- */
-    .quote-card, .content-card, .kd-card, .market-summary-box, .chart-container-box, .ai-chat-box {
-        background-color: rgba(30, 30, 30, 0.75) !important;
+    /* --- 統一樣式：灰白色卡片 (Light Theme) --- */
+    .quote-card, .content-card, .kd-card, .market-summary-box, .chart-container-box, .ai-chat-box, .light-card {
+        background-color: rgba(245, 245, 245, 0.95) !important; /* 統一灰白底 */
         backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         border-radius: 16px; padding: 20px 24px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-        margin-bottom: 20px; border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15); /* 陰影調淡 */
+        margin-bottom: 20px; border: 1px solid #dcdcdc;
         position: relative; z-index: 1;
+        color: #333 !important; /* 強制深色字 */
     }
-    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .chart-container-box *, .ai-chat-box * { text-shadow: none !important; }
     
-    /* --- 灰白色卡片 (用於籌碼與新聞) --- */
-    .light-card {
-        background-color: rgba(245, 245, 245, 0.95) !important; /* 灰白色 */
-        backdrop-filter: blur(10px);
-        border-radius: 16px; padding: 20px 24px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        margin-bottom: 20px; border: 1px solid #ccc;
-        position: relative; z-index: 1;
-        color: #333 !important; /* 強制深色文字 */
+    /* 強制卡片內所有元素文字顏色 */
+    .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .chart-container-box *, .ai-chat-box *, .light-card * { 
+        text-shadow: none !important;
+        color: #333 !important;
     }
-    .light-card h3 { color: #000 !important; border-bottom: 3px solid #FFD700; padding-bottom: 10px; font-weight: 900 !important; }
-    .light-card p, .light-card div, .light-card span, .light-card li { color: #333 !important; }
-    .light-card a { color: #0056b3 !important; font-weight: bold; } /* 深藍色連結 */
-    .light-card .news-meta { color: #666 !important; }
 
-    /* 分析報告文字 */
-    .content-card p, .content-card li { font-size: 1.05rem !important; line-height: 1.6 !important; color: #cfcfcf !important; }
-    .content-card h3 { border-bottom: 3px solid #FFD700; padding-bottom: 10px; font-size: 1.5rem !important; font-weight: 900 !important; color: #fff !important; }
-    .content-card h4 { color: #4fc3f7 !important; margin-top: 20px; font-size: 1.2rem !important; font-weight: 800 !important; }
+    /* 特殊文字顏色覆蓋 (漲跌色) */
+    .up-color { color: #ef5350 !important; }
+    .down-color { color: #2e7d32 !important; } /* 改用深綠色，在白底較清晰 */
+    
+    /* 分析報告標題與文字 */
+    .content-card p, .content-card li { font-size: 1.05rem !important; line-height: 1.6 !important; color: #444 !important; }
+    .content-card h3 { border-bottom: 3px solid #FFD700; padding-bottom: 10px; font-size: 1.5rem !important; font-weight: 900 !important; color: #000 !important; }
+    .content-card h4 { color: #0277bd !important; margin-top: 20px; font-size: 1.2rem !important; font-weight: 800 !important; }
 
-    /* 表格樣式 */
+    /* 表格樣式 (深色字) */
     .analysis-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .analysis-table td, .analysis-table th { padding: 8px; border-bottom: 1px solid #444; color: #ddd; }
-    .analysis-table th { text-align: left; color: #aaa; }
-    
-    /* 灰白卡片內的表格樣式調整 */
-    .light-card .analysis-table td, .light-card .analysis-table th { border-bottom: 1px solid #ccc; color: #333; }
-    .light-card .analysis-table th { color: #555; font-weight: bold; }
+    .analysis-table td, .analysis-table th { padding: 8px; border-bottom: 1px solid #ccc; color: #333; }
+    .analysis-table th { text-align: left; color: #555; font-weight: bold; }
 
     /* 報價卡片排版 */
     .quote-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .stock-title { font-size: 1.8rem !important; font-weight: 900 !important; margin: 0; line-height: 1.2; color: #fff !important; }
-    .stock-id { font-size: 1.2rem !important; color: #aaa !important; font-weight: normal; margin-left: 8px;}
+    .stock-title { font-size: 1.8rem !important; font-weight: 900 !important; margin: 0; line-height: 1.2; color: #000 !important; }
+    .stock-id { font-size: 1.2rem !important; color: #666 !important; font-weight: normal; margin-left: 8px;}
     
     .price-container { display: flex; align-items: baseline; gap: 12px; margin-bottom: 15px; }
     .price-big { font-size: 4rem !important; font-weight: 800 !important; line-height: 1; letter-spacing: -1px;}
     .price-change { font-size: 1.4rem !important; font-weight: 700 !important; }
     
-    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 30px; border-top: 1px solid #444; padding-top: 15px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 30px; border-top: 1px solid #ccc; padding-top: 15px; }
     .stat-row { display: flex; justify-content: space-between; align-items: center; }
-    .stat-label { font-size: 1rem !important; color: #aaa !important; font-weight: 500; }
-    .stat-val { font-weight: 700 !important; color: #fff !important; font-size: 1.1rem !important; }
+    .stat-label { font-size: 1rem !important; color: #666 !important; font-weight: 500; }
+    .stat-val { font-weight: 700 !important; color: #000 !important; font-size: 1.1rem !important; }
 
     /* 輸入框 */
     .stTextInput > div > div > input {
-        background-color: rgba(0, 0, 0, 0.5) !important; color: #ffffff !important;
-        border: 1px solid #FFD700 !important; border-radius: 12px;
+        background-color: #ffffff !important; color: #000000 !important;
+        border: 2px solid #FFD700 !important; border-radius: 12px;
         font-weight: bold; font-size: 1.1rem; padding: 10px;
     }
-    .stSelectbox > div > div > div { background-color: rgba(0, 0, 0, 0.5) !important; color: white !important; }
+    .stSelectbox > div > div > div { background-color: #ffffff !important; color: #000 !important; }
 
+    /* KD 卡片 */
     .kd-card { border-left: 8px solid #2962ff; display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; margin-top: 10px; }
-    .kd-title { font-size: 1.3rem !important; font-weight: bold !important; color: #fff !important; }
-    .kd-val { font-size: 2rem !important; font-weight: 800 !important; color: #fff !important; }
-    .kd-tag { padding: 4px 8px; border-radius: 6px; color: white; font-weight: bold; font-size: 0.9rem; }
+    .kd-title { font-size: 1.3rem !important; font-weight: bold !important; color: #000 !important; }
+    .kd-val { font-size: 2rem !important; font-weight: 800 !important; color: #000 !important; }
+    .kd-tag { padding: 4px 8px; border-radius: 6px; color: white !important; font-weight: bold; font-size: 0.9rem; }
 
-    /* Tab 橫向滑動 */
+    /* Tab 橫向滑動 (淺色適配) */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 4px; gap: 4px;
+        background-color: rgba(255, 255, 255, 0.6); border-radius: 12px; padding: 4px; gap: 4px;
         white-space: nowrap; overflow-x: auto;
     }
     .stTabs [data-baseweb="tab-list"] button { border-radius: 8px; border: none; background-color: transparent; flex: 0 0 auto; }
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        color: #aaa !important; font-weight: 700; font-size: 1.1rem; text-shadow: none !important; white-space: nowrap;
+        color: #666 !important; font-weight: 700; font-size: 1.1rem; text-shadow: none !important; white-space: nowrap;
     }
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] { background-color: rgba(255, 255, 255, 0.15); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] { background-color: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p { color: #FFD700 !important; }
 
-    /* Radio Group 橫向滑動 */
+    /* Radio Group (淺色適配) */
     .stRadio > div[role="radiogroup"] {
-        display: flex; flex-direction: row; gap: 8px;
-        background-color: rgba(0,0,0,0.3); padding: 8px; border-radius: 20px;
+        background-color: rgba(255,255,255,0.6); border: 1px solid #ccc;
+        display: flex; flex-direction: row; gap: 8px; padding: 8px; border-radius: 20px;
         width: 100%; overflow-x: auto; white-space: nowrap;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2); border: 1px solid #444;
         scrollbar-width: none; -ms-overflow-style: none;
     }
     .stRadio > div[role="radiogroup"]::-webkit-scrollbar { display: none; }
@@ -158,25 +151,27 @@ st.markdown("""
         border-radius: 15px; margin: 0; border: none; cursor: pointer;
         min-width: 60px; background-color: transparent;
     }
-    .stRadio div[role="radiogroup"] > label p { color: #aaa !important; font-weight: bold; margin: 0; font-size: 1rem; white-space: nowrap; }
+    .stRadio div[role="radiogroup"] > label p { color: #666 !important; font-weight: bold; margin: 0; font-size: 1rem; white-space: nowrap; }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] { background-color: #FFD700 !important; border-color: #FFD700; }
     .stRadio div[role="radiogroup"] > label[data-checked="true"] p { color: #000 !important; }
     
     [data-testid="stMetric"] { display: none; }
-    .stLinkButton a { background-color: #333 !important; color: #fff !important; border: 1px solid #555 !important; font-weight: bold; }
+    .stLinkButton a { background-color: #f0f0f0 !important; color: #333 !important; border: 1px solid #ccc !important; font-weight: bold; }
 
-    h1 { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); color: #FFD700 !important; margin-bottom: 20px; font-weight: 900; text-align: center; }
+    h1 { text-shadow: 2px 2px 0px #fff, 0 0 10px rgba(0,0,0,0.1); color: #FFD700 !important; margin-bottom: 20px; font-weight: 900; text-align: center; -webkit-text-stroke: 1px #888; }
+    
     .js-plotly-plot .plotly .main-svg { background: transparent !important; border-radius: 12px; }
     
-    .news-item { padding: 12px 0; border-bottom: 1px solid #ddd; } /* 改為淺色分隔線 */
+    .news-item { padding: 12px 0; border-bottom: 1px solid #ddd; }
     .news-item a { text-decoration: none; color: #0056b3 !important; font-weight: 700; font-size: 1.1rem; }
     .news-meta { font-size: 0.85rem !important; color: #666 !important; margin-top: 5px; }
 
     .ai-msg-user { text-align: right; margin: 10px 0; }
-    .ai-msg-user span { background-color: #1b5e20; padding: 10px 14px; border-radius: 12px; display: inline-block; color: #e8f5e9; border: 1px solid #2e7d32; }
+    .ai-msg-user span { background-color: #dcf8c6; padding: 10px 14px; border-radius: 12px; display: inline-block; color: #000 !important; border: 1px solid #ccc; }
     .ai-msg-bot { text-align: left; margin: 10px 0; }
-    .ai-msg-bot span { background-color: #424242; padding: 10px 14px; border-radius: 12px; display: inline-block; color: #fff; border: 1px solid #616161; }
-    .market-summary-box { color: white; }
+    .ai-msg-bot span { background-color: #f0f0f0; padding: 10px 14px; border-radius: 12px; display: inline-block; color: #000 !important; border: 1px solid #ccc; }
+    
+    .market-summary-box div { color: #333 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -335,26 +330,20 @@ def run_backtest(df, strategy_type, initial_capital=100000):
     df = df.copy()
     df['Signal'] = 0
     
-    # 策略 1: MA 交叉 (MA5 > MA20 買進)
     if strategy_type == "MA 均線策略 (MA5穿過MA20)":
         df['Signal'] = np.where(df['MA5'] > df['MA20'], 1, -1)
-        
-    # 策略 2: KD 策略 (K > D 買進)
     elif strategy_type == "KD 策略 (黃金交叉)":
         df['Signal'] = np.where(df['K'] > df['D'], 1, -1)
     
     df['Action'] = df['Signal'].diff()
-    
     capital = initial_capital
-    position = 0 # 股數
+    position = 0 
     df['Total_Assets'] = initial_capital
     trades = []
     
     for i in range(1, len(df)):
         price = df['Close'].iloc[i]
         date = df.index[i]
-        
-        # 買進
         if df['Signal'].iloc[i] == 1 and df['Signal'].iloc[i-1] != 1:
             if capital > 0:
                 shares = int(capital // price)
@@ -363,20 +352,16 @@ def run_backtest(df, strategy_type, initial_capital=100000):
                     capital -= cost
                     position += shares
                     trades.append({'日期': date, '動作': '買進', '價格': price, '股數': shares, '餘額': capital})
-        
-        # 賣出
         elif df['Signal'].iloc[i] == -1 and df['Signal'].iloc[i-1] != -1:
             if position > 0:
                 revenue = position * price
                 capital += revenue
                 trades.append({'日期': date, '動作': '賣出', '價格': price, '股數': position, '餘額': capital})
                 position = 0
-                
         df.iloc[i, df.columns.get_loc('Total_Assets')] = capital + (position * price)
         
     final_assets = df['Total_Assets'].iloc[-1]
     return_rate = ((final_assets - initial_capital) / initial_capital) * 100
-    
     return df, trades, final_assets, return_rate
 
 def generate_narrative_report(name, ticker, latest, inst_df, df, info):
@@ -388,20 +373,20 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     tech_desc = ""
     if price > ma5 and ma5 > ma10 and ma10 > ma20:
         tech_trend = "多頭排列"
-        tech_desc = "均線結構良好，顯示股價處於健康的上漲趨勢中。"
+        tech_desc = "均線結構良好。"
     elif price < ma5 and ma5 < ma10 and ma10 < ma20:
         tech_trend = "空頭排列"
-        tech_desc = "短線趨勢偏弱，上方壓力重重。"
+        tech_desc = "短線趨勢偏弱。"
     elif price > ma20:
         tech_trend = "站上月線"
-        tech_desc = "中期趨勢偏多，唯短線可能震盪。"
+        tech_desc = "中期趨勢偏多。"
     else:
         tech_trend = "跌破月線"
-        tech_desc = "短線轉弱，需觀察季線支撐。"
+        tech_desc = "短線轉弱。"
 
     kd_status = "黃金交叉" if k > d else "死亡交叉"
-    kd_color_style = "#ef5350" if k > d else "#66bb6a"
-    kd_desc = f"KD 指標 ({k:.1f}/{d:.1f}) 呈現 <b style='color:{kd_color_style}'>{kd_status}</b>。"
+    kd_color_style = "up-color" if k > d else "down-color"
+    kd_desc = f"KD 指標 ({k:.1f}/{d:.1f}) 呈現 <b class='{kd_color_style}'>{kd_status}</b>。"
     
     inst_table_html = "<tr><td colspan='4'>暫無資料</td></tr>"
     inst_desc = "暫無法人數據。"
@@ -409,18 +394,16 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         last = inst_df.iloc[-1]
         f_val, t_val, d_val = last['Foreign'], last['Trust'], last['Dealer']
         total = f_val + t_val + d_val
-        color_total = '#ef5350' if total > 0 else '#66bb6a'
-        inst_desc = f"法人單日合計 <b style='color:{color_total}'>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
-        if f_val > 0 and t_val > 0: inst_desc += " 土洋同步看多，有利股價推升。"
-        elif f_val < 0 and t_val < 0: inst_desc += " 土洋同步調節，籌碼面承壓。"
+        color_total = 'up-color' if total > 0 else 'down-color'
+        inst_desc = f"法人單日合計 <b class='{color_total}'>{'買超' if total>0 else '賣超'} {abs(total):,} 張</b>。"
         
         inst_table_html = f"""
         <tr>
             <td>{last['Date']}</td>
-            <td style="color:{'#ef5350' if f_val>0 else '#66bb6a'}">{f_val:,}</td>
-            <td style="color:{'#ef5350' if t_val>0 else '#66bb6a'}">{t_val:,}</td>
-            <td style="color:{'#ef5350' if d_val>0 else '#66bb6a'}">{d_val:,}</td>
-            <td style="color:{'#ef5350' if total>0 else '#66bb6a'}"><b>{total:,}</b></td>
+            <td class="{'up-color' if f_val>0 else 'down-color'}">{f_val:,}</td>
+            <td class="{'up-color' if t_val>0 else 'down-color'}">{t_val:,}</td>
+            <td class="{'up-color' if d_val>0 else 'down-color'}">{d_val:,}</td>
+            <td class="{'up-color' if total>0 else 'down-color'}"><b>{total:,}</b></td>
         </tr>
         """
 
@@ -479,7 +462,7 @@ def analyze_market_index(ticker_symbol):
         change = price - df['Close'].iloc[-2]
         
         status = "多頭強勢" if price > ma20 and k > d else "多頭回檔" if price > ma20 else "空方修正"
-        color = "#ef5350" if k > d else "#ff9800" if price > ma20 else "#66bb6a"
+        color = "#ef5350" if k > d else "#ff9800" if price > ma20 else "#2e7d32"
         comment = f"KD({k:.1f}/{d:.1f})。市場氣氛：{status}。"
         return {"price": price, "change": change, "status": status, "color": color, "comment": comment}
     except: return None
@@ -526,7 +509,7 @@ if target:
             prev_close = df_fast['Close'].iloc[-2]
             change = latest_fast['Close'] - prev_close
             pct = (change / prev_close) * 100
-            color = "#ef5350" if change >= 0 else "#66bb6a"
+            color = "#ef5350" if change >= 0 else "#2e7d32"
             arrow = "▲" if change >= 0 else "▼"
             
             st.markdown(f"""
@@ -538,7 +521,7 @@ if target:
                 </div>
                 <div class="stats-grid">
                     <div class="stat-row"><span class="stat-label">最高</span><span class="stat-val" style="color:#ef5350;">{latest_fast['High']:.2f}</span></div>
-                    <div class="stat-row"><span class="stat-label">最低</span><span class="stat-val" style="color:#66bb6a;">{latest_fast['Low']:.2f}</span></div>
+                    <div class="stat-row"><span class="stat-label">最低</span><span class="stat-val" style="color:#2e7d32;">{latest_fast['Low']:.2f}</span></div>
                     <div class="stat-row"><span class="stat-label">昨收</span><span class="stat-val">{prev_close:.2f}</span></div>
                     <div class="stat-row"><span class="stat-label">開盤</span><span class="stat-val">{latest_fast['Open']:.2f}</span></div>
                 </div>
@@ -570,13 +553,13 @@ if target:
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 fig.add_trace(go.Candlestick(
                     x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], 
-                    name='K線', increasing_line_color='#ef5350', decreasing_line_color='#66bb6a'
+                    name='K線', increasing_line_color='#ef5350', decreasing_line_color='#2e7d32'
                 ), row=1, col=1)
                 
                 for ma, c in [('MA5','#4fc3f7'), ('MA10','#ba68c8'), ('MA20','#ffb74d'), ('MA60','#dce775')]:
                     if ma in plot_df.columns: fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
                 
-                colors_vol = ['#ef5350' if r['Open'] < r['Close'] else '#66bb6a' for i, r in plot_df.iterrows()]
+                colors_vol = ['#ef5350' if r['Open'] < r['Close'] else '#2e7d32' for i, r in plot_df.iterrows()]
                 fig.add_trace(go.Bar(x=plot_df.index, y=plot_df['Volume'], marker_color=colors_vol, name='成交量'), row=2, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#4fc3f7', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ffb74d', width=1.5), name='D9'), row=3, col=1)
@@ -585,13 +568,21 @@ if target:
                     fig.update_xaxes(range=[plot_df.index[-60], plot_df.index[-1]], row=1, col=1)
 
                 fig.update_layout(
-                    template="plotly_dark", height=600, margin=dict(l=10, r=10, t=10, b=10), 
-                    legend=dict(orientation="h", y=1.01, x=0), dragmode='pan', hovermode='x unified', 
-                    xaxis=dict(rangeslider_visible=False), yaxis=dict(fixedrange=True),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                    template="plotly_white", # 淺色圖表
+                    height=600, margin=dict(l=10, r=10, t=10, b=10), 
+                    legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
+                    dragmode='pan', hovermode='x unified', 
+                    xaxis=dict(rangeslider_visible=False), 
+                    # --- 重要：鎖定所有Y軸的縮放，只允許左右移動 ---
+                    yaxis=dict(fixedrange=True),
+                    yaxis2=dict(fixedrange=True),
+                    yaxis3=dict(fixedrange=True),
+                    # ---------------------------------------------
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='black')
                 )
                 
-                grid_color = "#444"
+                grid_color = "#ccc"
                 for row in [1, 2, 3]:
                     fig.update_xaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
                     fig.update_yaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
@@ -599,7 +590,7 @@ if target:
                 st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
             st.markdown('</div>', unsafe_allow_html=True)
             
-            kd_color = "#ef5350" if latest['K'] > latest['D'] else "#66bb6a"
+            kd_color = "#ef5350" if latest['K'] > latest['D'] else "#2e7d32"
             kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
             st.markdown(f"""<div class="kd-card" style="border-left: 6px solid {kd_color};"><div class="kd-title">KD 指標 (9,3,3)</div><div style="text-align:right;"><div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div><div class="kd-tag" style="background-color:{kd_color};">{kd_text}</div></div></div>""", unsafe_allow_html=True)
 
@@ -612,11 +603,9 @@ if target:
             inst_df = get_institutional_data_finmind(target)
             if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
             
-            # 使用 light-card 樣式 (灰白底)
             if inst_df is not None and not inst_df.empty:
-                st.markdown(f"<div class='light-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='content-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
                 
-                # 配合淺色底，使用 plotly_white 模板，背景設為透明
                 fig_inst = go.Figure()
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#4fc3f7'))
                 fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#ba68c8'))
@@ -624,24 +613,23 @@ if target:
                 fig_inst.update_layout(
                     barmode='group', template="plotly_white", height=400, xaxis=dict(autorange="reversed"),
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='black') # 強制圖表文字為黑色
+                    font=dict(color='black'),
+                    yaxis=dict(fixedrange=True) # 鎖定Y軸
                 )
                 
-                # 將圖表放入 light-card 容器中
-                st.markdown("<div class='light-card'>", unsafe_allow_html=True)
-                st.plotly_chart(fig_inst, use_container_width=True)
+                st.markdown("<div class='content-card'>", unsafe_allow_html=True)
+                st.plotly_chart(fig_inst, use_container_width=True, config={'displayModeBar': False})
                 
-                # 手動建立 HTML 表格以確保樣式一致
                 table_html = "<table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
                 for _, row in inst_df.sort_values('Date', ascending=False).head(10).iterrows():
-                    table_html += f"<tr><td>{row['Date']}</td><td>{row['Foreign']:,}</td><td>{row['Trust']:,}</td><td>{row['Dealer']:,}</td></tr>"
+                    table_html += f"<tr><td>{row['Date']}</td><td style='color:{'#ef5350' if row['Foreign']>0 else '#2e7d32'}'>{row['Foreign']:,}</td><td style='color:{'#ef5350' if row['Trust']>0 else '#2e7d32'}'>{row['Trust']:,}</td><td style='color:{'#ef5350' if row['Dealer']>0 else '#2e7d32'}'>{row['Dealer']:,}</td></tr>"
                 table_html += "</tbody></table>"
                 st.markdown(table_html, unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
             else: st.info("無法人籌碼資料")
 
         with tab4:
-            st.markdown("<div class='light-card'><h3>📰 個股相關新聞</h3>", unsafe_allow_html=True)
+            st.markdown("<div class='content-card'><h3>📰 個股相關新聞</h3>", unsafe_allow_html=True)
             news_list = get_google_news(target)
             for news in news_list:
                 st.markdown(f"<div class='news-item'><a href='{news['link']}' target='_blank'>{news['title']}</a><div class='news-meta'>{news['pubDate']} | {news['source']}</div></div>", unsafe_allow_html=True)
@@ -650,32 +638,32 @@ if target:
         with tab5:
             st.markdown("<div class='ai-chat-box'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
-            # --- AI 自動分析邏輯 ---
-            # 初始化 session state
+            # --- AI 自動分析邏輯 (修復版) ---
             if 'last_target' not in st.session_state: st.session_state['last_target'] = None
             if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
 
-            # 若切換股票，重置分析並自動觸發
+            # 若目標改變，強制重置並分析
             if st.session_state['last_target'] != target:
                 st.session_state['last_target'] = target
                 st.session_state['ai_analysis'] = None
+            
+            # 若無分析結果，則執行分析
+            if st.session_state['ai_analysis'] is None:
                 with st.spinner(f"AI 正在分析 {name} 的各項數據..."):
-                    # 自動觸發的 Prompt
                     auto_prompt = f"""
                     請擔任專業股市分析師「武吉拉」，對 {name} ({target}) 進行今日的綜合分析。
                     目前的技術數據：收盤價 {latest['Close']:.2f}，MA5={latest['MA5']:.2f}，MA20={latest['MA20']:.2f}，KD指標 K={latest['K']:.1f}/D={latest['D']:.1f}。
                     請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
                     語氣請專業、客觀且親切。
                     """
-                    st.session_state['ai_analysis'] = call_gemini_api(auto_prompt)
+                    result = call_gemini_api(auto_prompt)
+                    st.session_state['ai_analysis'] = result
             
-            # 顯示自動分析結果
             if st.session_state['ai_analysis']:
                 st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
             
-            st.markdown("<p style='margin-top:15px; border-top:1px solid #555; padding-top:10px;'>💬 還有其他問題嗎？歡迎隨時提問：</p>", unsafe_allow_html=True)
+            st.markdown("<p style='margin-top:15px; border-top:1px solid #ccc; padding-top:10px;'>💬 還有其他問題嗎？歡迎隨時提問：</p>", unsafe_allow_html=True)
             
-            # 手動提問區
             user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
             if user_query:
                 with st.spinner("AI 正在思考您的問題..."):
@@ -702,7 +690,7 @@ if target:
                 backtest_df = calculate_indicators(backtest_df)
                 res_df, trades, final_assets, return_rate = run_backtest(backtest_df, strategy, initial_capital)
                 
-                color_ret = "#ef5350" if return_rate > 0 else "#66bb6a"
+                color_ret = "#ef5350" if return_rate > 0 else "#2e7d32"
                 st.markdown(f"""
                 <div class="market-summary-box" style="margin-bottom: 20px;">
                     <div style="font-size: 1.2rem;">最終資產: <b>{int(final_assets):,}</b> 元</div>
@@ -713,7 +701,7 @@ if target:
                 
                 fig_bt = go.Figure()
                 fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#FFD700', width=2)))
-                fig_bt.update_layout(title="資產成長曲線", template="plotly_dark", height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                fig_bt.update_layout(title="資產成長曲線", template="plotly_white", height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='black'))
                 st.plotly_chart(fig_bt, use_container_width=True)
                 
                 if trades:
@@ -726,5 +714,3 @@ if target:
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
-
-

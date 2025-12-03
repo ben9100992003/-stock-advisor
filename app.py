@@ -85,40 +85,59 @@ st.markdown("""
     
     /* --- AI 回測深色卡片 (仿圖風格) --- */
     .ai-backtest-card {
-        background-color: #0e1117 !important; /* 深黑底色 */
-        border-radius: 16px;
-        padding: 25px;
+        background-color: #000000 !important; /* 全黑背景 */
+        border-radius: 20px;
+        padding: 30px;
         color: white !important;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 30px rgba(0,0,0,0.5);
         margin-bottom: 20px;
         border: 1px solid #333;
+        font-family: 'Segoe UI', sans-serif;
     }
-    .ai-backtest-header {
-        display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;
-    }
-    .ai-title-block { display: flex; align-items: center; gap: 10px; }
-    .ai-icon { font-size: 2rem; background: #007bff; border-radius: 10px; padding: 5px; }
-    .ai-title-text h3 { color: white !important; margin: 0; font-size: 1.3rem; font-weight: bold; }
-    .ai-title-text p { color: #888 !important; margin: 0; font-size: 0.8rem; }
     
-    .ai-win-rate { text-align: right; }
-    .ai-win-val { font-size: 2.5rem; font-weight: bold; color: #4facfe; line-height: 1; }
-    .ai-win-label { color: #888; font-size: 0.9rem; }
-    
-    .prediction-row { display: flex; gap: 15px; margin-top: 15px; }
-    .prediction-box {
-        flex: 1; background: #1c1f26; border-radius: 12px; padding: 15px;
-        border: 1px solid #333;
+    .ai-header-row {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        margin-bottom: 30px;
     }
-    .pred-label { color: #aaa; font-size: 0.9rem; margin-bottom: 5px; }
-    .pred-value { font-size: 1.8rem; font-weight: bold; }
-    .pred-up { color: #43a047; } /* 綠色 */
-    .pred-down { color: #e53935; } /* 紅色 */
     
-    /* --- 讓 Plotly 圖表在深色卡片中更自然 --- */
-    .ai-backtest-card .js-plotly-plot .plotly .main-svg {
-        background: transparent !important;
+    .ai-title-group { display: flex; gap: 15px; align-items: center; }
+    .ai-icon-box {
+        width: 50px; height: 50px;
+        background: #0066ff;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px; color: white;
     }
+    .ai-title-text h3 { color: white !important; margin: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.5px; }
+    .ai-title-text p { color: #888 !important; margin: 0; font-size: 0.9rem; margin-top: 2px; }
+    
+    .ai-score-group { text-align: right; }
+    .ai-score-val { 
+        font-size: 3rem; font-weight: 700; 
+        background: linear-gradient(to right, #4facfe, #00f2fe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1;
+    }
+    .ai-score-label { color: #888; font-size: 0.9rem; margin-top: 5px; letter-spacing: 1px; }
+    
+    .ai-pred-row {
+        display: flex; gap: 20px; margin-bottom: 20px;
+    }
+    .ai-pred-box {
+        flex: 1;
+        background: #11141c;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid #222;
+    }
+    .pred-title { color: #888; font-size: 1rem; margin-bottom: 10px; }
+    .pred-num { font-size: 2rem; font-weight: 700; letter-spacing: 1px; }
+    .color-green { color: #4ade80; }
+    .color-red { color: #f87171; }
+    
+    /* Plotly 圖表容器 */
+    .chart-container { margin-top: 10px; border-radius: 12px; overflow: hidden; }
 
     /* 強制卡片內文字顏色 */
     .quote-card *, .content-card *, .kd-card *, .market-summary-box *, .ai-chat-box *, .light-card * {
@@ -131,22 +150,18 @@ st.markdown("""
     .text-down { color: #43a047 !important; }
     .text-flat { color: #333 !important; }
     
-    /* --- 報價卡片樣式 (仿圖片風格) --- */
+    /* --- 報價卡片樣式 --- */
     .quote-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
     .stock-name { font-size: 1.8rem; font-weight: 900; color: #222; }
     .stock-id { font-size: 1.2rem; color: #888; font-weight: 500; }
-    
     .price-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
     .main-price { font-size: 4.2rem; line-height: 1; font-weight: 700; letter-spacing: -1px; }
-    
     .change-info { display: flex; flex-direction: column; justify-content: center; font-size: 1.1rem; font-weight: 600; line-height: 1.4; }
-    
     .market-tag {
         display: inline-block; padding: 3px 12px; border: 1px solid #ddd;
         border-radius: 20px; color: #666; font-size: 0.9rem;
         background-color: #f9f9f9; margin-bottom: 20px;
     }
-
     .detail-grid {
         display: grid; grid-template-columns: 1fr 1fr;
         column-gap: 20px; row-gap: 8px; font-size: 1.1rem;
@@ -180,7 +195,6 @@ st.markdown("""
     /* --- 其他元件 --- */
     .stTextInput input, .stSelectbox div[data-baseweb="select"] > div { background-color: #fff !important; color: #333 !important; }
     .stButton button { background-color: #fff; color: #333; border: 1px solid #ccc; font-weight: bold; }
-    
     .stTabs [data-baseweb="tab-list"] { background-color: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px; gap: 5px; overflow-x: auto; }
     .stTabs button[aria-selected="true"] { background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .stTabs button[aria-selected="true"] p { color: #e53935 !important; }
@@ -543,6 +557,39 @@ if target_input:
     if resolved_ticker: target = resolved_ticker; name = resolved_name
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
 
+# --- 觸發 AI 自動分析的邏輯 (放在主流程中) ---
+if 'last_target' not in st.session_state: st.session_state['last_target'] = None
+if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
+
+# 如果目標股票改變，或者尚未分析過，就清空並準備分析
+if st.session_state['last_target'] != target:
+    st.session_state['last_target'] = target
+    st.session_state['ai_analysis'] = None
+
+# 如果 AI 分析結果是空的，則執行分析
+# 這裡不使用 st.spinner 避免在非 Tab 顯示時出錯，改用背景執行
+if st.session_state['ai_analysis'] is None:
+    try:
+        # 使用 yfinance 獲取最新基本數據用於 Prompt
+        temp_stock = yf.Ticker(target)
+        temp_hist = temp_stock.history(period="5d")
+        if not temp_hist.empty:
+            temp_hist = calculate_indicators(temp_hist)
+            t_latest = temp_hist.iloc[-1]
+            
+            auto_prompt = f"""
+            請擔任專業股市分析師「武吉拉」，對 {name} ({target}) 進行今日的綜合分析。
+            目前的技術數據：收盤價 {t_latest['Close']:.2f}，MA5={t_latest['MA5']:.2f}，MA20={t_latest['MA20']:.2f}，KD指標 K={t_latest['K']:.1f}/D={t_latest['D']:.1f}。
+            請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
+            語氣請專業、客觀且親切。
+            """
+            result = call_gemini_api(auto_prompt)
+            st.session_state['ai_analysis'] = result
+            # 這裡不使用 rerun，讓它在下一次互動或切換 Tab 時自然顯示
+            # 或者如果希望立即看到，可以 rerun，但可能會閃爍
+    except:
+        st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
+
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
     with t1:
@@ -616,6 +663,8 @@ if target:
             
             interval = interval_map[period_label]
             is_intraday = interval in ["1m", "5m", "15m", "30m", "60m"]
+            
+            # 修正：分時線強制抓 5 天，日線抓 2 年
             data_period = "5d" if is_intraday else ("2y" if interval == "1d" else "5y")
             
             df = stock.history(period=data_period, interval=interval)
@@ -625,11 +674,6 @@ if target:
                 latest = df.iloc[-1]
                 
                 plot_df = df.copy()
-                
-                # --- [修正] 如果是分時K線，只取最後一天的資料 ---
-                if is_intraday:
-                    last_date = df.index[-1].date()
-                    plot_df = df[df.index.date == last_date]
                 
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 
@@ -646,6 +690,28 @@ if target:
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
                 fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
+                # --- 核心修正 ---
+                if is_intraday:
+                    # 1. 強制隱藏非交易時段，讓資料連續
+                    # 隱藏 13:30 ~ 09:00 (小時) 及 週末
+                    fig.update_xaxes(
+                        rangebreaks=[
+                            dict(bounds=[13.5, 9], pattern="hour"), 
+                            dict(bounds=["sat", "mon"])
+                        ]
+                    )
+                    
+                    # 2. 預設只顯示「最後一天 (當日)」
+                    # 透過設定 x-axis range 達成。
+                    last_day_date = plot_df.index[-1].date()
+                    # 抓取最後一天的資料範圍作為預設 range
+                    today_data = plot_df[plot_df.index.date == last_day_date]
+                    if not today_data.empty:
+                        start_time = today_data.index[0]
+                        end_time = today_data.index[-1]
+                        # 稍微加一點 buffer
+                        fig.update_xaxes(range=[start_time, end_time], row=1, col=1)
+
                 fig.update_layout(
                     template="plotly_white",
                     height=600, margin=dict(l=10, r=10, t=10, b=10), 
@@ -659,16 +725,6 @@ if target:
                     font=dict(color='black')
                 )
                 
-                # --- [修正] 隱藏非交易時段 (13:30 ~ 09:00) 以避免空白 ---
-                # 只有分時線需要這個設定，日線不需要
-                if is_intraday:
-                    fig.update_xaxes(
-                        rangebreaks=[
-                            dict(bounds=[13.5, 9], pattern="hour"), # 隱藏下午1:30到隔天早上9:00
-                            dict(bounds=["sat", "mon"]), # 隱藏週末
-                        ]
-                    )
-
                 grid_color = "#e0e0e0"
                 for row in [1, 2, 3]:
                     fig.update_xaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
@@ -744,32 +800,12 @@ if target:
         with tab5:
             st.markdown("<div class='ai-chat-box'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
-            if 'last_target' not in st.session_state: st.session_state['last_target'] = None
-            if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
-
-            # --- [修正] 當切換股票時，自動重置並觸發 AI 分析 ---
-            if st.session_state['last_target'] != target:
-                st.session_state['last_target'] = target
-                st.session_state['ai_analysis'] = None
-            
-            if st.session_state['ai_analysis'] is None:
-                st.info(f"正在為您分析 {name} 的各項數據，請稍候...")
-                try:
-                    auto_prompt = f"""
-                    請擔任專業股市分析師「武吉拉」，對 {name} ({target}) 進行今日的綜合分析。
-                    目前的技術數據：收盤價 {latest['Close']:.2f}，MA5={latest['MA5']:.2f}，MA20={latest['MA20']:.2f}，KD指標 K={latest['K']:.1f}/D={latest['D']:.1f}。
-                    請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
-                    語氣請專業、客觀且親切。
-                    """
-                    result = call_gemini_api(auto_prompt)
-                    st.session_state['ai_analysis'] = result
-                    st.rerun() 
-                except Exception as e:
-                    st.error(f"AI 分析連線失敗，請稍後再試。({e})")
-            
+            # 已在上方自動執行，這裡直接顯示結果
             if st.session_state['ai_analysis']:
                 st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
-            
+            else:
+                st.info("AI 正在分析中，請稍候...")
+
             st.markdown("<p style='margin-top:15px; border-top:1px solid #ccc; padding-top:10px;'>💬 還有其他問題嗎？歡迎隨時提問：</p>", unsafe_allow_html=True)
             
             user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
@@ -788,7 +824,6 @@ if target:
             st.markdown("</div>", unsafe_allow_html=True)
 
         with tab6:
-            # --- [修改] Tab 6 介面與顯示風格 ---
             st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測</p></div>", unsafe_allow_html=True)
             c1, c2 = st.columns(2)
             with c1: initial_capital = st.number_input("初始資金", value=100000, step=10000)
@@ -799,61 +834,61 @@ if target:
                 backtest_df = calculate_indicators(backtest_df)
                 res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
                 
-                # 計算支撐與壓力 (簡單模擬：使用近期高低點)
+                # 計算支撐與壓力 (簡單模擬)
                 recent_high = backtest_df['High'].tail(20).max()
                 recent_low = backtest_df['Low'].tail(20).min()
                 
-                # --- [新增] 建立圖表，並將其設置為深色透明背景 ---
+                # --- 圖表改為深色透明 ---
                 fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#FFD700', width=2)))
+                fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
                 fig_bt.update_layout(
-                    title="資產成長曲線",
-                    template="plotly_dark", # 改為深色主題
-                    height=350,
-                    paper_bgcolor='rgba(0,0,0,0)', # 透明背景
-                    plot_bgcolor='rgba(0,0,0,0)', # 透明背景
-                    font=dict(color='white'), # 字體改為白色
-                    margin=dict(l=20, r=20, t=50, b=20)
+                    template="plotly_dark",
+                    height=250, # 配合卡片高度
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#aaa'),
+                    margin=dict(l=0, r=0, t=10, b=10),
+                    xaxis=dict(showgrid=False),
+                    yaxis=dict(showgrid=True, gridcolor='#333'),
                 )
-                # 將圖表轉換為 HTML 字串，不顯示工具列
                 chart_html = fig_bt.to_html(full_html=False, config={'displayModeBar': False})
 
-                # --- [新增] 深色卡片 UI (仿照您提供的圖片)，並將圖表嵌入其中 ---
+                # --- 復刻深色卡片 HTML ---
                 backtest_html = f"""
                 <div class="ai-backtest-card">
-                    <div class="ai-backtest-header">
-                        <div class="ai-title-block">
-                            <div class="ai-icon">💻</div>
+                    <div class="ai-header-row">
+                        <div class="ai-title-group">
+                            <div class="ai-icon-box">💻</div>
                             <div class="ai-title-text">
                                 <h3>AI 大數據回測</h3>
                                 <p>Pattern Matching</p>
                             </div>
                         </div>
-                        <div class="ai-win-rate">
-                            <div class="ai-win-val">{int(win_rate)}%</div>
-                            <div class="ai-win-label">上漲機率</div>
+                        <div class="ai-score-group">
+                            <div class="ai-score-val">{int(win_rate)}%</div>
+                            <div class="ai-score-label">上漲機率</div>
                         </div>
                     </div>
                     
-                    <div class="prediction-row">
-                        <div class="prediction-box">
-                            <div class="pred-label">支撐預測</div>
-                            <div class="pred-value pred-up">{recent_low:.0f}</div>
+                    <div class="ai-pred-row">
+                        <div class="ai-pred-box">
+                            <div class="pred-title">支撐預測</div>
+                            <div class="pred-num color-green">{recent_low:.0f}</div>
                         </div>
-                        <div class="prediction-box">
-                            <div class="pred-label">壓力預測</div>
-                            <div class="pred-value pred-down">{recent_high:.0f}</div>
+                        <div class="ai-pred-box">
+                            <div class="pred-title">壓力預測</div>
+                            <div class="pred-num color-red">{recent_high:.0f}</div>
                         </div>
                     </div>
-                    <!-- 嵌入圖表 HTML -->
-                    <div style="margin-top: 20px;">
+                    
+                    <div class="chart-container">
                         {chart_html}
                     </div>
                 </div>
                 """
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
-                # 傳統文字報告 (保留在下方)
+                # 文字報告
                 color_ret = "text-up" if return_rate > 0 else "text-down"
                 st.markdown(f"""
                 <div class="market-summary-box" style="margin-bottom: 20px;">

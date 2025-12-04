@@ -266,7 +266,8 @@ SECTOR_MAP = {
     "Consumer Cyclical": "非必需消費品", "Industrials": "工業", "Communication Services": "通訊服務",
     "Consumer Defensive": "必需消費品", "Energy": "能源", "Basic Materials": "原物料",
     "Real Estate": "房地產", "Utilities": "公共事業", "Financials": "金融",
-    "Health Care": "醫療保健", "Information Technology": "資訊科技", "Materials": "原物料"
+    "Health Care": "醫療保健", "Information Technology": "資訊科技", "Materials": "原物料",
+    "Technology Services": "科技服務", "Hardware": "硬體設備", "Medical Devices": "醫療器材"
 }
 
 @st.cache_data(ttl=3600)
@@ -395,8 +396,8 @@ def get_yahoo_stock_url(ticker):
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 修正：改用 gemini-2.5-flash，它在 v1beta API 上有更好的相容性
-    model = "gemini-2.5-flash"
+    # 修正：使用更穩定的預覽模型 ID
+    model = "gemini-2.5-flash-preview-09-2025" 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
@@ -415,6 +416,9 @@ def call_gemini_api(prompt):
                 error_body = response.json()
                 error_msg = error_body.get('error', {}).get('message', response.text)
                 status = error_body.get('error', {}).get('status', response.status_code)
+                # 專門處理權限問題的提示
+                if status == 'PERMISSION_DENIED':
+                    return f"⚠️ 權限錯誤 (403): API Key 無法存取 {model}。請檢查 API Key 狀態與 Generative Language API 是否已啟用。"
                 return f"⚠️ AI 服務錯誤 ({status}): {error_msg}"
             except:
                 return f"⚠️ AI 服務錯誤 ({response.status_code}): {response.text}"
@@ -440,7 +444,8 @@ def get_stock_summary_zh(summary_text):
     """
     try:
         result = call_gemini_api(prompt)
-        if "錯誤" in result or "無法使用" in result:
+        # 專門針對 AI 服務失敗的訊息，避免將錯誤訊息當成原文翻譯
+        if "⚠️" in result or "錯誤" in result or "無法使用" in result: 
             return summary_text 
         return result
     except:
@@ -578,14 +583,14 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     sector_en = info.get('sector', '科技')
     sector = SECTOR_MAP.get(sector_en, sector_en) # 使用對照表翻譯產業
     
-    # 修正：確保在 info 中獲取名稱，若無則回退到中文股名表
-    company_name = info.get('longName', name)
-    # 再次覆寫名稱，確保使用中文
-    if target in STOCK_NAMES: company_name = STOCK_NAMES[target]
-
+    company_name = STOCK_NAMES.get(ticker, info.get('longName', name)) # 修正: 優先使用中文股名
     raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
     summary = get_stock_summary_zh(raw_summary) # 使用翻譯後的內容
     
+    # 修正: 即使 AI 翻譯失敗，也要確保公司名稱是中文
+    if "Taiwan Semiconductor Manufacturing Company Limited" in summary:
+        summary = summary.replace("Taiwan Semiconductor Manufacturing Company Limited", "台積電")
+        
     theme_text = f"<b>{company_name}</b> 屬於 {sector} 產業。<br><br>{summary}"
     
     support = ma10 if price > ma10 else ma20
@@ -653,7 +658,7 @@ if target_input:
     resolved_ticker, resolved_name = resolve_ticker(target_input)
     if resolved_ticker: 
         target = resolved_ticker
-        # 修正重點：優先使用內建的中文股名，若無才使用解析出的名稱
+        # 修正重點：優先使用內建的中文股名
         name = STOCK_NAMES.get(target, resolved_name)
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
     
@@ -876,10 +881,10 @@ if target:
             st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
             if st.session_state['ai_analysis']:
-                if "錯誤" in st.session_state['ai_analysis'] or "無法使用" in st.session_state['ai_analysis']:
+                if "⚠️" in st.session_state['ai_analysis']:
                      # 顯示詳細錯誤，並加入 API 提示
-                     error_msg = st.session_state['ai_analysis'].replace("models/gemini-1.5-flash", "models/gemini-2.5-flash")
-                     st.markdown(f"<div class='content-card' style='border-left: 5px solid #f44336; background: #fff5f5;'>❌ **AI 連線失敗 (重要：請檢查 Key 權限)**<br>{error_msg}<br><br>系統已嘗試切換至 **gemini-2.5-flash**，若仍失敗，請確認您的 API Key 是否已啟用 **Generative Language API** 服務。</div>", unsafe_allow_html=True)
+                     error_msg = st.session_state['ai_analysis']
+                     st.markdown(f"<div class='content-card' style='border-left: 5px solid #f44336; background: #fff5f5;'>❌ **AI 連線失敗 (重要：請檢查 Key 權限)**<br>{error_msg}<br><br>系統已嘗試使用 **gemini-2.5-flash-preview-09-2025** 模型。若持續出現 **NOT_FOUND** 或 **PERMISSION_DENIED**，請確認您的 API Key 是否已啟用 **Generative Language API** 服務，且 Key 沒有被限制。</div>", unsafe_allow_html=True)
                      if st.button("🔄 重試自動分析", key="retry_ai"):
                          st.session_state['ai_analysis'] = None
                          st.cache_data.clear() # 清除快取，確保重新嘗試連線
@@ -906,7 +911,7 @@ if target:
                     請用繁體中文回答，語氣專業且親切。
                     """
                     ai_response = call_gemini_api(prompt)
-                    if "錯誤" in ai_response or "無法使用" in ai_response:
+                    if "⚠️" in ai_response:
                         st.markdown(f"<div class='content-card' style='background: #fff5f5; border-left: 5px solid #f44336;'>❌ {ai_response}</div>", unsafe_allow_html=True)
                     else:
                         st.markdown(f"<div class='content-card ai-user-box'>👤 {user_query}</div>", unsafe_allow_html=True)

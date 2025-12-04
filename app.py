@@ -539,7 +539,6 @@ def get_ai_stock_recommendations():
                 return json.loads(json_text)
             
     except Exception as e:
-        st.warning(f"推薦模型連線失敗或格式錯誤，錯誤: {e}")
         return None
 
 def calculate_indicators(df):
@@ -758,14 +757,22 @@ if st.session_state['ai_analysis'] is None:
             with st.spinner(f"🤖 AI 正在分析 {name} 的最新數據，請稍候..."):
                 result = call_gemini_api(auto_prompt)
                 
-                # --- 關鍵修正：只有在成功時才儲存結果，否則儲存錯誤訊息 ---
+                # --- 關鍵修正：儲存結果或錯誤訊息 ---
                 st.session_state['ai_analysis'] = result
     except:
         st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
 
-# 重新定義 Tabs，新增推薦頁籤
-tab1, tab2, tab3, tab4, tab_rec, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🚀 股票推薦", "🤖 AI 投顧", "🔄 回測"])
-        
+with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
+    t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
+    with t1:
+        tw = analyze_market_index("^TWII")
+        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
+    with t2:
+        us = analyze_market_index("^IXIC")
+        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
+
+st.markdown("---")
+
 if target:
     try:
         stock = yf.Ticker(target)
@@ -817,6 +824,8 @@ if target:
 </div>
 </div>"""
             st.markdown(quote_html, unsafe_allow_html=True)
+        
+        tab1, tab2, tab3, tab4, tab_rec, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🚀 股票推薦", "🤖 AI 投顧", "🔄 回測"])
         
         with tab1:
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
@@ -952,7 +961,7 @@ if target:
                         """
                         st.markdown(rec_card, unsafe_allow_html=True)
             else:
-                st.info("AI 推薦服務暫時無法取得數據，請稍後重試。")
+                st.markdown("<div class='ai-msg-error'>⚠️ <b>AI 推薦服務暫時無法取得數據，請確認您的 API Key 權限或稍後重試。</b></div>", unsafe_allow_html=True)
 
             st.markdown("</div>", unsafe_allow_html=True)
             

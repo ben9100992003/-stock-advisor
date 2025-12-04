@@ -16,7 +16,7 @@ import io
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 已更新為您 cURL 範例中提供的新 API Key: AIzaSyBTUwl2wFxALOG0fX3UI1JD3qI3isPd0v0
+# 已更新為您 cURL 範例中提供的新 API Key: AIzaSyBTUwl2wFxALOG0fXXUI1JD3qI3isPd0v0
 GEMINI_API_KEY = "AIzaSyBTUwl2wFxALOG0fX3UI1JD3qI3isPd0v0" 
 
 # --- 1. 頁面設定 ---
@@ -546,7 +546,7 @@ def get_ai_stock_recommendations():
                     }
                 }
             }
-        } # 修正：關閉 data 字典
+        } 
             try:
                 response = requests.post(url, headers=headers, json=data, timeout=30)
                 

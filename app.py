@@ -698,7 +698,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 <table class="analysis-table">
 <tr><td><b>收盤價</b></td><td>{price:.2f}</td><td><b>MA5</b></td><td>{ma5:.2f}</td></tr>
 <tr><td><b>MA20</b></td><td>{ma20:.2f}</td><td><b>KD</b></td><td>{k:.1f}/{d:.1f}</td></tr>
-<tr><td colspan="4"><b>趨勢判讀：</b>{tech_trend}。{kd_desc}</td></tr>
+<tr><td colspan="4"><b>趨勢判讀：：</b>{tech_trend}。{kd_desc}</td></tr>
 </table>
 </div>
 <h4>2. 三大法人籌碼分析</h4>
@@ -791,12 +791,13 @@ if st.session_state['ai_analysis'] is None:
     except:
         st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
 
+# --- 頂部大盤情緒分欄 ---
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
-    t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
-    with t1:
+    col_tw, col_us = st.columns(2)
+    with col_tw:
         us_index = analyze_market_index("^TWII") # 應為 TWII
         if us_index: st.markdown(f"<div class='market-summary-box'><div style='color:{us_index['color']};font-weight:bold;font-size:1.2rem'>{us_index['price']:.0f} ({us_index['change']:+.0f})</div><div>{us_index['status']} - {us_index['comment']}</div></div>", unsafe_allow_html=True)
-    with t2:
+    with col_us:
         us_index = analyze_market_index("^IXIC")
         if us_index: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us_index['color']};font-weight:bold;font-size:1.2rem'>{us_index['price']:.0f} ({us_index['change']:+.0f})</div><div>{us_index['status']} - {us_index['comment']}</div></div>", unsafe_allow_html=True)
 
@@ -832,6 +833,7 @@ if target:
             c_low = get_color(latest_fast['Low'], prev_close)
             c_open = get_color(latest_fast['Open'], prev_close)
             
+            # --- 股價報價卡片 HTML ---
             quote_html = f"""<div class="quote-card">
 <div class="quote-header">
 <span class="stock-name"><a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a></span>
@@ -852,227 +854,247 @@ if target:
 <div class="detail-item"><span class="detail-label">開盤</span><span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span></div>
 </div>
 </div>"""
-            st.markdown(quote_html, unsafe_allow_html=True)
-        
-        tab1, tab2, tab3, tab4, tab_rec, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🚀 股票推薦", "🤖 AI 投顧", "🔄 回測"])
-        
-        with tab1:
-            interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
-            period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
-            
-            interval = interval_map[period_label]
-            is_intraday = interval in ["1m", "5m", "15m", "30m", "60m"]
-            
-            data_period = "1d" if is_intraday else ("2y" if interval == "1d" else "5y")
-            
-            df = stock.history(period=data_period, interval=interval)
-            
-            if not df.empty:
-                df = calculate_indicators(df)
-                latest = df.iloc[-1]
-                
-                plot_df = df.copy()
-                
-                fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
-                
-                fig.add_trace(go.Candlestick(
-                    x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], 
-                    name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047'
-                ), row=1, col=1)
-                
-                for ma, c in [('MA5','#2196f3'), ('MA10','#9c27b0'), ('MA20','#ff9800'), ('MA60','#795548')]:
-                    if ma in plot_df.columns: fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
-                
-                colors_vol = ['#e53935' if r['Open'] < r['Close'] else '#43a047' for i, r in plot_df.iterrows()]
-                fig.add_trace(go.Bar(x=plot_df.index, y=plot_df['Volume'], marker_color=colors_vol, name='成交量'), row=2, col=1)
-                fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
-                fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-                fig.update_layout(
-                    template="plotly_white",
-                    height=600, margin=dict(l=10, r=10, t=10, b=10), 
-                    legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
-                    dragmode='pan', hovermode='x unified', 
-                    xaxis=dict(rangeslider_visible=False), 
-                    yaxis=dict(fixedrange=True),
-                    yaxis2=dict(fixedrange=True),
-                    yaxis3=dict(fixedrange=True),
-                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white',
-                    font=dict(color='black')
-                )
+            # --- 股票報價和 AI 投顧分欄 (4:6 比例) ---
+            col_quote, col_ai_summary = st.columns([4, 6])
+
+            with col_quote:
+                st.markdown(quote_html, unsafe_allow_html=True)
                 
-                grid_color = "#e0e0e0"
-                for row in [1, 2, 3]:
-                    fig.update_xaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
-                    fig.update_yaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
-                
-                st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+                # KD 指標卡片 (調整為靠左下方)
+                if 'latest' in locals():
+                    kd_color_style = "text-up" if latest['K'] > latest['D'] else "text-down"
+                    kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
+                    kd_border_color = "#e53935" if latest['K'] > latest['D'] else "#43a047"
+                    st.markdown(f"""<div class="kd-card" style="border-left: 6px solid {kd_border_color};"><div class="kd-title">KD 指標 (9,3,3)</div><div style="text-align:right;"><div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div><div class="kd-tag {kd_color_style}" style="background-color:transparent; font-size:1.1rem;">{kd_text}</div></div></div>""", unsafe_allow_html=True)
+
+
+            with col_ai_summary:
+                # AI 分析結果顯示區 (強制白卡)
+                st.markdown("<div class='content-card' style='min-height: 250px;'><h3>🤖 AI 智能投顧自動分析</h3>", unsafe_allow_html=True)
+                if st.session_state['ai_analysis']:
+                    if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or "錯誤" in st.session_state['ai_analysis']:
+                         st.markdown(f"<div class='ai-msg-error'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
+                         if st.button("🔄 重試自動分析", key="retry_ai_summary"):
+                             st.session_state['ai_analysis'] = None
+                             st.rerun()
+                    else:
+                        st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div class='ai-msg-info'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # --- 下方分頁區 ---
+            tab1, tab2, tab3, tab4, tab_rec, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🚀 股票推薦", "💬 AI 問答", "🔄 回測"])
             
-            kd_color_style = "text-up" if latest['K'] > latest['D'] else "text-down"
-            kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
-            kd_border_color = "#e53935" if latest['K'] > latest['D'] else "#43a047"
-            
-            st.markdown(f"""<div class="kd-card" style="border-left: 6px solid {kd_border_color};"><div class="kd-title">KD 指標 (9,3,3)</div><div style="text-align:right;"><div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div><div class="kd-tag {kd_color_style}" style="background-color:transparent; font-size:1.1rem;">{kd_text}</div></div></div>""", unsafe_allow_html=True)
+            with tab1:
+                interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
+                period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
+                
+                interval = interval_map[period_label]
+                is_intraday = interval in ["1m", "5m", "15m", "30m", "60m"]
+                
+                data_period = "1d" if is_intraday else ("2y" if interval == "1d" else "5y")
+                
+                df = stock.history(period=data_period, interval=interval)
+                
+                if not df.empty:
+                    df = calculate_indicators(df)
+                    latest = df.iloc[-1]
+                    
+                    plot_df = df.copy()
+                    
+                    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
+                    
+                    fig.add_trace(go.Candlestick(
+                        x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], 
+                        name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047'
+                    ), row=1, col=1)
+                    
+                    for ma, c in [('MA5','#2196f3'), ('MA10','#9c27b0'), ('MA20','#ff9800'), ('MA60','#795548')]:
+                        if ma in plot_df.columns: fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[ma], line=dict(color=c, width=1), name=ma), row=1, col=1)
+                    
+                    colors_vol = ['#e53935' if r['Open'] < r['Close'] else '#43a047' for i, r in plot_df.iterrows()]
+                    fig.add_trace(go.Bar(x=plot_df.index, y=plot_df['Volume'], marker_color=colors_vol, name='成交量'), row=2, col=1)
+                    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['K'], line=dict(color='#2196f3', width=1.5), name='K9'), row=3, col=1)
+                    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['D'], line=dict(color='#ff9800', width=1.5), name='D9'), row=3, col=1)
 
-        with tab2:
-            inst_df = get_institutional_data_finmind(target)
-            if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
-            st.markdown(generate_narrative_report(name, target, latest, inst_df, df, info), unsafe_allow_html=True)
+                    fig.update_layout(
+                        template="plotly_white",
+                        height=600, margin=dict(l=10, r=10, t=10, b=10), 
+                        legend=dict(orientation="h", y=1.01, x=0, font=dict(color="black")),
+                        dragmode='pan', hovermode='x unified', 
+                        xaxis=dict(rangeslider_visible=False), 
+                        yaxis=dict(fixedrange=True),
+                        yaxis2=dict(fixedrange=True),
+                        yaxis3=dict(fixedrange=True),
+                        paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white',
+                        font=dict(color='black')
+                    )
+                    
+                    grid_color = "#e0e0e0"
+                    for row in [1, 2, 3]:
+                        fig.update_xaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
+                        fig.update_yaxes(showgrid=True, gridcolor=grid_color, row=row, col=1)
+                    
+                    st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+                
+                # 移除 KD 指標卡片，因為已經移到左側報價卡下方
+                # st.markdown(f"""<div class="kd-card" style="border-left: 6px solid {kd_border_color};"><div class="kd-title">KD 指標 (9,3,3)</div><div style="text-align:right;"><div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div><div class="kd-tag {kd_color_style}" style="background-color:transparent; font-size:1.1rem;">{kd_text}</div></div></div>""", unsafe_allow_html=True)
 
-        with tab3:
-            inst_df = get_institutional_data_finmind(target)
-            if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
-            
-            if inst_df is not None and not inst_df.empty:
-                st.markdown(f"<div class='content-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
-                
-                fig_inst = go.Figure()
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#2196f3'))
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
-                fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
-                
-                fig_inst.update_layout(
-                    barmode='group', template="plotly_white", height=400,
-                    margin=dict(t=0, b=10, l=10, r=10),
-                    paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', 
-                    font=dict(color='black'), 
-                    yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333', gridcolor='#e0e0e0'), 
-                    dragmode='pan',
-                    xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0', fixedrange=False)
-                )
-                
-                st.plotly_chart(fig_inst, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True})
-                
-                table_html = "<div class='table-container'><table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
-                for _, row in inst_df.sort_values('Date', ascending=False).head(10).iterrows():
-                    table_html += f"<tr><td>{row['Date']}</td><td class='{'text-up' if row['Foreign']>0 else 'text-down'}'>{row['Foreign']:,}</td><td class='{'text-up' if row['Trust']>0 else 'text-down'}'>{row['Trust']:,}</td><td class='{'text-up' if row['Dealer']>0 else 'text-down'}'>{row['Dealer']:,}</td></tr>"
-                table_html += "</tbody></table></div>"
-                
-                final_table_html = f"<div class='content-card'><h3>📊 詳細數據</h3>{table_html}</div>"
-                st.markdown(final_table_html, unsafe_allow_html=True)
+            with tab2:
+                inst_df = get_institutional_data_finmind(target)
+                if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
+                st.markdown(generate_narrative_report(name, target, latest, inst_df, df, info), unsafe_allow_html=True)
 
-            else: st.info("無法人籌碼資料")
+            with tab3:
+                inst_df = get_institutional_data_finmind(target)
+                if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
+                
+                if inst_df is not None and not inst_df.empty:
+                    st.markdown(f"<div class='content-card'><h3>🏛️ 三大法人買賣超 (近30日)</h3></div>", unsafe_allow_html=True)
+                    
+                    col_chart, col_table = st.columns([6, 4])
 
-        with tab4:
-            news_list = get_google_news(target)
-            news_html_content = ""
-            for news in news_list:
-                news_html_content += f"""<div class='news-item'>
+                    with col_chart:
+                        fig_inst = go.Figure()
+                        fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Foreign'], name='外資', marker_color='#2196f3'))
+                        fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Trust'], name='投信', marker_color='#9c27b0'))
+                        fig_inst.add_trace(go.Bar(x=inst_df['Date'], y=inst_df['Dealer'], name='自營商', marker_color='#e53935'))
+                        
+                        fig_inst.update_layout(
+                            barmode='group', template="plotly_white", height=400,
+                            margin=dict(t=0, b=10, l=10, r=10),
+                            paper_bgcolor='rgba(255,255,255,0.95)', plot_bgcolor='white', 
+                            font=dict(color='black'), 
+                            yaxis=dict(fixedrange=True, zeroline=True, zerolinecolor='#333', gridcolor='#e0e0e0'), 
+                            dragmode='pan',
+                            xaxis=dict(autorange="reversed", showgrid=True, gridcolor='#e0e0e0', fixedrange=False)
+                        )
+                        
+                        st.plotly_chart(fig_inst, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': True})
+                    
+                    with col_table:
+                        table_html = "<div class='table-container'><table class='analysis-table' style='width:100%'><thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th></tr></thead><tbody>"
+                        for _, row in inst_df.sort_values('Date', ascending=False).head(10).iterrows():
+                            table_html += f"<tr><td>{row['Date']}</td><td class='{'text-up' if row['Foreign']>0 else 'text-down'}'>{row['Foreign']:,}</td><td class='{'text-up' if row['Trust']>0 else 'text-down'}'>{row['Trust']:,}</td><td class='{'text-up' if row['Dealer']>0 else 'text-down'}'>{row['Dealer']:,}</td></tr>"
+                        table_html += "</tbody></table></div>"
+                        
+                        final_table_html = f"<div class='content-card'><h3>📊 詳細數據</h3>{table_html}</div>"
+                        st.markdown(final_table_html, unsafe_allow_html=True)
+
+                else: st.info("無法人籌碼資料")
+
+            with tab4:
+                news_list = get_google_news(target)
+                news_html_content = ""
+                for news in news_list:
+                    news_html_content += f"""<div class='news-item'>
 <a href='{news['link']}' target='_blank'>{news['title']}</a>
 <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
 </div>"""
-            
-            final_news_html = f"""<div class='light-card'>
+                
+                final_news_html = f"""<div class='light-card'>
 <h3>📰 個股相關新聞</h3>
 {news_html_content}
 </div>"""
-            st.markdown(final_news_html, unsafe_allow_html=True)
-            
-        with tab_rec: # 🚀 股票推薦 Tab 邏輯
-            st.markdown("<div class='content-card'><h3>🚀 AI 股票大推薦</h3><p>根據當前市場熱門題材，由 AI 分析師為您推薦潛力標的。</p>", unsafe_allow_html=True)
-            
-            with st.spinner("🤖 正在生成推薦列表，請稍候..."):
-                recommendations = get_ai_stock_recommendations()
-            
-            if recommendations and 'recommendations' in recommendations:
-                for market_rec in recommendations['recommendations']:
-                    market = market_rec['market']
-                    stocks = market_rec['stocks']
-                    
-                    st.markdown(f"<h4>{market} 🎯 市場焦點 ({'台股' if market=='TW' else '美股'})</h4>", unsafe_allow_html=True)
-                    
-                    for stock in stocks:
-                        rec_card = f"""
-                        <div class='recommend-card'>
-                            <h5>{stock['name']} ({stock['ticker']})</h5>
-                            <p><b>✨ 潛力題材：</b>{stock['theme']}</p>
-                        </div>
-                        """
-                        st.markdown(rec_card, unsafe_allow_html=True)
-            elif recommendations and 'error' in recommendations and 'expired' in recommendations['error']:
-                 st.markdown("<div class='ai-msg-error'>⚠️ <b>API 錯誤：金鑰已過期！請立即更新金鑰以使用 AI 服務。</b></div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='ai-msg-error'>⚠️ <b>AI 推薦服務暫時無法取得數據，請確認您的 API Key 權限或稍後重試。</b></div>", unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-        with tab5:
-            st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
-            
-            # AI 分析結果顯示區 (強制白卡)
-            if st.session_state['ai_analysis']:
-                # 檢查是否為錯誤訊息 (如果之前有錯誤，現在顯示並提供重試按鈕)
-                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or "錯誤" in st.session_state['ai_analysis']:
-                     st.markdown(f"<div class='ai-msg-error'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
-                     # 加入重試按鈕
-                     if st.button("🔄 重試自動分析", key="retry_ai"):
-                         st.session_state['ai_analysis'] = None
-                         st.rerun()
+                st.markdown(final_news_html, unsafe_allow_html=True)
+                
+            with tab_rec: # 🚀 股票推薦 Tab 邏輯
+                st.markdown("<div class='content-card'><h3>🚀 AI 股票大推薦</h3><p>根據當前市場熱門題材，由 AI 分析師為您推薦潛力標的。</p>", unsafe_allow_html=True)
+                
+                with st.spinner("🤖 正在生成推薦列表，請稍候..."):
+                    recommendations = get_ai_stock_recommendations()
+                
+                if recommendations and 'recommendations' in recommendations:
+                    for market_rec in recommendations['recommendations']:
+                        market = market_rec['market']
+                        stocks = market_rec['stocks']
+                        
+                        st.markdown(f"<h4>{market} 🎯 市場焦點 ({'台股' if market=='TW' else '美股'})</h4>", unsafe_allow_html=True)
+                        
+                        # 推薦卡片左右分欄
+                        rec_cols = st.columns(3)
+                        
+                        for i, stock in enumerate(stocks):
+                            if stock:
+                                with rec_cols[i]:
+                                    rec_card = f"""
+                                    <div class='recommend-card'>
+                                        <h5>{stock['name']} ({stock['ticker']})</h5>
+                                        <p><b>✨ 潛力題材：</b>{stock['theme']}</p>
+                                    </div>
+                                    """
+                                    st.markdown(rec_card, unsafe_allow_html=True)
+                elif recommendations and 'error' in recommendations and 'expired' in recommendations['error']:
+                     st.markdown("<div class='ai-msg-error'>⚠️ <b>API 錯誤：金鑰已過期！請立即更新金鑰以使用 AI 服務。</b></div>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='ai-msg-info'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='ai-msg-error'>⚠️ <b>AI 推薦服務暫時無法取得數據，請確認您的 API Key 權限或稍後重試。</b></div>", unsafe_allow_html=True)
 
-            # 對話區塊
-            st.markdown("</div>", unsafe_allow_html=True) # 結束第一個 content-card
-            st.markdown("<div class='content-card'><h4>💬 還有其他問題嗎？歡迎隨時提問：</h4>", unsafe_allow_html=True)
-            user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
-            if user_query:
-                with st.spinner("AI 正在思考您的問題..."):
-                    prompt = f"""
-                    你是一位專業的股市分析師「武吉拉」。請針對 {name} ({target}) 回答使用者的問題。
-                    目前股價 {latest['Close']:.2f}，MA5 {latest['MA5']:.2f}，MA20 {latest['MA20']:.2f}。
-                    KD指標 K={latest['K']:.1f}, D={latest['D']:.1f}。
-                    使用者問題：{user_query}
-                    請用繁體中文回答，語氣專業且親切。
-                    """
-                    ai_response = call_gemini_api(prompt)
-                    if "錯誤" in ai_response or "無法使用" in ai_response:
-                        st.markdown(f"<div class='ai-msg-error'>❌ {ai_response}</div>", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"<div class='ai-msg-user'>👤 {user_query}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='ai-msg-bot'>🦖 {ai_response}</div>", unsafe_allow_html=True)
-            
-            st.markdown("</div>", unsafe_allow_html=True) # 結束第二個 content-card
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+            with tab5: # 💬 AI 問答 Tab 邏輯
+                st.markdown("<div class='content-card'><h3>💬 AI 智能問答</h3>", unsafe_allow_html=True)
+                st.markdown("<h4>還有其他問題嗎？歡迎隨時提問：</h4>", unsafe_allow_html=True)
+                
+                user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
+                
+                if user_query:
+                    with st.spinner("AI 正在思考您的問題..."):
+                        prompt = f"""
+                        你是一位專業的股市分析師「武吉拉」。請針對 {name} ({target}) 回答使用者的問題。
+                        目前股價 {latest['Close']:.2f}，MA5 {latest['MA5']:.2f}，MA20 {latest['MA20']:.2f}。
+                        KD指標 K={latest['K']:.1f}, D={latest['D']:.1f}。
+                        使用者問題：{user_query}
+                        請用繁體中文回答，語氣專業且親切。
+                        """
+                        ai_response = call_gemini_api(prompt)
+                        if "錯誤" in ai_response or "無法使用" in ai_response:
+                            st.markdown(f"<div class='ai-msg-error'>❌ {ai_response}</div>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"<div class='ai-msg-user'>👤 {user_query}</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div class='ai-msg-bot'>🦖 {ai_response}</div>", unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True) 
 
-        with tab6:
-            st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測 (初始資金: 500,000)</p></div>", unsafe_allow_html=True)
-            
-            # --- 固定參數與自動回測 ---
-            initial_capital = 500000
-            strategy = "KD 策略 (黃金交叉)"
-            
-            # 直接執行回測
-            backtest_df = stock.history(period="1y", interval="1d")
-            
-            # 簡單的錯誤處理防止當機
-            if backtest_df.empty:
-                st.error("無法取得回測資料")
-            else:
-                backtest_df = calculate_indicators(backtest_df)
-                res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
+            with tab6:
+                st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測 (初始資金: 500,000)</p></div>", unsafe_allow_html=True)
                 
-                # 計算支撐與壓力 (簡單模擬)
-                recent_high = backtest_df['High'].tail(20).max()
-                recent_low = backtest_df['Low'].tail(20).min()
+                # --- 固定參數與自動回測 ---
+                initial_capital = 500000
+                strategy = "KD 策略 (黃金交叉)"
                 
-                # --- 圖表改為深色透明，並移除背景格線 ---
-                fig_bt = go.Figure()
-                fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
-                fig_bt.update_layout(
-                    template="plotly_dark",
-                    height=200, 
-                    margin=dict(l=0, r=0, t=10, b=0),
-                    paper_bgcolor='#050505', # 配合深色卡片背景
-                    plot_bgcolor='#050505',  # 配合深色卡片背景
-                    showlegend=False,
-                    xaxis=dict(visible=False), 
-                    # 修正重點：稍微顯示格線，讓圖表有意義
-                    yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
-                )
+                # 直接執行回測
+                backtest_df = stock.history(period="1y", interval="1d")
                 
-                # --- 復刻深色卡片 HTML (上方資訊) ---
-                backtest_html = f"""<div class="ai-backtest-card">
+                # 簡單的錯誤處理防止當機
+                if backtest_df.empty:
+                    st.error("無法取得回測資料")
+                else:
+                    backtest_df = calculate_indicators(backtest_df)
+                    res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
+                    
+                    # 計算支撐與壓力 (簡單模擬)
+                    recent_high = backtest_df['High'].tail(20).max()
+                    recent_low = backtest_df['Low'].tail(20).min()
+                    
+                    # --- 圖表改為深色透明，並移除背景格線 ---
+                    fig_bt = go.Figure()
+                    fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
+                    fig_bt.update_layout(
+                        template="plotly_dark",
+                        height=200, 
+                        margin=dict(l=0, r=0, t=10, b=0),
+                        paper_bgcolor='#050505', # 配合深色卡片背景
+                        plot_bgcolor='#050505',  # 配合深色卡片背景
+                        showlegend=False,
+                        xaxis=dict(visible=False), 
+                        # 修正重點：稍微顯示格線，讓圖表有意義
+                        yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
+                    )
+                    
+                    # --- 復刻深色卡片 HTML (上方資訊) ---
+                    backtest_html = f"""<div class="ai-backtest-card">
 <div class="ai-header-row">
 <div class="ai-title-group">
 <div class="ai-icon-box">📊</div>
@@ -1097,30 +1119,34 @@ if target:
 </div>
 </div>
 </div>"""
-                st.markdown(backtest_html, unsafe_allow_html=True)
-                
-                # --- 獨立顯示圖表 (使用 staticPlot=True) ---
-                st.markdown('<div style="margin-top: -25px; border-radius: 0 0 24px 24px; overflow: hidden; border: 1px solid #222; border-top: none;">', unsafe_allow_html=True)
-                st.plotly_chart(fig_bt, use_container_width=True, config={'staticPlot': True, 'displayModeBar': False})
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 文字報告
-                color_ret = "text-up" if return_rate > 0 else "text-down"
-                st.markdown(f"""
-                <div class="market-summary-box" style="margin-bottom: 20px; margin-top: 20px;">
-                    <div style="font-size: 1.2rem;">最終資產: <b>{int(final_assets):,}</b> 元</div>
-                    <div style="font-size: 1.5rem;">報酬率: <b class="{color_ret}">{return_rate:.2f}%</b></div>
-                    <div>總交易次數: {len(trades)} 次</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if trades:
-                    st.write("📝 近期交易明細：")
-                    trades_df = pd.DataFrame(trades)
-                    trades_df['日期'] = pd.to_datetime(trades_df['日期']).dt.strftime('%Y-%m-%d')
-                    st.dataframe(trades_df, use_container_width=True)
-                else:
-                    st.info("此期間無觸發交易訊號。")
+                    st.markdown(backtest_html, unsafe_allow_html=True)
+                    
+                    # --- 獨立顯示圖表 (使用 staticPlot=True) ---
+                    st.markdown('<div style="margin-top: -25px; border-radius: 0 0 24px 24px; overflow: hidden; border: 1px solid #222; border-top: none;">', unsafe_allow_html=True)
+                    st.plotly_chart(fig_bt, use_container_width=True, config={'staticPlot': True, 'displayModeBar': False})
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                    # 文字報告和交易明細分欄
+                    col_metrics, col_trades = st.columns([4, 6])
+
+                    with col_metrics:
+                        color_ret = "text-up" if return_rate > 0 else "text-down"
+                        st.markdown(f"""
+                        <div class="market-summary-box" style="margin-bottom: 20px; margin-top: 20px;">
+                            <div style="font-size: 1.2rem;">最終資產: <b>{int(final_assets):,}</b> 元</div>
+                            <div style="font-size: 1.5rem;">報酬率: <b class="{color_ret}">{return_rate:.2f}%</b></div>
+                            <div>總交易次數: {len(trades)} 次</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_trades:
+                        if trades:
+                            st.write("📝 近期交易明細：")
+                            trades_df = pd.DataFrame(trades)
+                            trades_df['日期'] = pd.to_datetime(trades_df['日期']).dt.strftime('%Y-%m-%d')
+                            st.dataframe(trades_df, use_container_width=True)
+                        else:
+                            st.info("此期間無觸發交易訊號。")
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")

@@ -670,7 +670,12 @@ if st.session_state['ai_analysis'] is None:
             """
             with st.spinner(f"🤖 AI 正在分析 {name} 的最新數據，請稍候..."):
                 result = call_gemini_api(auto_prompt)
-                st.session_state['ai_analysis'] = result
+                
+                # --- 關鍵修正：只有在成功時才儲存結果，否則保留 None ---
+                if not result.startswith("AI 服務暫時無法使用") and "錯誤" not in result:
+                    st.session_state['ai_analysis'] = result
+                else:
+                    st.session_state['ai_analysis'] = result # 儲存錯誤訊息，讓 Tab 5 可以顯示
     except:
         st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
 

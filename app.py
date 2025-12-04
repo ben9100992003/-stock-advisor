@@ -497,14 +497,14 @@ def get_ai_stock_recommendations():
           "market": "TW",
           "stocks": [
             {"ticker": "2330.TW", "name": "台積電", "theme": "AI晶片供應鏈領頭羊，受惠於高速運算與資料中心需求爆發。"},
-            ...
+            null
           ]
         },
         {
           "market": "US",
           "stocks": [
             {"ticker": "NVDA", "name": "輝達", "theme": "壟斷全球AI加速器市場，下一代Blackwell架構持續推動業績成長。"},
-            ...
+            null
           ]
         }
       ]

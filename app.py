@@ -15,8 +15,8 @@ import textwrap
 import io 
 
 # --- 0. 設定與金鑰 ---
-# 注意：為了資訊安全，建議未來將 API Key 移至環境變數或是 streamlit secrets 中
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
+# 已更新為您提供的新 API Key
 GEMINI_API_KEY = "AIzaSyBGlDFkBi9ErTUJEu68Q_NaP0Q2fw78KE0" 
 
 # --- 1. 頁面設定 ---
@@ -74,9 +74,9 @@ st.markdown("""
     
     /* --- 卡片通用設定 --- */
     .quote-card, .content-card, .kd-card, .market-summary-box, .ai-chat-box, .light-card {
-        background-color: rgba(255, 255, 255, 0.95) !important;
+        background-color: rgba(255, 255, 255, 0.96) !important; /* 提高不透明度 */
         border-radius: 16px; 
-        padding: 25px;
+        padding: 20px; /* 稍微減少 padding 避免擠壓 */
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         margin-bottom: 20px; 
         border: 1px solid #fff;
@@ -91,34 +91,35 @@ st.markdown("""
         line-height: 1.8;
         text-align: justify;
         margin-bottom: 12px;
+        color: #333 !important; /* 強制深色字體 */
     }
 
     /* --- AI 對話氣泡樣式 --- */
     .ai-msg-bot, .ai-msg-user, .ai-msg-error, .ai-msg-info {
-        background-color: rgba(255, 255, 255, 0.98) !important;
-        padding: 20px;
-        border-radius: 16px;
+        background-color: #f8f9fa !important;
+        padding: 15px 20px;
+        border-radius: 12px;
         margin-bottom: 15px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid #f0f0f0;
-        color: #333 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+        color: #212529 !important;
         line-height: 1.6;
         font-size: 1rem;
     }
     
-    .ai-msg-user { border-left: 6px solid #2196f3; background-color: #f8fbff !important; }
-    .ai-msg-bot { border-left: 6px solid #4caf50; }
-    .ai-msg-error { border-left: 6px solid #f44336; background-color: #fff5f5 !important; color: #d32f2f !important; }
-    .ai-msg-info { border-left: 6px solid #ff9800; background-color: #fff8e1 !important; }
+    .ai-msg-user { border-left: 5px solid #2196f3; background-color: #e3f2fd !important; }
+    .ai-msg-bot { border-left: 5px solid #4caf50; background-color: #ffffff !important; }
+    .ai-msg-error { border-left: 5px solid #f44336; background-color: #fff5f5 !important; color: #d32f2f !important; }
+    .ai-msg-info { border-left: 5px solid #ff9800; background-color: #fff8e1 !important; }
 
     /* --- AI 回測深色卡片 --- */
     .ai-backtest-card {
         background-color: #050505 !important;
-        border-radius: 24px 24px 0 0;
+        border-radius: 24px 24px 0 0; /* 下方圓角由圖表接手 */
         padding: 25px;
         color: white !important;
         box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-        margin-bottom: 0px; 
+        margin-bottom: 0px; /* 貼合圖表 */
         border: 1px solid #222;
         border-bottom: none;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -207,7 +208,7 @@ st.markdown("""
     }
     .detail-grid {
         display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 縮小最小寬度 */
         column-gap: 20px; row-gap: 10px; font-size: 1.1rem;
     }
     .detail-item { display: flex; justify-content: flex-start; align-items: center; gap: 8px; }
@@ -258,16 +259,6 @@ STOCK_NAMES = {
     "3231.TW": "緯創", "2356.TW": "英業達", "2376.TW": "技嘉", "2301.TW": "光寶科",
     "4903.TWO": "聯光通", "8110.TW": "華東", "6187.TWO": "萬潤", "3131.TWO": "弘塑",
     "NVDA": "輝達", "TSLA": "特斯拉", "AAPL": "蘋果", "AMD": "超微", "MSFT": "微軟"
-}
-
-# 產業類別中英對照表 (擴充版)
-SECTOR_MAP = {
-    "Technology": "科技", "Financial Services": "金融服務", "Healthcare": "醫療保健",
-    "Consumer Cyclical": "非必需消費品", "Industrials": "工業", "Communication Services": "通訊服務",
-    "Consumer Defensive": "必需消費品", "Energy": "能源", "Basic Materials": "原物料",
-    "Real Estate": "房地產", "Utilities": "公共事業", "Financials": "金融",
-    "Health Care": "醫療保健", "Information Technology": "資訊科技", "Materials": "原物料",
-    "Technology Services": "科技服務", "Hardware": "硬體設備", "Medical Devices": "醫療器材"
 }
 
 @st.cache_data(ttl=3600)
@@ -393,61 +384,74 @@ def get_yahoo_stock_url(ticker):
     else:
         return f"https://finance.yahoo.com/quote/{ticker}"
 
+# 修改 AI API 呼叫，加入超級完整的模型清單 (地毯式搜索)
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 修正：使用更穩定的預覽模型 ID
-    model = "gemini-2.5-flash-preview-09-2025" 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+    # 擴充模型清單，涵蓋最新與最舊的穩定版本
+    models_to_try = [
+        "gemini-2.0-flash",       # 最新模型
+        "gemini-1.5-flash",       # 標準 Flash
+        "gemini-1.5-flash-latest",# Flash 最新
+        "gemini-1.5-pro",         # Pro 版本
+        "gemini-pro"              # 最通用名稱
+    ]
+    
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
     
-    try:
-        response = requests.post(url, headers=headers, json=data, timeout=20)
-        if response.status_code == 200: 
-            # 確保回傳內容存在
-            if 'candidates' in response.json() and response.json()['candidates'][0]['content']['parts'][0]['text']:
+    last_error = ""
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=20)
+            if response.status_code == 200: 
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
+            elif response.status_code == 404:
+                last_error = f"模型 {model} 未找到 (404)，嘗試下一個..."
+                continue 
+            elif response.status_code == 403:
+                last_error = f"API 權限錯誤 (403): Key 無法存取 {model}。"
+                continue
             else:
-                return "⚠️ AI 回應內容為空，請稍後再試。"
-        else:
-            # 嘗試解析詳細錯誤訊息
-            try:
-                error_body = response.json()
-                error_msg = error_body.get('error', {}).get('message', response.text)
-                status = error_body.get('error', {}).get('status', response.status_code)
-                # 專門處理權限問題的提示
-                if status == 'PERMISSION_DENIED':
-                    return f"⚠️ 權限錯誤 (403): API Key 無法存取 {model}。請檢查 API Key 狀態與 Generative Language API 是否已啟用。"
-                return f"⚠️ AI 服務錯誤 ({status}): {error_msg}"
-            except:
-                return f"⚠️ AI 服務錯誤 ({response.status_code}): {response.text}"
-    except requests.exceptions.Timeout:
-        return "⚠️ AI 連線逾時，請檢查網路狀況。"
-    except Exception as e: 
-        return f"⚠️ 連線失敗: {str(e)}"
+                last_error = f"AI 回應錯誤: {response.status_code} - {response.text}"
+                continue
+        except requests.exceptions.Timeout:
+            last_error = "AI 連線逾時。"
+            continue
+        except Exception as e: 
+            last_error = f"連線錯誤: {e}"
+            continue
+
+    return f"AI 服務暫時無法使用。所有模型嘗試失敗。最後錯誤: {last_error}"
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def get_stock_summary_zh(summary_text):
+def get_ai_translated_summary(summary_text):
     if not summary_text or summary_text == "暫無詳細說明。":
         return "暫無詳細說明。"
     
     prompt = f"""
     請將以下公司介紹翻譯成流暢、完整的繁體中文。
     重點：
-    1. 必須使用繁體中文，不要出現英文簡介。
-    2. 保留所有關鍵資訊，不要刪減。
-    3. 語氣專業。
+    1. 保留所有關鍵資訊，不要刪減。
+    2. 語氣專業。
     
     原文：
     {summary_text}
     """
     try:
-        result = call_gemini_api(prompt)
-        # 專門針對 AI 服務失敗的訊息，避免將錯誤訊息當成原文翻譯
-        if "⚠️" in result or "錯誤" in result or "無法使用" in result: 
-            return summary_text 
-        return result
+        # 由於這個是背景任務，只用最穩定的模型即可，避免佔用太多資源
+        models_to_try = ["gemini-1.5-flash", "gemini-pro"]
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+            headers = {'Content-Type': 'application/json'}
+            data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.3}}
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            if response.status_code == 200:
+                result = response.json()['candidates'][0]['content']['parts'][0]['text']
+                if result: return result
+        return summary_text
     except:
         return summary_text
 
@@ -464,38 +468,6 @@ def calculate_indicators(df):
     df['K'] = df['RSV'].ewm(com=2).mean()
     df['D'] = df['K'].ewm(com=2).mean()
     return df
-
-# --- 補上遺失的大盤分析函式 ---
-def analyze_market_index(ticker):
-    try:
-        data = yf.Ticker(ticker).history(period="5d")
-        if data.empty: return None
-        
-        latest = data.iloc[-1]
-        prev = data.iloc[-2]
-        change = latest['Close'] - prev['Close']
-        pct = (change / prev['Close']) * 100
-        
-        # 台股紅漲綠跌邏輯
-        color = "#e53935" if change > 0 else "#43a047"
-        
-        status = "強勢整理"
-        if pct > 1: status = "多頭強勢"
-        elif pct < -1: status = "空頭賣壓"
-        elif pct > 0: status = "偏多震盪"
-        else: status = "偏空震盪"
-        
-        comment = f"漲跌幅 {pct:.2f}%"
-        
-        return {
-            "price": latest['Close'],
-            "change": change,
-            "color": color,
-            "status": status,
-            "comment": comment
-        }
-    except:
-        return None
 
 # --- 回測邏輯 ---
 def run_backtest(df, strategy_type, initial_capital=100000):
@@ -580,18 +552,13 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     <td class="{'text-up' if total>0 else 'text-down'}"><b>{total:,}</b></td>
 </tr>"""
 
-    sector_en = info.get('sector', '科技')
-    sector = SECTOR_MAP.get(sector_en, sector_en) # 使用對照表翻譯產業
-    
-    company_name = STOCK_NAMES.get(ticker, info.get('longName', name)) # 修正: 優先使用中文股名
+    sector = info.get('sector', '科技')
     raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
-    summary = get_stock_summary_zh(raw_summary) # 使用翻譯後的內容
     
-    # 修正: 即使 AI 翻譯失敗，也要確保公司名稱是中文
-    if "Taiwan Semiconductor Manufacturing Company Limited" in summary:
-        summary = summary.replace("Taiwan Semiconductor Manufacturing Company Limited", "台積電")
-        
-    theme_text = f"<b>{company_name}</b> 屬於 {sector} 產業。<br><br>{summary}"
+    # 呼叫 AI 翻譯與摘要
+    summary = get_ai_translated_summary(raw_summary)
+    
+    theme_text = f"<b>{name}</b> 屬於 {sector} 產業。<br><br>{summary}"
     
     support = ma10 if price > ma10 else ma20
     resistance = ma5 if price < ma5 else price * 1.05
@@ -609,9 +576,8 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
         entry = f"箱型下緣 {support:.2f} 低接"
         exit_pt = f"箱型上緣 {resistance:.2f} 獲利"
 
-    # 使用完全靠左的 HTML 字串，避免 st.markdown 誤判
     return f"""<div class="content-card">
-<h3>📊 {company_name} ({ticker}) 綜合分析報告</h3>
+<h3>📊 {name} ({ticker}) 綜合分析報告</h3>
 <h4>1. 技術指標分析</h4>
 <div class="table-container">
 <table class="analysis-table">
@@ -634,19 +600,38 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 <ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
 </div>"""
 
+def analyze_market_index(ticker_symbol):
+    try:
+        stock = yf.Ticker(ticker_symbol)
+        df = stock.history(period="6mo")
+        if df.empty: return None
+        df = calculate_indicators(df)
+        latest = df.iloc[-1]
+        price = latest['Close']
+        ma20 = latest['MA20']
+        k, d = latest['K'], latest['D']
+        change = price - df['Close'].iloc[-2]
+        
+        status = "多頭強勢" if price > ma20 and k > d else "多頭回檔" if price > ma20 else "空方修正"
+        color = "#e53935" if k > d else "#f57c00" if price > ma20 else "#43a047"
+        comment = f"KD({k:.1f}/{d:.1f})。市場氣氛：{status}。"
+        return {"price": price, "change": change, "status": status, "color": color, "comment": comment}
+    except: return None
+
 # --- UI 介面 ---
 st.markdown("<h1 style='text-align: center; margin-bottom: 20px;'>🦖 武吉拉 Wujila</h1>", unsafe_allow_html=True)
 
 with st.spinner("載入數據..."):
     hot_tw, hot_us = get_market_hot_stocks()
 
-c_search, c_hot, c_btn = st.columns([2.5, 1.2, 0.5])
+# 調整搜尋欄位比例
+c_search, c_hot, c_btn = st.columns([3, 1.5, 0.5])
 with c_search:
     target_input = st.text_input("🔍 搜尋代號/名稱 (如: 4903, 2330, NVDA)", value="2330")
 with c_hot:
     hot_stock = st.selectbox("🔥 熱門快選", ["(請選擇)"] + [f"{t}.TW" for t in hot_tw] + hot_us)
 with c_btn:
-    st.write("")
+    st.write("") 
     st.write("") 
     if st.button("🔄", help="重新整理數據"):
         st.cache_data.clear()
@@ -656,24 +641,20 @@ target = "2330.TW"
 if hot_stock != "(請選擇)": target = hot_stock.split("(")[-1].replace(")", "")
 if target_input:
     resolved_ticker, resolved_name = resolve_ticker(target_input)
-    if resolved_ticker: 
-        target = resolved_ticker
-        # 修正重點：優先使用內建的中文股名
-        name = STOCK_NAMES.get(target, resolved_name)
+    if resolved_ticker: target = resolved_ticker; name = resolved_name
     else: st.error(f"❌ 找不到股票代號：{target_input}。"); target = None
-    
-# 如果沒搜尋，預設名稱
-if 'name' not in locals(): name = STOCK_NAMES.get(target, target)
 
-# --- AI 自動分析邏輯 ---
+# --- 觸發 AI 自動分析的邏輯 (放在主流程中) ---
 if 'last_target' not in st.session_state: st.session_state['last_target'] = None
 if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = None
 
+# 如果目標股票改變，或者尚未分析過，就清空並準備分析
 if st.session_state['last_target'] != target:
     st.session_state['last_target'] = target
     st.session_state['ai_analysis'] = None
 
-if st.session_state['ai_analysis'] is None and target:
+# 如果 AI 分析結果是空的，則執行分析
+if st.session_state['ai_analysis'] is None:
     try:
         temp_stock = yf.Ticker(target)
         temp_hist = temp_stock.history(period="5d")
@@ -687,10 +668,11 @@ if st.session_state['ai_analysis'] is None and target:
             請簡潔說明：1. 技術面趨勢 2. 籌碼面或市場消息（若有） 3. 短線操作建議。
             語氣請專業、客觀且親切。
             """
-            result = call_gemini_api(auto_prompt)
-            st.session_state['ai_analysis'] = result
+            with st.spinner(f"🤖 AI 正在分析 {name} 的最新數據，請稍候..."):
+                result = call_gemini_api(auto_prompt)
+                st.session_state['ai_analysis'] = result
     except:
-        st.session_state['ai_analysis'] = "AI 服務連線失敗，請稍後再試。"
+        st.session_state['ai_analysis'] = "分析暫時無法使用，請稍後再試。"
 
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
@@ -707,9 +689,7 @@ if target:
     try:
         stock = yf.Ticker(target)
         info = stock.info
-        # 二次確認名稱
-        if 'name' not in locals() or name == target: 
-             name = STOCK_NAMES.get(target, info.get('longName', target))
+        if 'name' not in locals(): name = STOCK_NAMES.get(target, info.get('longName', target))
         
         df_fast = stock.history(period="5d")
         if not df_fast.empty:
@@ -735,7 +715,6 @@ if target:
             c_low = get_color(latest_fast['Low'], prev_close)
             c_open = get_color(latest_fast['Open'], prev_close)
             
-            # 使用完全靠左的 HTML 字串
             quote_html = f"""<div class="quote-card">
 <div class="quote-header">
 <span class="stock-name"><a href="{yahoo_url}" target="_blank" style="text-decoration:none; color:inherit;">{name}</a></span>
@@ -779,12 +758,9 @@ if target:
                 
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.6, 0.2, 0.2], vertical_spacing=0.02)
                 
-                # K線圖設定中文 Hover
                 fig.add_trace(go.Candlestick(
                     x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], 
-                    name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047',
-                    text=["開盤: {:.2f}<br>最高: {:.2f}<br>最低: {:.2f}<br>收盤: {:.2f}".format(o,h,l,c) for o,h,l,c in zip(plot_df['Open'], plot_df['High'], plot_df['Low'], plot_df['Close'])],
-                    hoverinfo='text+x'
+                    name='K線', increasing_line_color='#e53935', decreasing_line_color='#43a047'
                 ), row=1, col=1)
                 
                 for ma, c in [('MA5','#2196f3'), ('MA10','#9c27b0'), ('MA20','#ff9800'), ('MA60','#795548')]:
@@ -864,13 +840,11 @@ if target:
             news_list = get_google_news(target)
             news_html_content = ""
             for news in news_list:
-                # 使用完全靠左的 HTML 字串
                 news_html_content += f"""<div class='news-item'>
 <a href='{news['link']}' target='_blank'>{news['title']}</a>
 <div class='news-meta'>{news['pubDate']} | {news['source']}</div>
 </div>"""
             
-            # 使用完全靠左的 HTML 字串
             final_news_html = f"""<div class='light-card'>
 <h3>📰 個股相關新聞</h3>
 {news_html_content}
@@ -880,25 +854,22 @@ if target:
         with tab5:
             st.markdown("<div class='content-card'><h3>🤖 AI 智能投顧</h3>", unsafe_allow_html=True)
             
+            # AI 分析結果顯示區 (強制白卡)
             if st.session_state['ai_analysis']:
-                if "⚠️" in st.session_state['ai_analysis']:
-                     # 顯示詳細錯誤，並加入 API 提示
-                     error_msg = st.session_state['ai_analysis']
-                     st.markdown(f"<div class='content-card' style='border-left: 5px solid #f44336; background: #fff5f5;'>❌ **AI 連線失敗 (重要：請檢查 Key 權限)**<br>{error_msg}<br><br>系統已嘗試使用 **gemini-2.5-flash-preview-09-2025** 模型。若持續出現 **NOT_FOUND** 或 **PERMISSION_DENIED**，請確認您的 API Key 是否已啟用 **Generative Language API** 服務，且 Key 沒有被限制。</div>", unsafe_allow_html=True)
+                # 檢查是否為錯誤訊息 (如果之前有錯誤，現在顯示並提供重試按鈕)
+                if st.session_state['ai_analysis'].startswith("AI 服務暫時無法使用") or "錯誤" in st.session_state['ai_analysis']:
+                     st.markdown(f"<div class='ai-msg-error'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
+                     # 加入重試按鈕
                      if st.button("🔄 重試自動分析", key="retry_ai"):
                          st.session_state['ai_analysis'] = None
-                         st.cache_data.clear() # 清除快取，確保重新嘗試連線
                          st.rerun()
                 else:
-                    st.markdown(f"""
-                    <div class='content-card ai-msg-box'>
-                        <h4>🦖 {name} 自動分析報告：</h4>
-                        <div style='color: #333;'>{st.session_state['ai_analysis']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
             else:
-                st.markdown(f"<div class='content-card' style='background: #fff8e1; border-left: 5px solid #ff9800;'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='ai-msg-info'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
 
+            # 對話區塊
+            st.markdown("</div>", unsafe_allow_html=True) # 結束第一個 content-card
             st.markdown("<div class='content-card'><h4>💬 還有其他問題嗎？歡迎隨時提問：</h4>", unsafe_allow_html=True)
             user_query = st.text_input("", placeholder="例如：這檔股票適合長期持有嗎？", key="ai_query")
             if user_query:
@@ -911,51 +882,59 @@ if target:
                     請用繁體中文回答，語氣專業且親切。
                     """
                     ai_response = call_gemini_api(prompt)
-                    if "⚠️" in ai_response:
-                        st.markdown(f"<div class='content-card' style='background: #fff5f5; border-left: 5px solid #f44336;'>❌ {ai_response}</div>", unsafe_allow_html=True)
+                    if "錯誤" in ai_response or "無法使用" in ai_response:
+                        st.markdown(f"<div class='ai-msg-error'>❌ {ai_response}</div>", unsafe_allow_html=True)
                     else:
-                        st.markdown(f"<div class='content-card ai-user-box'>👤 {user_query}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='content-card ai-msg-box'>🦖 {ai_response}</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='ai-msg-user'>👤 {user_query}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='ai-msg-bot'>🦖 {ai_response}</div>", unsafe_allow_html=True)
+            
+            st.markdown("</div>", unsafe_allow_html=True) # 結束第二個 content-card
 
         with tab6:
             st.markdown("<div class='content-card'><h3>🔄 歷史回測模擬</h3><p>使用日線資料進行簡單策略回測 (初始資金: 500,000)</p></div>", unsafe_allow_html=True)
             
+            # --- 固定參數與自動回測 ---
             initial_capital = 500000
             strategy = "KD 策略 (黃金交叉)"
             
+            # 直接執行回測
             backtest_df = stock.history(period="1y", interval="1d")
             
+            # 簡單的錯誤處理防止當機
             if backtest_df.empty:
                 st.error("無法取得回測資料")
             else:
                 backtest_df = calculate_indicators(backtest_df)
                 res_df, trades, final_assets, return_rate, win_rate = run_backtest(backtest_df, strategy, initial_capital)
                 
+                # 計算支撐與壓力 (簡單模擬)
                 recent_high = backtest_df['High'].tail(20).max()
                 recent_low = backtest_df['Low'].tail(20).min()
                 
+                # --- 圖表改為深色透明，並移除背景格線 ---
                 fig_bt = go.Figure()
                 fig_bt.add_trace(go.Scatter(x=res_df.index, y=res_df['Total_Assets'], mode='lines', name='總資產', line=dict(color='#007bff', width=3)))
                 fig_bt.update_layout(
                     template="plotly_dark",
                     height=200, 
                     margin=dict(l=0, r=0, t=10, b=0),
-                    paper_bgcolor='#050505',
-                    plot_bgcolor='#050505',
+                    paper_bgcolor='#050505', # 配合深色卡片背景
+                    plot_bgcolor='#050505',  # 配合深色卡片背景
                     showlegend=False,
                     xaxis=dict(visible=False), 
+                    # 修正重點：稍微顯示格線，讓圖表有意義
                     yaxis=dict(showgrid=True, gridcolor='#222', visible=True, side='right'),
                 )
                 
-                # 使用完全靠左的 HTML 字串
+                # --- 復刻深色卡片 HTML (上方資訊) ---
+                # 使用完全靠左對齊的 HTML 字串，解決縮排問題
                 backtest_html = f"""<div class="ai-backtest-card">
 <div class="ai-header-row">
 <div class="ai-title-group">
 <div class="ai-icon-box">📊</div>
 <div class="ai-title-text">
 <h3>AI 大數據回測</h3>
-<p>趨勢型態識別 (Trend Pattern)</p>
+<p>Pattern Matching</p>
 </div>
 </div>
 <div class="ai-score-group">
@@ -976,10 +955,12 @@ if target:
 </div>"""
                 st.markdown(backtest_html, unsafe_allow_html=True)
                 
+                # --- 獨立顯示圖表 (使用 staticPlot=True) ---
                 st.markdown('<div style="margin-top: -25px; border-radius: 0 0 24px 24px; overflow: hidden; border: 1px solid #222; border-top: none;">', unsafe_allow_html=True)
                 st.plotly_chart(fig_bt, use_container_width=True, config={'staticPlot': True, 'displayModeBar': False})
                 st.markdown('</div>', unsafe_allow_html=True)
                 
+                # 文字報告
                 color_ret = "text-up" if return_rate > 0 else "text-down"
                 st.markdown(f"""
                 <div class="market-summary-box" style="margin-bottom: 20px; margin-top: 20px;">
@@ -999,4 +980,3 @@ if target:
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
-

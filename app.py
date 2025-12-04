@@ -395,9 +395,8 @@ def get_yahoo_stock_url(ticker):
 def call_gemini_api(prompt):
     if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
     
-    # 修正：移除多模型重試邏輯，直接使用目前最穩定的模型
-    # 這樣可以顯示真實的錯誤代碼 (如 403, 429) 而不是被舊模型的 404 掩蓋
-    model = "gemini-1.5-flash"
+    # 修正：改用 gemini-2.5-flash，它在 v1beta API 上有更好的相容性
+    model = "gemini-2.5-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.7}}
@@ -405,7 +404,11 @@ def call_gemini_api(prompt):
     try:
         response = requests.post(url, headers=headers, json=data, timeout=20)
         if response.status_code == 200: 
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
+            # 確保回傳內容存在
+            if 'candidates' in response.json() and response.json()['candidates'][0]['content']['parts'][0]['text']:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            else:
+                return "⚠️ AI 回應內容為空，請稍後再試。"
         else:
             # 嘗試解析詳細錯誤訊息
             try:
@@ -575,10 +578,15 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
     sector_en = info.get('sector', '科技')
     sector = SECTOR_MAP.get(sector_en, sector_en) # 使用對照表翻譯產業
     
+    # 修正：確保在 info 中獲取名稱，若無則回退到中文股名表
+    company_name = info.get('longName', name)
+    # 再次覆寫名稱，確保使用中文
+    if target in STOCK_NAMES: company_name = STOCK_NAMES[target]
+
     raw_summary = info.get('longBusinessSummary', '暫無詳細說明。')
     summary = get_stock_summary_zh(raw_summary) # 使用翻譯後的內容
     
-    theme_text = f"<b>{name}</b> 屬於 {sector} 產業。<br><br>{summary}"
+    theme_text = f"<b>{company_name}</b> 屬於 {sector} 產業。<br><br>{summary}"
     
     support = ma10 if price > ma10 else ma20
     resistance = ma5 if price < ma5 else price * 1.05
@@ -598,7 +606,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 
     # 使用完全靠左的 HTML 字串，避免 st.markdown 誤判
     return f"""<div class="content-card">
-<h3>📊 {name} ({ticker}) 綜合分析報告</h3>
+<h3>📊 {company_name} ({ticker}) 綜合分析報告</h3>
 <h4>1. 技術指標分析</h4>
 <div class="table-container">
 <table class="analysis-table">
@@ -869,9 +877,12 @@ if target:
             
             if st.session_state['ai_analysis']:
                 if "錯誤" in st.session_state['ai_analysis'] or "無法使用" in st.session_state['ai_analysis']:
-                     st.markdown(f"<div class='content-card' style='border-left: 5px solid #f44336; background: #fff5f5;'>⚠️ {st.session_state['ai_analysis']}</div>", unsafe_allow_html=True)
+                     # 顯示詳細錯誤，並加入 API 提示
+                     error_msg = st.session_state['ai_analysis'].replace("models/gemini-1.5-flash", "models/gemini-2.5-flash")
+                     st.markdown(f"<div class='content-card' style='border-left: 5px solid #f44336; background: #fff5f5;'>❌ **AI 連線失敗 (重要：請檢查 Key 權限)**<br>{error_msg}<br><br>系統已嘗試切換至 **gemini-2.5-flash**，若仍失敗，請確認您的 API Key 是否已啟用 **Generative Language API** 服務。</div>", unsafe_allow_html=True)
                      if st.button("🔄 重試自動分析", key="retry_ai"):
                          st.session_state['ai_analysis'] = None
+                         st.cache_data.clear() # 清除快取，確保重新嘗試連線
                          st.rerun()
                 else:
                     st.markdown(f"""
@@ -983,3 +994,4 @@ if target:
 
     except Exception as e:
         st.error(f"無法取得資料，請確認代號是否正確。({e})")
+

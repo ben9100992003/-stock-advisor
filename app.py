@@ -711,13 +711,47 @@ if target:
         if 'name' not in locals() or name == target: 
              name = STOCK_NAMES.get(target, info.get('longName', target))
         
-        df_fast = stock.history(period="5d")
-        if not df_fast.empty:
-            latest_fast = df_fast.iloc[-1]
-            prev_close = df_fast['Close'].iloc[-2]
-            change = latest_fast['Close'] - prev_close
-            pct = (change / prev_close) * 100
+        # --- 修正: 報價區塊改用當日盤中數據 (1m interval) ---
+        df_intraday = stock.history(period="1d", interval="1m")
+        df_daily = stock.history(period="5d", interval="1d")
+
+        if not df_intraday.empty:
+            # 使用最新的盤中數據作為當前數據
+            latest_data = df_intraday.iloc[-1]
+            latest_close = latest_data['Close']
+            latest_high = latest_data['High']
+            latest_open = latest_data['Open']
             
+            # 使用昨收價格計算漲跌幅
+            prev_close = df_daily['Close'].iloc[-2] if len(df_daily) >= 2 else latest_close
+            
+        else:
+            # 如果盤中數據為空 (例如：休市或非交易時段)，則使用最新的日線數據
+            if not df_daily.empty:
+                latest_data = df_daily.iloc[-1]
+                latest_close = latest_data['Close']
+                latest_high = latest_data['High']
+                latest_open = latest_data['Open']
+                prev_close = df_daily['Close'].iloc[-2] if len(df_daily) >= 2 else latest_close
+            else:
+                # 數據完全抓不到，使用 fallback
+                latest_close = 0
+                latest_high = 0
+                latest_open = 0
+                prev_close = 0
+            
+        # 確保價格不是 0 才能計算漲跌
+        if latest_close != 0 and prev_close != 0:
+            change = latest_close - prev_close
+            pct = (change / prev_close) * 100
+        else:
+            change = 0
+            pct = 0
+            
+        
+        # --- 顯示報價 ---
+        
+        if latest_close != 0:
             color_class = "text-up" if change >= 0 else "text-down"
             arrow = "▲" if change >= 0 else "▼"
             yahoo_url = get_yahoo_stock_url(target)
@@ -731,9 +765,10 @@ if target:
                 elif val < ref: return "text-down"
                 else: return "text-flat"
             
-            c_high = get_color(latest_fast['High'], prev_close)
-            c_low = get_color(latest_fast['Low'], prev_close)
-            c_open = get_color(latest_fast['Open'], prev_close)
+            # 使用最新數據來判斷顏色
+            c_high = get_color(latest_high, prev_close)
+            c_low = get_color(latest_data['Low'], prev_close)
+            c_open = get_color(latest_open, prev_close)
             
             # 使用完全靠左的 HTML 字串
             quote_html = f"""<div class="quote-card">
@@ -742,7 +777,7 @@ if target:
 <span class="stock-id">{target.replace('.TW','').replace('.TWO','')}</span>
 </div>
 <div class="price-row">
-<div class="main-price {color_class}">{latest_fast['Close']:.2f}</div>
+<div class="main-price {color_class}">{latest_close:.2f}</div>
 <div class="change-info {color_class}">
 <div>{arrow} {abs(change):.2f}</div>
 <div>{arrow} {abs(pct):.2f}%</div>
@@ -750,16 +785,22 @@ if target:
 </div>
 <div><span class="market-tag">{market_tag}</span></div>
 <div class="detail-grid">
-<div class="detail-item"><span class="detail-label">最高</span><span class="detail-value {c_high}">{latest_fast['High']:.2f}</span></div>
+<div class="detail-item"><span class="detail-label">最高</span><span class="detail-value {c_high}">{latest_high:.2f}</span></div>
 <div class="detail-item"><span class="detail-label">昨收</span><span class="detail-value text-flat">{prev_close:.2f}</span></div>
-<div class="detail-item"><span class="detail-label">最低</span><span class="detail-value {c_low}">{latest_fast['Low']:.2f}</span></div>
-<div class="detail-item"><span class="detail-label">開盤</span><span class="detail-value {c_open}">{latest_fast['Open']:.2f}</span></div>
+<div class="detail-item"><span class="detail-label">最低</span><span class="detail-value {c_low}">{latest_data['Low']:.2f}</span></div>
+<div class="detail-item"><span class="detail-label">開盤</span><span class="detail-value {c_open}">{latest_open:.2f}</span></div>
 </div>
 </div>"""
             st.markdown(quote_html, unsafe_allow_html=True)
+        else:
+             st.error("無法取得即時或日線報價資料，請檢查代號或市場狀態。")
+
+
+        # --- Tab 內容 (使用日線數據 for 指標計算) ---
         
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 K 線", "📝 分析", "🏛️ 籌碼", "📰 新聞", "🤖 AI 投顧", "🔄 回測"])
         
+        # K線圖 Tab1 
         with tab1:
             interval_map = {"1分": "1m", "5分": "5m", "15分": "15m", "30分": "30m", "60分": "60m", "日": "1d", "週": "1wk", "月": "1mo"}
             period_label = st.radio("週期", list(interval_map.keys()), horizontal=True, label_visibility="collapsed")
@@ -767,7 +808,8 @@ if target:
             interval = interval_map[period_label]
             is_intraday = interval in ["1m", "5m", "15m", "30m", "60m"]
             
-            data_period = "1d" if is_intraday else ("2y" if interval == "1d" else "5y")
+            # 盤中數據抓取較近的日期，日線抓取較長期的數據
+            data_period = "5d" if is_intraday else ("2y" if interval == "1d" else "5y")
             
             df = stock.history(period=data_period, interval=interval)
             
@@ -815,16 +857,31 @@ if target:
                 
                 st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
             
-            kd_color_style = "text-up" if latest['K'] > latest['D'] else "text-down"
-            kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
-            kd_border_color = "#e53935" if latest['K'] > latest['D'] else "#43a047"
-            
-            st.markdown(f"""<div class="kd-card" style="border-left: 6px solid {kd_border_color};"><div class="kd-title">KD 指標 (9,3,3)</div><div style="text-align:right;"><div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div><div class="kd-tag {kd_color_style}" style="background-color:transparent; font-size:1.1rem;">{kd_text}</div></div></div>""", unsafe_allow_html=True)
+                kd_color_style = "text-up" if latest['K'] > latest['D'] else "text-down"
+                kd_text = "黃金交叉" if latest['K'] > latest['D'] else "死亡交叉"
+                kd_border_color = "#e53935" if latest['K'] > latest['D'] else "#43a047"
+                
+                st.markdown(f"""<div class="kd-card" style="border-left: 6px solid {kd_border_color};"><div class="kd-title">KD 指標 (9,3,3)</div><div style="text-align:right;"><div class="kd-val">{latest['K']:.1f} / {latest['D']:.1f}</div><div class="kd-tag {kd_color_style}" style="background-color:transparent; font-size:1.1rem;">{kd_text}</div></div></div>""", unsafe_allow_html=True)
+            else:
+                 st.error("無法取得 K 線圖資料，請檢查選定的週期或代號是否正確。")
 
+        # Tab2 - Tab6 (使用日線數據計算指標)
+        
+        # 由於 Tab2-Tab6 都需要日線指標數據，我們需要確保 `latest` 變數在 K 線 Tab 之外也能使用。
+        # 這裡假設如果 K線圖成功，`df` 和 `latest` 已經存在。如果 K 線圖失敗，這裡會跳錯。
+        # 為了容錯，我們重新計算一次最新的日線指標。
+        
+        df_indicators = stock.history(period="60d", interval="1d")
+        if not df_indicators.empty:
+            df_indicators = calculate_indicators(df_indicators)
+            latest_indicators = df_indicators.iloc[-1]
+        else:
+             latest_indicators = pd.Series({'Close': 0, 'MA5': 0, 'MA20': 0, 'K': 0, 'D': 0})
+        
         with tab2:
             inst_df = get_institutional_data_finmind(target)
             if inst_df is None and (".TW" in target or ".TWO" in target): inst_df = get_institutional_data_yahoo(target)
-            st.markdown(generate_narrative_report(name, target, latest, inst_df, df, info), unsafe_allow_html=True)
+            st.markdown(generate_narrative_report(name, target, latest_indicators, inst_df, df_indicators, info), unsafe_allow_html=True)
 
         with tab3:
             inst_df = get_institutional_data_finmind(target)
@@ -905,8 +962,8 @@ if target:
                 with st.spinner("AI 正在思考您的問題..."):
                     prompt = f"""
                     你是一位專業的股市分析師「武吉拉」。請針對 {name} ({target}) 回答使用者的問題。
-                    目前股價 {latest['Close']:.2f}，MA5 {latest['MA5']:.2f}，MA20 {latest['MA20']:.2f}。
-                    KD指標 K={latest['K']:.1f}, D={latest['D']:.1f}。
+                    目前股價 {latest_indicators['Close']:.2f}，MA5 {latest_indicators['MA5']:.2f}，MA20 {latest_indicators['MA20']:.2f}。
+                    KD指標 K={latest_indicators['K']:.1f}, D={latest_indicators['D']:.1f}。
                     使用者問題：{user_query}
                     請用繁體中文回答，語氣專業且親切。
                     """

@@ -546,7 +546,7 @@ def get_ai_stock_recommendations():
                     }
                 }
             }
-        
+        } # 修正：關閉 data 字典
             try:
                 response = requests.post(url, headers=headers, json=data, timeout=30)
                 

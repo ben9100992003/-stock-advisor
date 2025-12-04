@@ -547,25 +547,25 @@ def get_ai_stock_recommendations():
                 }
             }
         } 
-            try:
-                response = requests.post(url, headers=headers, json=data, timeout=30)
-                
-                if response.status_code == 400 and "expired" in response.text:
-                    return {"error": "API Key expired"}
-                
-                if response.status_code == 200:
-                    json_text = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-                    return json.loads(json_text)
-                
-            except requests.exceptions.Timeout:
-                last_error = f"推薦模型 {model} 連線逾時。"
-                continue
-            except json.JSONDecodeError:
-                last_error = f"模型 {model} 輸出格式錯誤，嘗試下一個..."
-                continue
-            except Exception as e:
-                last_error = f"模型 {model} 發生未知錯誤: {e}"
-                continue
+        try: # 修正後的縮排
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            
+            if response.status_code == 400 and "expired" in response.text:
+                return {"error": "API Key expired"}
+            
+            if response.status_code == 200:
+                json_text = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+                return json.loads(json_text)
+            
+        except requests.exceptions.Timeout:
+            last_error = f"推薦模型 {model} 連線逾時。"
+            continue
+        except json.JSONDecodeError:
+            last_error = f"模型 {model} 輸出格式錯誤，嘗試下一個..."
+            continue
+        except Exception as e:
+            last_error = f"模型 {model} 發生未知錯誤: {e}"
+            continue
                 
     return {"error": last_error}
 

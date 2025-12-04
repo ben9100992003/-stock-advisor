@@ -16,7 +16,7 @@ import io
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 【最終修正】請在此處替換為您從 Google AI Studio 申請的「新」金鑰
+# 已更新為您 cURL 範例中提供的新 API Key: AIzaSyBTUwl2wFxALOG0fX3UI1JD3qI3isPd0v0
 GEMINI_API_KEY = "AIzaSyBTUwl2wFxALOG0fX3UI1JD3qI3isPd0v0" 
 
 # --- 1. 頁面設定 ---
@@ -404,7 +404,7 @@ def call_gemini_api(prompt):
     
     # 擴充模型清單，涵蓋最新與最舊的穩定版本
     models_to_try = [
-        "gemini-2.0-flash",       # 最新模型
+        "gemini-2.0-flash",       # 最新模型 (來自 cURL 範例)
         "gemini-1.5-flash",       # 標準 Flash
         "gemini-1.5-flash-latest",# Flash 最新
         "gemini-1.5-pro",         # Pro 版本
@@ -708,11 +708,11 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 <tbody>{inst_table_html}</tbody>
 </table>
 </div>
-<p><b>籌碼解讀：</b>{inst_desc}</p>
+<p><b>籌碼解讀：：</b>{inst_desc}</p>
 <h4>3. 公司題材與願景</h4>
 <p>{theme_text}</p>
 <h4>4. 💡 進出場價格建議 ({action})</h4>
-<ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：：</b>{exit_pt}</li></ul>
+<ul><li><b>🟢 進場參考：：</b>{entry}</li><li><b>🔴 出場參考：：</b>{exit_pt}</li></ul>
 </div>"""
 
 def analyze_market_index(ticker_symbol):
@@ -1009,7 +1009,7 @@ if target:
                          st.session_state['ai_analysis'] = None
                          st.rerun()
                 else:
-                    st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='ai-msg-bot'><span>🦖 <b>{name} 自動分析報告：：</b><br>{st.session_state['ai_analysis']}</span></div>", unsafe_allow_html=True)
             else:
                 st.markdown(f"<div class='ai-msg-info'>⏳ AI 正在分析 {name} 的最新數據，請稍候...</div>", unsafe_allow_html=True)
 

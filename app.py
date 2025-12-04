@@ -794,11 +794,11 @@ if st.session_state['ai_analysis'] is None:
 with st.expander("🌍 查看今日大盤情緒 (台股 / 美股)", expanded=False):
     t1, t2 = st.tabs(["🇹🇼 台股加權", "🇺🇸 美股那斯達克"])
     with t1:
-        tw = analyze_market_index("^TWII")
-        if tw: st.markdown(f"<div class='market-summary-box'><div style='color:{tw['color']};font-weight:bold;font-size:1.2rem'>{tw['price']:.0f} ({tw['change']:+.0f})</div><div>{tw['status']} - {tw['comment']}</div></div>", unsafe_allow_html=True)
+        us_index = analyze_market_index("^TWII") # 應為 TWII
+        if us_index: st.markdown(f"<div class='market-summary-box'><div style='color:{us_index['color']};font-weight:bold;font-size:1.2rem'>{us_index['price']:.0f} ({us_index['change']:+.0f})</div><div>{us_index['status']} - {us_index['comment']}</div></div>", unsafe_allow_html=True)
     with t2:
-        us = analyze_market_index("^IXIC")
-        if us: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us['color']};font-weight:bold;font-size:1.2rem'>{us['price']:.0f} ({us['change']:+.0f})</div><div>{us['status']} - {us['comment']}</div></div>", unsafe_allow_html=True)
+        us_index = analyze_market_index("^IXIC")
+        if us_index: st.markdown(f"<div class='market-summary-box' style='border-left:4px solid #00BFFF'><div style='color:{us_index['color']};font-weight:bold;font-size:1.2rem'>{us_index['price']:.0f} ({us_index['change']:+.0f})</div><div>{us_index['status']} - {us_index['comment']}</div></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 

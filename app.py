@@ -16,8 +16,8 @@ import io
 
 # --- 0. 設定與金鑰 ---
 FINMIND_API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNS0xMS0yNiAxMDo1MzoxOCIsInVzZXJfaWQiOiJiZW45MTAwOTkiLCJpcCI6IjM5LjEwLjEuMzgifQ.osRPdmmg6jV5UcHuiu2bYetrgvcTtBC4VN4zG0Ct5Ng"
-# 已更新為您提供的新 API Key
-GEMINI_API_KEY = "AIzaSyBGlDFkBi9ErTUJEu68Q_NaP0Q2fw78KE0" 
+# 【最終修正】請在此處替換為您從 Google AI Studio 申請的「新」金鑰
+GEMINI_API_KEY = "AIzaSyBTUwl2wFxALOG0fX3UI1JD3qI3isPd0v0" 
 
 # --- 1. 頁面設定 ---
 st.set_page_config(
@@ -279,7 +279,8 @@ def get_market_hot_stocks():
     hot_us = ["NVDA", "TSLA", "AAPL", "AMD", "PLTR", "MSFT", "AMZN", "META", "GOOGL", "AVGO"]
     try:
         dl = DataLoader(token=FINMIND_API_TOKEN)
-        latest_date = dl.taiwan_stock_daily_adj(stock_id="2330", start_date=(datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')).iloc[-1]['date']
+        latest_date = (datetime.now()-timedelta(days=7)).strftime('%Y-%m-%d')
+        # 嘗試使用更穩定的方式獲取熱門股，如果FinMind失敗則使用預設
         df = dl.taiwan_stock_daily_adj(start_date=latest_date)
         top_df = df.sort_values(by='Trading_Volume', ascending=False).head(15)
         if not top_df.empty: hot_tw = top_df['stock_id'].tolist()
@@ -398,7 +399,8 @@ def get_yahoo_stock_url(ticker):
 
 # 修改 AI API 呼叫，加入超級完整的模型清單 (地毯式搜索)
 def call_gemini_api(prompt):
-    if not GEMINI_API_KEY: return "⚠️ 未設定 Gemini API Key，無法使用 AI 功能。"
+    if not GEMINI_API_KEY or "YOUR_NEW_GEMINI_API_KEY" in GEMINI_API_KEY: 
+        return "⚠️ **錯誤：GEMINI API 金鑰未設定或使用預設值。請更新金鑰。**"
     
     # 擴充模型清單，涵蓋最新與最舊的穩定版本
     models_to_try = [
@@ -418,6 +420,11 @@ def call_gemini_api(prompt):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
             response = requests.post(url, headers=headers, json=data, timeout=20)
+            
+            # 檢查 API 錯誤訊息是否包含 Key 過期
+            if response.status_code == 400 and "expired" in response.text:
+                 return "⚠️ **API 錯誤：金鑰已過期 (400)。請前往 Google AI Studio 申請新的金鑰。**"
+            
             if response.status_code == 200: 
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 404:
@@ -459,6 +466,10 @@ def get_ai_translated_summary(summary_text):
             headers = {'Content-Type': 'application/json'}
             data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.3}}
             response = requests.post(url, headers=headers, json=data, timeout=10)
+            
+            if response.status_code == 400 and "expired" in response.text:
+                 return "⚠️ 翻譯功能錯誤：金鑰已過期。"
+                 
             if response.status_code == 200:
                 result = response.json()['candidates'][0]['content']['parts'][0]['text']
                 if result: return result
@@ -468,6 +479,9 @@ def get_ai_translated_summary(summary_text):
         
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_ai_stock_recommendations():
+    # 針對 JSON 輸出，採用專注於穩定性的模型清單
+    models_to_try = ["gemini-1.5-flash", "gemini-pro"] 
+    
     prompt = """
     你是一位專業的股市分析師「武吉拉」。請根據當前全球市場趨勢和熱門題材，推薦最具潛力的股票。
     
@@ -496,34 +510,33 @@ def get_ai_stock_recommendations():
       ]
     }
     """
-    try:
-        # 專門用於結構化輸出的模型列表
-        models_to_try = ["gemini-1.5-flash", "gemini-pro"]
-        for model in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-            headers = {'Content-Type': 'application/json'}
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "responseSchema": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "recommendations": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "OBJECT",
-                                    "properties": {
-                                        "market": {"type": "STRING"},
-                                        "stocks": {
-                                            "type": "ARRAY",
-                                            "items": {
-                                                "type": "OBJECT",
-                                                "properties": {
-                                                    "ticker": {"type": "STRING"},
-                                                    "name": {"type": "STRING"},
-                                                    "theme": {"type": "STRING"}
-                                                }
+    
+    last_error = ""
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "recommendations": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "market": {"type": "STRING"},
+                                    "stocks": {
+                                        "type": "ARRAY",
+                                        "items": {
+                                            "type": "OBJECT",
+                                            "properties": {
+                                                "ticker": {"type": "STRING"},
+                                                "name": {"type": "STRING"},
+                                                "theme": {"type": "STRING"}
                                             }
                                         }
                                     }
@@ -533,13 +546,29 @@ def get_ai_stock_recommendations():
                     }
                 }
             }
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            if response.status_code == 200:
-                json_text = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-                return json.loads(json_text)
-            
-    except Exception as e:
-        return None
+        
+            try:
+                response = requests.post(url, headers=headers, json=data, timeout=30)
+                
+                if response.status_code == 400 and "expired" in response.text:
+                    return {"error": "API Key expired"}
+                
+                if response.status_code == 200:
+                    json_text = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+                    return json.loads(json_text)
+                
+            except requests.exceptions.Timeout:
+                last_error = f"推薦模型 {model} 連線逾時。"
+                continue
+            except json.JSONDecodeError:
+                last_error = f"模型 {model} 輸出格式錯誤，嘗試下一個..."
+                continue
+            except Exception as e:
+                last_error = f"模型 {model} 發生未知錯誤: {e}"
+                continue
+                
+    return {"error": last_error}
+
 
 def calculate_indicators(df):
     df['MA5'] = df['Close'].rolling(5).mean()
@@ -683,7 +712,7 @@ def generate_narrative_report(name, ticker, latest, inst_df, df, info):
 <h4>3. 公司題材與願景</h4>
 <p>{theme_text}</p>
 <h4>4. 💡 進出場價格建議 ({action})</h4>
-<ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：</b>{exit_pt}</li></ul>
+<ul><li><b>🟢 進場參考：</b>{entry}</li><li><b>🔴 出場參考：：</b>{exit_pt}</li></ul>
 </div>"""
 
 def analyze_market_index(ticker_symbol):
@@ -942,7 +971,8 @@ if target:
         with tab_rec: # 🚀 股票推薦 Tab 邏輯
             st.markdown("<div class='content-card'><h3>🚀 AI 股票大推薦</h3><p>根據當前市場熱門題材，由 AI 分析師為您推薦潛力標的。</p>", unsafe_allow_html=True)
             
-            recommendations = get_ai_stock_recommendations()
+            with st.spinner("🤖 正在生成推薦列表，請稍候..."):
+                recommendations = get_ai_stock_recommendations()
             
             if recommendations and 'recommendations' in recommendations:
                 for market_rec in recommendations['recommendations']:
@@ -952,7 +982,6 @@ if target:
                     st.markdown(f"<h4>{market} 🎯 市場焦點 ({'台股' if market=='TW' else '美股'})</h4>", unsafe_allow_html=True)
                     
                     for stock in stocks:
-                        # 創建一個推薦卡片
                         rec_card = f"""
                         <div class='recommend-card'>
                             <h5>{stock['name']} ({stock['ticker']})</h5>
@@ -960,6 +989,8 @@ if target:
                         </div>
                         """
                         st.markdown(rec_card, unsafe_allow_html=True)
+            elif recommendations and 'error' in recommendations and 'expired' in recommendations['error']:
+                 st.markdown("<div class='ai-msg-error'>⚠️ <b>API 錯誤：金鑰已過期！請立即更新金鑰以使用 AI 服務。</b></div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div class='ai-msg-error'>⚠️ <b>AI 推薦服務暫時無法取得數據，請確認您的 API Key 權限或稍後重試。</b></div>", unsafe_allow_html=True)
 
@@ -1041,7 +1072,6 @@ if target:
                 )
                 
                 # --- 復刻深色卡片 HTML (上方資訊) ---
-                # 使用完全靠左對齊的 HTML 字串，解決縮排問題
                 backtest_html = f"""<div class="ai-backtest-card">
 <div class="ai-header-row">
 <div class="ai-title-group">
